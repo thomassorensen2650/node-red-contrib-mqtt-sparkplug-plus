@@ -1,0 +1,179 @@
+<!--
+  Copyright JS Foundation and other contributors, http://js.foundation
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+  http://www.apache.org/licenses/LICENSE-2.0
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+-->
+<style>
+
+    #sparkplug-input-metric-container-row .red-ui-editableList-header {
+        display: flex;
+        background: var(--red-ui-tertiary-background);
+        padding-right: 75px;
+    }
+
+    .mqtt-form-row-cols2 > input.mqtt-form-row-col1 {
+        width: calc(35% - 75px);
+    }
+    .mqtt-form-row-cols2 > select.mqtt-form-row-col1 {
+        width: calc(35% - 75px);
+    }
+
+    .mqtt-form-row-cols2 > label.mqtt-form-row-col2 {
+        width: 100px;
+        margin-left: 42px;
+        display: inline-block;
+    }
+    .mqtt-form-row-cols2 > input.mqtt-form-row-col2 {
+        width: calc(35% - 75px);
+        display: inline-block;
+    }
+    .mqtt-form-row-cols2 > select.mqtt-form-row-col2 {
+        width: calc(35% - 75px);
+        display: inline-block;
+    }
+    .form-row.mqtt5-out > label {
+        width: 130px;
+    }
+    .form-row.mqtt-flags-row > label {
+        vertical-align: top;
+    }
+    .form-row.mqtt-flags-row > .mqtt-flags {
+        display: inline-block;
+        width: 70%
+    }
+
+    .form-row.mqtt-flags-row > .mqtt-flags > .mqtt-flag > label {
+        display: block;
+        width: 100%;
+    }
+    .form-row.mqtt-flags-row > .mqtt-flags > .mqtt-flag > label > input {
+        position: relative;
+        vertical-align: bottom;
+        top: -2px;
+        width: 15px;
+        height: 15px;
+    }
+</style>
+
+<script type="text/html" data-template-name="mqtt sparkplug device">
+    <div class="form-row">
+        <label for="node-input-broker"><i class="fa fa-globe"></i> <span data-i18n="[placeholder]Broker">Broker</span></label>
+        <input type="text" id="node-input-broker">
+    </div>
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> <span data-i18n="common.label.name">Device</span></label>
+        <input type="text" id="node-input-name" data-i18n="[placeholder]My Device">
+    </div>
+    <div class="form-row">
+        <label for="node-input-deviceGroup"><i class="fa fa-tasks"></i> <span>Group</span></label>
+        <input type="text" id="node-input-deviceGroup" data-i18n="[placeholder]Sparkplug Devices">
+    </div>
+
+    <div class="form-row sparkplug-input-metric-row" style="margin-bottom: 0px;">
+        <label><i class="fa fa-cubes"></i> <span>Metrics</span></label>
+    </div>
+    <div class="form-row sparkplug-input-metric-row" id="sparkplug-input-metric-container-row">
+        <ol id="sparkplug-input-metric-container"></ol>
+    </div>
+
+
+    <div class="form-tips"><span>Birth messages are not send before all the metrics has been written</span></div>
+</script>
+
+<script type="text/javascript">
+(function() {
+
+    /**
+    * Function that returns a list of configured Metrics
+    * @return   {Object} A object with all configured metrics.
+    */
+    function getMetricsList() {
+        var _metrics = {};
+        var metrics = $("#sparkplug-input-metric-container").editableList("items");
+        metrics.each(function(i) {
+            var item = $(this);
+            var name = item.find(".sparkplug-input-metric-name").val();
+            var dt = item.find(".sparkplug-input-metric-dateType option:selected").text();
+           
+            if (name) {
+                _metrics[name] = { dataType : dt};
+            }
+        });
+        return _metrics;
+    }
+
+    RED.nodes.registerType('mqtt sparkplug device',{
+        category: 'network',
+        defaults: {
+            name: {value:"",  validate :x => /^[^/+#]*$/.test(x) },
+            deviceGroup : {value:"",  validate :x => /^[^/+#]*$/.test(x) },
+            metrics: {value:{}, required:true, validate : x => Object.keys(x).length > 0 },
+            broker: {type:"mqtt-broker", required:true}
+        },
+        color:"#d8bfd8",
+        inputs:1,
+        outputs:1,
+        icon: "bridge.svg",
+        align: "right",
+        label: function() {
+            return this.name||"sparkplug device";
+        },
+        oneditprepare: function() {
+            var that = this;
+            // Setup model 
+            var metricsList = $("#sparkplug-input-metric-container").editableList( {
+                header: $("<div>").append($.parseHTML("<div style='width:80%; display: inline-grid'>Name</div><div style='display: inline-grid'>Type</div>")),
+                addButton: "add",
+                removable: true,
+                height: 300,
+                addItem: function(container,i,opt) {
+                    var parent = container.parent();
+                    var row = $("<div/>").addClass("sparkplug-input-metric").appendTo(container);
+                    var fmoduleSpan = $("<span>").appendTo(row);
+                    var fmodule = $("<input/>", {
+                        class: "sparkplug-input-metric-name",
+                        placeholder: "Metric Name",
+                        type: "text"
+                    }).css({
+                    }).appendTo(fmoduleSpan).val(opt.name);
+
+                    var selectField = $('<select/>',{
+                        style:"width:110px; margin-left: 5px; text-align: center;",
+                        class : "sparkplug-input-metric-dateType"
+                    }).appendTo(row);
+                    var group0 = $('<optgroup/>', { label: "Datatypes" }).appendTo(selectField);
+                    var dataTypes = ["Int8", "Int16", "Int32", "Int64", "Float", "Double", "Boolean" , "String", "Unknown"]
+                    for (var d in dataTypes) {
+                        let option = $("<option></option>").val(d).text(dataTypes[d]);
+                        group0.append(option);
+                        if (dataTypes[d] === opt.dataType || (Object.keys(opt).length === 0 && dataTypes[d] === "Int32")) {
+                            option.attr('selected','selected')
+                        }
+                    }
+                }
+            });
+            var metrics = this.metrics || {};
+       
+            for (const [key, value] of Object.entries(metrics)) {
+                value["name"] = key;
+                metricsList.editableList('addItem', value)
+            }
+        },
+        oneditsave: function() {
+            var node = this;
+            node.metrics = getMetricsList();
+        },
+
+        labelStyle: function() {
+            return this.name?"node_label_italic":"";
+        }
+    });
+})();
+</script>
