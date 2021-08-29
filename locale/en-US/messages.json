@@ -1,0 +1,88 @@
+{
+ "mqtt": {
+        "label": {
+            "broker": "Server",
+            "example": "e.g. localhost",
+            "output": "Output",
+            "qos": "QoS",
+            "retain": "Retain",
+            "clientid": "Client ID",
+            "port": "Port",
+            "keepalive": "Keep Alive",
+            "cleansession": "Use clean session",
+            "cleanstart": "Use clean start",
+            "use-tls": "Use TLS",
+            "tls-config":"TLS Configuration",
+            "verify-server-cert":"Verify server certificate",
+            "compatmode": "Use legacy MQTT 3.1 support",
+            "userProperties": "User Properties",
+            "subscriptionIdentifier": "Subscription ID",
+            "flags": "Flags",
+            "nl": "Do not receive messages published by this client",
+            "rap": "Keep retain flag of original publish",
+            "rh": "Retained message handling ",
+            "rh0": "Send retained messages",
+            "rh1": "Only send for new subscriptions",
+            "rh2": "Do not send",
+            "responseTopic": "Response topic",
+            "contentType": "Content Type",
+            "correlationData": "Correlation Data",
+            "expiry": "Expiry (secs)",
+            "sessionExpiry": "Session Expiry (secs)",
+            "topicAlias": "Alias",
+            "payloadFormatIndicator": "Format",
+            "payloadFormatIndicatorFalse": "unspecified bytes (Default)",
+            "payloadFormatIndicatorTrue": "UTF-8 encoded payload",
+            "protocolVersion": "Protocol",
+            "protocolVersion3": "MQTT V3.1 (legacy)",
+            "protocolVersion4": "MQTT V3.1.1",
+            "protocolVersion5": "MQTT V5",
+            "topicAliasMaximum": "Alias Max",
+            "maximumPacketSize": "Max Packet Size",
+            "receiveMaximum": "Receive Max",
+            "session": "Session",
+            "delay": "Delay"
+        },
+        "sections-label":{
+            "birth-message": "Message sent on connection (birth message)",
+            "will-message":"Message sent on an unexpected disconnection (will message)",
+            "close-message":"Message sent before disconnecting (close message)"
+        },
+        "tabs-label": {
+            "connection": "Connection",
+            "security": "Security",
+            "messages": "Messages"
+        },
+        "placeholder": {
+            "clientid": "Leave blank for auto generated",
+            "clientid-nonclean":"Must be set for non-clean sessions",
+            "will-topic": "Leave blank to disable will message",
+            "birth-topic": "Leave blank to disable birth message",
+            "close-topic": "Leave blank to disable close message"
+        },
+        "state": {
+            "connected": "Connected to broker: __broker__",
+            "disconnected": "Disconnected from broker: __broker__",
+            "connect-failed": "Connection failed to broker: __broker__"
+        },
+        "retain": "Retain",
+        "output": {
+            "buffer": "a Buffer",
+            "string": "a String",
+            "base64": "a Base64 encoded string",
+            "auto": "auto-detect (string or buffer)",
+            "json": "a parsed JSON object"
+        },
+        "true": "true",
+        "false": "false",
+        "tip": "Tip: Leave topic, qos or retain blank if you want to set them via msg properties.",
+        "errors": {
+            "not-defined": "topic not defined",
+            "missing-config": "missing broker configuration",
+            "invalid-topic": "Invalid topic specified",
+            "nonclean-missingclientid": "No client ID set, using clean session",
+            "invalid-json-string": "Invalid JSON string",
+            "invalid-json-parse": "Failed to parse JSON string"
+        }
+    }	
+}
