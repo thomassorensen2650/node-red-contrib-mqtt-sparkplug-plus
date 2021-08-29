@@ -1,6 +1,9 @@
 {
- "mqtt": {
+ "mqtt-sparkplug-plus": {
         "label": {
+            "name" : "My Broker",
+            "username" : "Username",
+            "password" : "Password",
             "broker": "Server",
             "example": "e.g. localhost",
             "output": "Output",
