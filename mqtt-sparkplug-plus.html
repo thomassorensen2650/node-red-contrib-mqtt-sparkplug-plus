@@ -84,12 +84,13 @@
                 <label for="node-config-input-usetls" style="width: 100px; line-height: 34px;"><span data-i18n="mqtt-sparkplug-plus.label.use-tls"></span></label>
                 <span id="node-config-row-tls" class="hide"><input style="width: 320px;" type="text" id="node-config-input-tls"></span>
             </div>
+
             <div class="form-row">
                 <label for="node-config-input-protocolVersion"><i class="fa fa-cog"></i> <span data-i18n="mqtt-sparkplug-plus.label.protocolVersion"></span></label>
                 <select id="node-config-input-protocolVersion" style="width:70%;">
-                    <option value="3" data-i18n="mqtt-sparkplug-plus.label.protocolVersion3"></option>
+                    <!--<option value="3" data-i18n="mqtt-sparkplug-plus.label.protocolVersion3"></option> -->
                     <option value="4" data-i18n="mqtt-sparkplug-plus.label.protocolVersion4"></option>
-                    <option value="5" data-i18n="mqtt-sparkplug-plus.label.protocolVersion5"></option>
+                    <!-- <option value="5" data-i18n="mqtt-sparkplug-plus.label.protocolVersion5"></option> -->
                 </select>
             </div>
             <div class="form-row">
@@ -131,153 +132,16 @@
                 <input type="password" id="node-config-input-password">
             </div>
         </div>
-        <!-- <div id="mqtt-broker-tab-messages" style="display:none">
-            <div id="mqtt-broker-section-birth">
-                <div class="red-ui-palette-header">
-                    <i class="fa fa-angle-down"></i><span data-i18n="mqtt-sparkplug-plus.sections-label.birth-message"></span>
-                </div>
-                <div class="section-content" style="padding:10px 0 0 10px">
-                    <div class="form-row">
-                        <label style="width: 100px !important;" for="node-config-input-birthTopic"><i class="fa fa-tasks"></i> <span data-i18n="mqtt-sparkplug-plus.label.topic"></span></label>
-                        <input style="width: calc(100% - 300px) !important" type="text" id="node-config-input-birthTopic" data-i18n="[placeholder]mqtt-sparkplug-plus.placeholder.birth-topic">
-                        <label style="margin-left: 10px; width: 90px !important;" for="node-config-input-birthRetain"><i class="fa fa-history"></i> <span data-i18n="mqtt-sparkplug-plus.label.retain"></span></label>
-                        <select id="node-config-input-birthRetain" style="width:75px !important">
-                            <option value="false" data-i18n="mqtt.false"></option>
-                            <option value="true" data-i18n="mqtt.true"></option>
-                        </select>
-                    </div>
-                    <div class="form-row">
-                        <label style="width: 100px !important;" for="node-config-input-birthPayload"><i class="fa fa-envelope"></i> <span data-i18n="mqtt-sparkplug-plus.label.payload"></span></label>
-                        <input style="width: calc(100% - 300px) !important" type="text" id="node-config-input-birthPayload" style="width:300px" data-i18n="[placeholder]mqtt-sparkplug-plus.label.payload">
-                        <label style="margin-left: 10px; width: 90px !important;" for="node-config-input-birthQos"><i class="fa fa-empire"></i> <span data-i18n="mqtt-sparkplug-plus.label.qos"></span></label>
-                        <select id="node-config-input-birthQos" style="width:75px !important">
-                            <option value="0">0</option>
-                            <option value="1">1</option>
-                            <option value="2">2</option>
-                        </select>
-                    </div>
-                    <div class="form-row mqtt5 mqtt5-out">
-                        <label for="node-config-input-birth-contentType" data-i18n="mqtt-sparkplug-plus.label.contentType"></label>
-                        <input type="text" style="width:calc(100% - 200px);" id="node-config-input-birth-contentType">
-                    </div>
-                    <div class="form-row mqtt5 mqtt5-out">
-                        <label for="node-config-input-birth-props" data-i18n="mqtt-sparkplug-plus.label.userProperties"></label>
-                        <input type="text" style="width:calc(100% - 200px);" id="node-config-input-birth-props">
-                    </div>
-                    <div class="form-row mqtt5 mqtt5-out">
-                        <label for="node-config-input-birth-respTopic"><span data-i18n="mqtt-sparkplug-plus.label.responseTopic"></span></label>
-                        <input type="text" id="node-config-input-birth-respTopic" style="width: calc(100% - 200px);">
-                    </div>
-                    <div class="form-row mqtt5 mqtt5-out">
-                        <label for="node-config-input-birth-correl"><span data-i18n="mqtt-sparkplug-plus.label.correlationData"></span></label>
-                        <input type="text" id="node-config-input-birth-correl" style="width: calc(100% - 200px);">
-                    </div>
-                    <div class="form-row mqtt5 mqtt5-out">
-                        <label for="node-config-input-birth-expiry"><span data-i18n="mqtt-sparkplug-plus.label.expiry"></span></label>
-                        <input id="node-config-input-birth-expiry"  style="width: calc(100% - 200px);">
-                    </div>
-                </div>
+         <div id="mqtt-broker-tab-sparkplug" style="display:none">
+            <div class="form-row">
+                <label for="node-config-input-eonName"><i class="fa fa-tag"></i> <span data-i18n="mqtt-sparkplug-plus.label.name"></span></label>
+                <input type="text" id="node-config-input-eonName" data-i18n="[placeholder]mqtt-sparkplug-plus.label.name">
             </div>
-            <div id="mqtt-broker-section-close">
-                <div class="red-ui-palette-header">
-                    <i class="fa fa-angle-down"></i><span data-i18n="mqtt-sparkplug-plus.sections-label.close-message"></span>
-                </div>
-                <div class="section-content" style="padding:10px 0 0 10px">
-                    <div class="form-row">
-                        <label style="width: 100px !important;" for="node-config-input-closeTopic"><i class="fa fa-tasks"></i> <span data-i18n="mqtt-sparkplug-plus.label.topic"></span></label>
-                        <input style="width: calc(100% - 300px) !important" type="text" id="node-config-input-closeTopic" style="width:300px" data-i18n="[placeholder]mqtt-sparkplug-plus.placeholder.close-topic">
-                        <label style="margin-left: 10px; width: 90px !important;" for="node-config-input-closeRetain"><i class="fa fa-history"></i> <span data-i18n="mqtt-sparkplug-plus.label.retain"></span></label>
-                        <select id="node-config-input-closeRetain" style="width:75px !important">
-                            <option value="false" data-i18n="mqtt-sparkplug-plus.false"></option>
-                            <option value="true" data-i18n="mqtt-sparkplug-plus.true"></option>
-                        </select>
-                    </div>
-                    <div class="form-row">
-                        <label style="width: 100px !important;" for="node-config-input-closePayload"><i class="fa fa-envelope"></i> <span data-i18n="mqtt-sparkplug-plus.label.payload"></span></label>
-                        <input style="width: calc(100% - 300px) !important" type="text" id="node-config-input-closePayload" style="width:300px" data-i18n="[placeholder]mqtt-sparkplug-plus.label.payload">
-                        <label style="margin-left: 10px; width: 90px !important;" for="node-config-input-closeQos"><i class="fa fa-empire"></i> <span data-i18n="mqtt-sparkplug-plus.label.qos"></span></label>
-                        <select id="node-config-input-closeQos" style="width:75px !important">
-                            <option value="0">0</option>
-                            <option value="1">1</option>
-                            <option value="2">2</option>
-                        </select>
-                    </div>
-                    <div class="form-row mqtt5 mqtt5-out">
-                        <label for="node-config-input-close-contentType" data-i18n="mqtt-sparkplug-plus.label.contentType"></label>
-                        <input type="text" style="width:calc(100% - 200px);" id="node-config-input-close-contentType">
-                    </div>
-                    <div class="form-row mqtt5 mqtt5-out">
-                        <label for="node-config-input-close-props" data-i18n="mqtt-sparkplug-plus.label.userProperties"></label>
-                        <input type="text" style="width:calc(100% - 200px);" id="node-config-input-close-props">
-                    </div>
-                    <div class="form-row mqtt5 mqtt5-out">
-                        <label for="node-config-input-close-respTopic"><span data-i18n="mqtt-sparkplug-plus.label.responseTopic"></span></label>
-                        <input type="text" id="node-config-input-close-respTopic" style="width: calc(100% - 200px);">
-                    </div>
-                    <div class="form-row mqtt5 mqtt5-out">
-                        <label for="node-config-input-close-correl"><span data-i18n="mqtt-sparkplug-plus.label.correlationData"></span></label>
-                        <input type="text" id="node-config-input-close-correl" style="width: calc(100% - 200px);">
-                    </div>
-                    <div class="form-row mqtt5 mqtt5-out">
-                        <label for="node-config-input-close-expiry"><span data-i18n="mqtt-sparkplug-plus.label.expiry"></span></label>
-                        <input id="node-config-input-close-expiry"  style="width: calc(100% - 200px);">
-                    </div>
-                </div>
+
+            <div class="form-row">
+                <label for="node-config-input-deviceGroup"><i class="fa fa-tasks"></i> <span>Group</span></label>
+                <input type="text" id="node-config-input-deviceGroup" data-i18n="[placeholder]Sparkplug Devices">
             </div>
-            <div id="mqtt-broker-section-will">
-                <div class="red-ui-palette-header">
-                    <i class="fa fa-angle-down"></i><span data-i18n="mqtt.sections-label.will-message"></span>
-                </div>
-                <div class="section-content" style="padding:10px 0 0 10px">
-                    <div class="form-row">
-                        <label style="width: 100px !important;" for="node-config-input-willTopic"><i class="fa fa-tasks"></i> <span data-i18n="common.label.topic"></span></label>
-                        <input style="width: calc(100% - 300px) !important" type="text" id="node-config-input-willTopic" style="width:300px" data-i18n="[placeholder]mqtt.placeholder.will-topic">
-                        <label style="margin-left: 10px; width: 90px !important;" for="node-config-input-willRetain"><i class="fa fa-history"></i> <span data-i18n="mqtt.label.retain"></span></label>
-                        <select id="node-config-input-willRetain" style="width:75px !important">
-                            <option value="false" data-i18n="mqtt.false"></option>
-                            <option value="true" data-i18n="mqtt.true"></option>
-                        </select>
-                    </div>
-                    <div class="form-row">
-                        <label style="width: 100px !important;" for="node-config-input-willPayload"><i class="fa fa-envelope"></i> <span data-i18n="common.label.payload"></span></label>
-                        <input style="width: calc(100% - 300px) !important" type="text" id="node-config-input-willPayload" style="width:300px" data-i18n="[placeholder]common.label.payload">
-                        <label style="margin-left: 10px; width: 90px !important;" for="node-config-input-willQos"><i class="fa fa-empire"></i> <span data-i18n="mqtt.label.qos"></span></label>
-                        <select id="node-config-input-willQos" style="width:75px !important">
-                            <option value="0">0</option>
-                            <option value="1">1</option>
-                            <option value="2">2</option>
-                        </select>
-                    </div>
-                    <div class="form-row mqtt5">
-                        <label><span data-i18n="mqtt.label.delay"></span></label>
-                        <input type="number" min="0" id="node-config-input-will-delay" style="width: 100px" >
-                    </div>
-                    <div class="form-row mqtt5 mqtt5-out">
-                        <label for="node-config-input-will-contentType" data-i18n="mqtt.label.contentType"></label>
-                        <input type="text" style="width:calc(100% - 200px);" id="node-config-input-will-contentType">
-                    </div>
-                    <div class="form-row mqtt5 mqtt5-out">
-                        <label for="node-config-input-will-props" data-i18n="mqtt.label.userProperties"></label>
-                        <input type="text" style="width:calc(100% - 200px);" id="node-config-input-will-props">
-                    </div>
-                    <div class="form-row mqtt5 mqtt5-out">
-                        <label for="node-config-input-will-respTopic"><span data-i18n="mqtt.label.responseTopic"></span></label>
-                        <input type="text" id="node-config-input-will-respTopic" style="width: calc(100% - 200px);">
-                    </div>
-                    <div class="form-row mqtt5 mqtt5-out">
-                        <label for="node-config-input-will-correl"><span data-i18n="mqtt.label.correlationData"></span></label>
-                        <input type="text" id="node-config-input-will-correl" style="width: calc(100% - 200px);">
-                    </div>
-                    <div class="form-row mqtt5 mqtt5-out">
-                        <label for="node-config-input-will-expiry"><span data-i18n="mqtt.label.expiry"></span></label>
-                        <input id="node-config-input-will-expiry"  style="width: calc(100% - 200px);">
-                    </div>
-                </div>
-            </div>
-       
-       
-       
-        -->
         </div>
     </div>
 </script>
@@ -320,7 +184,9 @@
     RED.nodes.registerType('mqtt-sparkplug-broker',{
         category: 'config',
         defaults: {
-            name: {value:""},
+            name: {value:"" },
+            deviceGroup : {value:"",  validate :x => /^[^/+#]*$/.test(x) },
+            eonName : {value:"",  validate :x => /^[^/+#]*$/.test(x) },
             broker: {value:"",required:true},
             port: {value:1883,required:false,validate:RED.validators.number(true)},
             tls: {type:"tls-config",required: false},
@@ -390,10 +256,10 @@
                 label: this._("mqtt-sparkplug-plus.tabs-label.security")
             });
 
-           /* tabs.addTab({
-                id: "mqtt-broker-tab-messages",
-                label: this._("mqtt-sparkplug-plus.tabs-label.messages")
-            }); */
+           tabs.addTab({
+                id: "mqtt-broker-tab-sparkplug",
+                label: this._("mqtt-sparkplug-plus.tabs-label.sparkplug")
+            });
 
             function setUpSection(sectionId, v5Opts, isExpanded) {
                 var birthMessageSection = $("#mqtt-broker-section-"+sectionId);
@@ -614,10 +480,7 @@
         <label for="node-input-name"><i class="fa fa-tag"></i> <span data-i18n="common.label.name">Device</span></label>
         <input type="text" id="node-input-name" data-i18n="[placeholder]My Device">
     </div>
-    <div class="form-row">
-        <label for="node-input-deviceGroup"><i class="fa fa-tasks"></i> <span>Group</span></label>
-        <input type="text" id="node-input-deviceGroup" data-i18n="[placeholder]Sparkplug Devices">
-    </div>
+
 
     <div class="form-row sparkplug-input-metric-row" style="margin-bottom: 0px;">
         <label><i class="fa fa-cubes"></i> <span>Metrics</span></label>
@@ -656,7 +519,6 @@
         category: 'network',
         defaults: {
             name: {value:"",  validate :x => /^[^/+#]*$/.test(x) },
-            deviceGroup : {value:"",  validate :x => /^[^/+#]*$/.test(x) },
             metrics: {value:{}, required:true, validate : x => Object.keys(x).length > 0 },
             broker: {type:"mqtt-sparkplug-broker", required:true}
         },

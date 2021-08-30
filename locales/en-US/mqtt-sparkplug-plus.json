@@ -1,6 +1,9 @@
 {
  "mqtt-sparkplug-plus": {
         "label": {
+            "name" : "Name",
+            "username": "Username",
+            "password": "Password",
             "broker": "Server",
             "example": "e.g. localhost",
             "output": "Output",
@@ -51,7 +54,7 @@
         "tabs-label": {
             "connection": "Connection",
             "security": "Security",
-            "messages": "Messages"
+            "sparkplug": "Sparkplug"
         },
         "placeholder": {
             "clientid": "Leave blank for auto generated",

@@ -18,8 +18,6 @@ module.exports = function(RED) {
     "use strict";
     var mqtt = require("mqtt");
     var spPayload = require('sparkplug-payload').get("spBv1.0");
-    //var util = require("util");
-    //var isUtf8 = require('is-utf8');
     var HttpsProxyAgent = require('https-proxy-agent');
     var url = require('url');
 
@@ -28,76 +26,37 @@ module.exports = function(RED) {
     // When to send DBirth (Solved)
     // 
     // Tasks: 
-    // Handle NCMDs, DCMDs
-    // 
+    // Handle NCMDs,
+    // (x) DCMDs
+    // () NCMDs
+    // (x) BIRTH
+    // (x) Last-Will
 
     // MQTT Sparkplug B message
 
     function MQTTSparkplugDeviceNode(n) {
         RED.nodes.createNode(this,n);
         this.broker = n.broker;
-
-        this.deviceGroup = n.deviceGroup||"Sparkplug Devices";
         this.name = n.name||"Sparkplug Device";
 
-        this.birthMessageSend = false;
+        
         this.latestMetrics = {};
         this.metrics = n.metrics || {};
-        this.seq = 0;
 
-        /**
-         * 
-         * @returns the next sequence number for the payload
-         */
-        this.nextSeq = function() {
-            if (this.seq > 255) {
-                this.seq = 0;
-            }
-            return this.seq++;
-        };
+        this.birthMessageSend = false;
 
-        /**
-         * Create a sparkplug b complient message
-         * @param {string} msgType the message type (DBIRTH, DDATA) 
-         * @param {*} metrics The metrics to include in the payload
-         * @returns a encoded sparkplug B message
-         */
-        this.createMsg = function(msgType, metrics, done) {
-            let msg = {
-                topic : `spBv1.0/${this.deviceGroup}/${msgType}/${this.name}/`,
-                payload : {
-                    timestamp : new Date().getTime(),
-                    seq : this.nextSeq(), 
-                    metrics : metrics
+        this.trySendBirth = function(done) {
+            console.log("try send birth");
+           
+            let readyToSend = Object.keys(this.metrics).every(m => this.latestMetrics.hasOwnProperty(m));
+            if (readyToSend) {
+                
+                let bMsg = node.brokerConn.createMsg(this.name, "DBIRTH", Object.values(this.latestMetrics), done);
+                if(bMsg) {
+                    this.brokerConn.publish(bMsg, done);  // send the message 
+                    this.birthMessageSend = true;
                 }
-            };
-            try {
-                msg.payload = this.encode(msg.payload); 
-            }catch (e) {
-                // TODO
-                done(e);
-                return null;
             }
-            return msg;   
-        };
-
-        /**
-         * 
-         * @param {object} payload object to encode 
-         * @returns a sparkplug B encoded Buffer
-         */
-        this.encode = function(payload) {
-            return spPayload.encodePayload(payload);
-        }
-        
-        /**
-         * 
-         * @param {Number[]} payload Sparkplug B encoded Payload
-         * @returns {Object} decoded JSON object
-         */
-        this.decode = function(payload) {
-            var buffer = Buffer.from(payload);
-            return spPayload.decodePayload(buffer);
         }
 
         this.brokerConn = RED.nodes.getNode(this.broker);
@@ -136,18 +95,10 @@ module.exports = function(RED) {
 
                     // Send DBIRTH
                     if (!this.birthMessageSend) {
-                        let readyToSend = Object.keys(this.metrics).every(m => this.latestMetrics.hasOwnProperty(m));
-                        if (readyToSend) {
-                            this.seq = 0;
-                            let bMsg = this.createMsg("DBIRTH", Object.values(this.latestMetrics), done);
-                            if(bMsg) {
-                                this.brokerConn.publish(bMsg, done);  // send the message 
-                                this.birthMessageSend = true;
-                            }
-                        }
+                        this.trySendBirth(done);
                     }else if (_metrics.length > 0) {
                         // SEND DDATA
-                        let dMsg = this.createMsg("DDATA", _metrics, done);
+                        let dMsg = this.brokerConn.createMsg(this.name, "DDATA", _metrics, done);
                         if (dMsg) {
                             this.brokerConn.publish(dMsg,done); 
                         }
@@ -193,8 +144,6 @@ module.exports = function(RED) {
     }
     RED.nodes.registerType("mqtt sparkplug device",MQTTSparkplugDeviceNode);
 
-
-
     function matchTopic(ts,t) {
         if (ts == "#") {
             return true;
@@ -219,6 +168,9 @@ module.exports = function(RED) {
     function MQTTBrokerNode(n) {
         RED.nodes.createNode(this,n);
 
+        this.name = n.name||"Sparkplug Node";
+        this.deviceGroup = n.deviceGroup||"Sparkplug Devices";
+        this.eonName = n.eonName||"EoN Node",
         // Configuration options passed by Node Red
         this.broker = n.broker;
         this.port = n.port;
@@ -246,53 +198,65 @@ module.exports = function(RED) {
         this.queue = [];
         this.subscriptions = {};
 
-        if (n.birthTopic) {
-            this.birthMessage = {
-                topic: n.birthTopic,
-                payload: n.birthPayload || "",
-                qos: Number(n.birthQos||0),
-                retain: n.birthRetain=="true"|| n.birthRetain===true,
-                //TODO: add payloadFormatIndicator, messageExpiryInterval, contentType, responseTopic, correlationData, userProperties
-            };
-            if (n.birthMsg) {
-                setStrProp(n.birthMsg, this.birthMessage, "contentType");
-                if(n.birthMsg.userProps && /^ *{/.test(n.birthMsg.userProps)) {
-                    try {
-                        setUserProperties(JSON.parse(n.birthMsg.userProps), this.birthMessage);
-                    } catch(err) {}
-                }
-                n.birthMsg.responseTopic = n.birthMsg.respTopic;
-                setStrProp(n.birthMsg, this.birthMessage, "responseTopic");
-                n.birthMsg.correlationData = n.birthMsg.correl;
-                setBufferProp(n.birthMsg, this.birthMessage, "correlationData");
-                n.birthMsg.messageExpiryInterval = n.birthMsg.expiry
-                setIntProp(n.birthMsg,this.birthMessage, "messageExpiryInterval")
+        this.seq = 0;
+
+        /**
+         * 
+         * @returns the next sequence number for the payload
+         */
+        this.nextSeq = function() {
+            if (this.seq > 255) {
+                this.seq = 0;
             }
+            return this.seq++;
+        };
+
+               /**
+         * 
+         * @param {object} payload object to encode 
+         * @returns a sparkplug B encoded Buffer
+         */
+        this.encode = function(payload) {
+            return payload;
+            //return spPayload.encodePayload(payload);
+        }
+        
+        /**
+         * 
+         * @param {Number[]} payload Sparkplug B encoded Payload
+         * @returns {Object} decoded JSON object
+         */
+        this.decode = function(payload) {
+            return payload;
+            var buffer = Buffer.from(payload);
+            return spPayload.decodePayload(buffer);
         }
 
-        if (n.closeTopic) {
-            this.closeMessage = {
-                topic: n.closeTopic,
-                payload: n.closePayload || "",
-                qos: Number(n.closeQos||0),
-                retain: n.closeRetain=="true"|| n.closeRetain===true,
-                //TODO: add payloadFormatIndicator, messageExpiryInterval, contentType, responseTopic, correlationData, userProperties
-            };
-            if (n.closeMsg) {
-                setStrProp(n.closeMsg, this.closeMessage, "contentType");
-                if(n.closeMsg.userProps && /^ *{/.test(n.closeMsg.userProps)) {
-                    try {
-                        setUserProperties(JSON.parse(n.closeMsg.userProps), this.closeMessage);
-                    } catch(err) {}
+        /**
+         * Create a sparkplug b complient message
+         * @param {string} msgType the message type (DBIRTH, DDATA) 
+         * @param {*} metrics The metrics to include in the payload
+         * @returns a encoded sparkplug B message
+         */
+        this.createMsg = function(name, msgType, metrics, done) {
+            let that = this;
+            let msg = {
+                topic : `spBv1.0/${this.deviceGroup}/${msgType}/${name}`,
+                payload : {
+                    timestamp : new Date().getTime(),
+                    seq : that.nextSeq(), 
+                    metrics : metrics
                 }
-                n.closeMsg.responseTopic = n.closeMsg.respTopic;
-                setStrProp(n.closeMsg, this.closeMessage, "responseTopic");
-                n.closeMsg.correlationData = n.closeMsg.correl;
-                setBufferProp(n.closeMsg, this.closeMessage, "correlationData");
-                n.closeMsg.messageExpiryInterval = n.closeMsg.expiry
-                setIntProp(n.birthMsg,this.closeMessage, "messageExpiryInterval")
+            };
+            try {
+                msg.payload = this.encode(msg.payload); 
+            }catch (e) {
+                // TODO
+                done(e);
+                return null;
             }
-        }
+            return msg;   
+        };
 
         if (this.credentials) {
             this.username = this.credentials.user;
@@ -380,7 +344,7 @@ module.exports = function(RED) {
 
         if (!this.cleansession && !this.clientid) {
             this.cleansession = true;
-            this.warn(RED._("mqtt.errors.nonclean-missingclientid"));
+            this.warn(RED._("mqtt-sparkplug-plus.errors.nonclean-missingclientid"));
         }
 
         // Build options for passing to the MQTT.js API
@@ -390,23 +354,7 @@ module.exports = function(RED) {
         this.options.keepalive = this.keepalive;
         this.options.clean = this.cleansession;
         this.options.reconnectPeriod = RED.settings.mqttReconnectTime||5000;
-        if (this.compatmode == "true" || this.compatmode === true || this.protocolVersion == 3) {
-            this.options.protocolId = 'MQIsdp';
-            this.options.protocolVersion = 3;
-        } else if ( this.protocolVersion == 5 ) {
-            this.options.protocolVersion = 5;
-            this.options.properties = {};
-            this.options.properties.requestResponseInformation = true;
-            this.options.properties.requestProblemInformation = true;
-            if(this.userProperties && /^ *{/.test(this.userProperties)) {
-                try {
-                    setUserProperties(JSON.parse(this.userProperties), this.options.properties);
-                } catch(err) {}
-            }
-            if (this.sessionExpiryInterval && this.sessionExpiryInterval !== "0") {
-                setIntProp(this,this.options.properties,"sessionExpiryInterval");
-            }
-        }
+     
         if (this.usetls && n.tls) {
             var tlsNode = RED.nodes.getNode(n.tls);
             if (tlsNode) {
@@ -421,41 +369,22 @@ module.exports = function(RED) {
             this.options.rejectUnauthorized = (this.verifyservercert == "true" || this.verifyservercert === true);
         }
 
-        if (n.willTopic) {
-            this.options.will = {
-                topic: n.willTopic,
-                payload: n.willPayload || "",
-                qos: Number(n.willQos||0),
-                retain: n.willRetain=="true"|| n.willRetain===true,
-                //TODO: add willDelayInterval, payloadFormatIndicator, messageExpiryInterval, contentType, responseTopic, correlationData, userProperties
-            };
-            if (n.willMsg) {
-                this.options.will.properties = {};
-
-                setStrProp(n.willMsg, this.options.will.properties, "contentType");
-                if(n.willMsg.userProps && /^ *{/.test(n.willMsg.userProps)) {
-                    try {
-                        setUserProperties(JSON.parse(n.willMsg.userProps), this.options.will.properties);
-                    } catch(err) {}
-                }
-                n.willMsg.responseTopic = n.willMsg.respTopic;
-                setStrProp(n.willMsg, this.options.will.properties, "responseTopic");
-                n.willMsg.correlationData = n.willMsg.correl;
-                setBufferProp(n.willMsg, this.options.will.properties, "correlationData");
-                n.willMsg.willDelayInterval = n.willMsg.delay
-                setIntProp(n.willMsg,this.options.will.properties, "willDelayInterval")
-                n.willMsg.messageExpiryInterval = n.willMsg.expiry
-                setIntProp(n.willMsg,this.options.will.properties, "messageExpiryInterval")
-                this.options.will.payloadFormatIndicator = true;
-            }
-        }
-
-        // console.log(this.brokerurl,this.options);
-
-        // Define functions called by MQTT in and out nodes
+        this.options.will = {
+            topic : `spBv1.0/${this.deviceGroup}/NDEATH/${this.eonName}`,
+            payload : "",
+            qos : 0,
+            retain : false
+        };
+     
+        // Define functions called by MQTT Devices
         var node = this;
         this.users = {};
 
+        /**
+         * Register a mqttNode to. This will ensure that this object can communcate with
+         * clients (e.g for REBIRTH commands)
+         * @param {object} mqttNode 
+         */
         this.register = function(mqttNode) {
             node.users[mqttNode.id] = mqttNode;
             if (Object.keys(node.users).length === 1) {
@@ -463,6 +392,12 @@ module.exports = function(RED) {
             }
         };
 
+        /**
+         * Deregister a client
+         * @param {object} mqttNode 
+         * @param {function} done 
+         * @returns void
+         */
         this.deregister = function(mqttNode,done) {
             delete node.users[mqttNode.id];
             if (node.closing) {
@@ -487,6 +422,9 @@ module.exports = function(RED) {
             done();
         };
 
+        /**
+         * Connect to the MQTT Broker
+         */
         this.connect = function () {
             if (!node.connected && !node.connecting) {
                 node.connecting = true;
@@ -547,10 +485,24 @@ module.exports = function(RED) {
                             }
                         }
 
-                        // Send any birth message
-                        if (node.birthMessage) {
-                            node.publish(node.birthMessage);
+                        // Send Node Birth
+                        
+
+                    this.seq = 0;
+                    // TODO: Ask each 
+                    var birthMessageMetrics = {
+                        "name" : "Node Control/Rebirth"
+                    }
+                    console.log(node.eonName);
+                    var nbirth = node.createMsg(node.eonName, "NBIRTH", birthMessageMetrics, x=>{});
+                    node.publish(nbirth);
+                    for (var id in node.users) {
+                        if (node.users.hasOwnProperty(id)) {
+                            node.users[id].birthMessageSend = false;
+                            node.users[id].trySendBirth(x=>{});
                         }
+                    }
+
                     });
                     node.client.on("reconnect", function() {
                         for (var id in node.users) {
@@ -562,8 +514,8 @@ module.exports = function(RED) {
                     //TODO: what to do with this event? Anything? Necessary?
                     node.client.on("disconnect", function(packet) {
                         //Emitted after receiving disconnect packet from broker. MQTT 5.0 feature.
-                        var rc = packet && packet.properties && packet.properties.reasonString;
-                        var rc = packet && packet.properties && packet.reasonCode;
+                        //var rc = packet && packet.properties && packet.properties.reasonString;
+                        //var rc = packet && packet.properties && packet.reasonCode;
                         //TODO: If keeping this event, do we use these? log these?
                     });
                     // Register disconnect handlers
@@ -593,6 +545,13 @@ module.exports = function(RED) {
 
         this.subscriptionIds = {};
         this.subid = 1;
+        /**
+         * Subscribe to a MQTT Topic
+         * @param {string} topic the topic to subscribe to 
+         * @param {object} options objects for the subsribtion
+         * @param {function} callback a function that will be called when new data comes in 
+         * @param {*} ref 
+         */
         this.subscribe = function (topic,options,callback,ref) {
             ref = ref||0;
             var qos;
@@ -669,6 +628,7 @@ module.exports = function(RED) {
         this.topicAliases = {};
 
         this.publish = function (msg,done) {
+            console.log(msg); //FIXME : Remove
             if (node.connected) {
                 if (msg.payload === null || msg.payload === undefined) {
                     msg.payload = "";

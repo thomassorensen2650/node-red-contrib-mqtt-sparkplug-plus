@@ -19,7 +19,7 @@
   "dependencies": {
     "https-proxy-agent": "5.0.0",
     "is-utf8": "0.2.1",
-    "mqtt": "^4.2.8",
+    "mqtt": "4.2.8",
     "protobufjs": "6.11.2",
     "sparkplug-payload": "^1.0.1"
   }
