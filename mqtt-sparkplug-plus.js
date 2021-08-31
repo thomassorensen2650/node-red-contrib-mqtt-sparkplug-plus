@@ -245,6 +245,28 @@ module.exports = function(RED) {
             return msg;   
         };
 
+        /**
+         * 
+         * @returns node death payload and topic
+         */
+        this.getDeathPayload = function() {
+            let payload = {
+                timestamp : new Date().getTime(),
+                metric : [ {
+                    name : "bdSeq", 
+                    value : 0, 
+                    type : "uint64"
+                }]
+            };
+            let msg = {
+                topic : `spBv1.0/${this.deviceGroup}/NDEATH/${this.eonName}`,
+                payload : sparkplugEncode(payload),
+                qos : 0,
+                retain : false
+            };
+            return msg;
+        };
+
         if (this.credentials) {
             this.username = this.credentials.user;
             this.password = this.credentials.password;
@@ -357,7 +379,7 @@ module.exports = function(RED) {
         }
 
         // FIXME
-       let lastWillPayload = { 
+       /*let lastWillPayload = { 
             timestamp : new Date().getTime(),
             metrics: [
                 {
@@ -365,13 +387,15 @@ module.exports = function(RED) {
                     "type" : "Int8",
                     "value": 0,
                 }
-            ]}; 
-        this.options.will = {
+            ]}; */
+        console.log("last will");
+        this.options.will = this.getDeathPayload();
+/*        {
             topic : `spBv1.0/${this.deviceGroup}/NDEATH/${this.eonName}`,
             payload : sparkplugEncode(lastWillPayload),
             qos : 0,
             retain : false
-        };
+        };*/
      
         // Define functions called by MQTT Devices
         var node = this;
@@ -403,13 +427,19 @@ module.exports = function(RED) {
             if (Object.keys(node.users).length === 0) {
                 if (node.client && node.client.connected) {
                     // Send close message
-                    if (node.closeMessage) {
+                    console.log("Closing");
+                    let msg = this.getDeathPayload();
+                    node.publish(msg, function(err) {
+                        node.client.end(done);
+                    });
+
+                   /* if (node.closeMessage) {
                         node.publish(node.closeMessage,function(err) {
                             node.client.end(done);
                         });
                     } else {
                         node.client.end(done);
-                    }
+                    }*/
                     return;
                 } else {
                     node.client.end();
@@ -679,7 +709,6 @@ module.exports = function(RED) {
                 });
             }
         };
-
         this.on('close', function(done) {
             this.closing = true;
             if (this.connected) {
