@@ -10,4 +10,4 @@ The client will connect to an MQTT Server and act as an MQTT Edge of Network (Eo
 
 The client also provides a interface for Node-Red messags to publish NDATA requrest. 
 
-Push requrest are welcome.
+Pull requrest are welcome.
