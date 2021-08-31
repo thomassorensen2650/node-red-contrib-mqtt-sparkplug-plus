@@ -574,11 +574,10 @@ module.exports = function(RED) {
         this.handleNCMD = function(payload) {
             try {
                 payload = sparkplugDecode(payload);
-
-                if (payload.metrics && array.isArray(payload.metrics)){
+                if (payload.hasOwnProperty("metrics") && Array.isArray(payload.metrics)){
                     payload.metrics.forEach(m => {
-                        if (m instanceof Object && m.hasOwnProperty("name") && m.name) {
-                            if (m.name.toLowerCase === "node control/rebirth") {
+                        if (typeof m === 'object' && m.hasOwnProperty("name") && m.name) {
+                            if (m.name.toLowerCase() === "node control/rebirth") {
                                 node.sendBirth();
                             }else 
                             {
