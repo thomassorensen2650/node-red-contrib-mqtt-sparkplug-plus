@@ -1,0 +1,108 @@
+[
+    {
+        "id": "55018ef8f0d13b74",
+        "type": "mqtt sparkplug device",
+        "z": "8221da631e912105",
+        "name": "My Device",
+        "metrics": {
+            "testing/test1": {
+                "dataType": "Int32"
+            },
+            "testing/test2": {
+                "dataType": "Int32"
+            }
+        },
+        "broker": "0d831bd9ba588536",
+        "x": 370,
+        "y": 120,
+        "wires": [
+            [
+                "ec9bfe25385c2e74"
+            ]
+        ]
+    },
+    {
+        "id": "75bcd1ea33eb5014",
+        "type": "inject",
+        "z": "8221da631e912105",
+        "name": "Send Metrics",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "{\"metrics\":[{\"name\":\"testing/test1\",\"value\":11},{\"name\":\"testing/test2\",\"value\":12}]}",
+        "payloadType": "json",
+        "x": 170,
+        "y": 120,
+        "wires": [
+            [
+                "55018ef8f0d13b74"
+            ]
+        ]
+    },
+    {
+        "id": "ec9bfe25385c2e74",
+        "type": "debug",
+        "z": "8221da631e912105",
+        "name": "NCMD",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "payload",
+        "targetType": "msg",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 570,
+        "y": 120,
+        "wires": []
+    },
+    {
+        "id": "c733eafb2dd65e76",
+        "type": "comment",
+        "z": "8221da631e912105",
+        "name": "Read Me",
+        "info": "# Simple Flow\nThis flow shows a basic example on how a MQTT Sparkplug Device can be implemented.\n\nMetrics are send in the Payload, and NCMDs (write request from other clients) are send as an output.",
+        "x": 380,
+        "y": 60,
+        "wires": []
+    },
+    {
+        "id": "0d831bd9ba588536",
+        "type": "mqtt-sparkplug-broker",
+        "name": "Local Host",
+        "deviceGroup": "My Devices",
+        "eonName": "Node-Red",
+        "broker": "localhost",
+        "port": "1883",
+        "clientid": "",
+        "usetls": false,
+        "protocolVersion": "4",
+        "keepalive": "60",
+        "cleansession": true,
+        "birthTopic": "",
+        "birthQos": "0",
+        "birthPayload": "",
+        "birthMsg": {},
+        "closeTopic": "",
+        "closeQos": "0",
+        "closePayload": "",
+        "closeMsg": {},
+        "willTopic": "",
+        "willQos": "0",
+        "willPayload": "",
+        "willMsg": {},
+        "sessionExpiry": "",
+        "credentials": {}
+    }
+]
