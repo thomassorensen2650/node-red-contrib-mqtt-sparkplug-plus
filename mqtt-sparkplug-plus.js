@@ -33,21 +33,41 @@ module.exports = function(RED) {
     // (x) Last-Will
 
     // MQTT Sparkplug B message
+    /**
+     * 
+     * @param {object} payload object to encode 
+     * @returns a sparkplug B encoded Buffer
+     */
+    function sparkplugEncode(payload) {
+            //return payload;
+            return spPayload.encodePayload(payload);
+    }
+        
+    /**
+     * 
+     * @param {Number[]} payload Sparkplug B encoded Payload
+     * @returns {Object} decoded JSON object
+     */
+    function sparkplugDecode(payload_) {
+            //return payload;
+            var buffer = Buffer.from(payload_);
+            return spPayload.decodePayload(buffer);
+    }
+
 
     function MQTTSparkplugDeviceNode(n) {
         RED.nodes.createNode(this,n);
         this.broker = n.broker;
         this.name = n.name||"Sparkplug Device";
-
-        
         this.latestMetrics = {};
         this.metrics = n.metrics || {};
-
         this.birthMessageSend = false;
 
-        this.trySendBirth = function(done) {
-            console.log("try send birth");
-           
+        /**
+         * try to send Sparkplug Birth Messages
+         * @param {function} done Node-Red Done Function 
+         */
+        this.trySendBirth = function(done) {           
             let readyToSend = Object.keys(this.metrics).every(m => this.latestMetrics.hasOwnProperty(m));
             if (readyToSend) {
                 
@@ -65,70 +85,73 @@ module.exports = function(RED) {
 
             this.status({fill:"red",shape:"ring",text:"node-red:common.status.disconnected"});
             this.on("input",function(msg,send,done) {
-                if (msg.hasOwnProperty("payload") && Array.isArray(msg.payload)) {
+                if (msg.hasOwnProperty("payload") && typeof msg.payload === 'object' || msg.payload !== null) {
 
-                    let _metrics = [];
-                    msg.payload.forEach(m => {
-                        if (!m.hasOwnProperty("name")){
-                            node.warn("Each metric must have a name attribute")
-                        } else if (!m.hasOwnProperty("value")) {
-                            node.warn(`The metric ${m.name} can't be written without a value`);
-                        } else if (this.metrics.hasOwnProperty(m.name)) {
-
-                            // Type must be send on every message per the specicications (not sure why)
-                            // We already know then type, so lets append it if it not already there
-                            if (!m.hasOwnProperty("type")) {
-                                m.type = this.metrics[m.name].dataType; 
-                            }
+                    if (msg.payload.hasOwnProperty("metrics")) {
+                        let _metrics = [];
+                        msg.payload.metrics.forEach(m => {
                             
-                            // We dont know how long it will take or when REBIRTH will be send
-                            // so always include timewstamp in DBIRTH messages
-                            this.latestMetrics[m.name] = JSON.parse(JSON.stringify(m));
-                            if (!this.latestMetrics[m.name].hasOwnProperty("timestamp")) {
-                                this.latestMetrics[m.name].timestamp = new Date().getTime(); // We dont know when DBIRTH will be send, so force a timetamp in metric 
+                            if (!m.hasOwnProperty("name")){
+                                node.warn("Each metric must have a name attribute")
+                            } else if (!m.hasOwnProperty("value")) {
+                                //node.warn(`The metric ${m.name} can't be written without a value`);
+                                m.is_null = true;
+                            } else if (this.metrics.hasOwnProperty(m.name)) {
+    
+                                // Type must be send on every message per the specicications (not sure why)
+                                // We already know then type, so lets append it if it not already there
+                                if (!m.hasOwnProperty("type")) {
+                                    m.type = this.metrics[m.name].dataType; 
+                                }
+                                
+                                // We dont know how long it will take or when REBIRTH will be send
+                                // so always include timewstamp in DBIRTH messages
+                                this.latestMetrics[m.name] = JSON.parse(JSON.stringify(m));
+                                if (!this.latestMetrics[m.name].hasOwnProperty("timestamp")) {
+                                    this.latestMetrics[m.name].timestamp = new Date().getTime(); // We dont know when DBIRTH will be send, so force a timetamp in metric 
+                                }
+                                _metrics.push(m);
+                            }else {
+                                node.warn(`The metric ${m.name} is not known by the device`);
                             }
-                            _metrics.push(m);
-                        }else {
-                            node.warn(`The metric ${m.name} is not known by the device`);
-                        }
-                    });
+                        });
 
-                    // Send DBIRTH
-                    if (!this.birthMessageSend) {
-                        this.trySendBirth(done);
-                    }else if (_metrics.length > 0) {
-                        // SEND DDATA
-                        let dMsg = this.brokerConn.createMsg(this.name, "DDATA", _metrics, done);
-                        if (dMsg) {
-                            this.brokerConn.publish(dMsg,done); 
+                        if (!this.birthMessageSend) {    // Send DBIRTH
+                            this.trySendBirth(done);
+                        }else if (_metrics.length > 0) { // SEND DDATA
+                            let dMsg = this.brokerConn.createMsg(this.name, "DDATA", _metrics, done);
+                            if (dMsg) {
+                                this.brokerConn.publish(dMsg, done); 
+                            }
                         }
-                    }
-                } else {
+                    }else 
+                    {
+                        node.warn("No metrics in payload");
                         done();
+                    }
+                } else if (msg.hasOwnProperty("toDecode")) {
+                    msg.decoded = sparkplugDecode(msg.toDecode);
+                    node.send(msg);
+                    done();
+                } else {
+                    node.warn("Payload must be of type object");
+                    done();
                 }
             }); // end input
 
             if (this.brokerConn.connected) {
                 node.status({fill:"green",shape:"dot",text:"node-red:common.status.connected"});
             }
-
-            // Ok
-            if (node.brokerConn.willTopic) {
-                node.warn("The last will configured will be removed... It's required for the MQTT Sparkplug connection");
-            }
-            
-
             node.brokerConn.register(node);
 
             // Handle Input Messages
             let options = { qos: 0 };
-            let subscribeTopic = `spBv1.0/${this.deviceGroup}/DCMD/${this.name}/`;
+            let subscribeTopic = `spBv1.0/${this.brokerConn.deviceGroup}/DCMD/${this.brokerConn.eonName}/${this.name}`;
             this.brokerConn.subscribe(subscribeTopic,options,function(topic_,payload_,packet) {
-                
                 try {
                     var msg = {
                         topic : topic_,
-                        payload : node.decode(payload_)
+                        payload : sparkplugDecode(payload_)
                     };
                     node.send(msg);
                 } catch (e) {
@@ -178,16 +201,9 @@ module.exports = function(RED) {
         this.usetls = n.usetls;
         this.usews = n.usews;
         this.verifyservercert = n.verifyservercert;
-        this.compatmode = n.compatmode;
         this.protocolVersion = n.protocolVersion;
         this.keepalive = n.keepalive;
         this.cleansession = n.cleansession;
-        this.sessionExpiryInterval = n.sessionExpiry;
-        this.topicAliasMaximum = n.topicAliasMaximum;
-        this.maximumPacketSize = n.maximumPacketSize;
-        this.receiveMaximum = n.receiveMaximum;
-        this.userProperties = n.userProperties;//https://docs.oasis-open.org/mqtt/mqtt/v5.0/os/mqtt-v5.0-os.html#_Toc3901116
-        this.userPropertiesType = n.userPropertiesType;
 
         // Config node state
         this.brokerurl = "";
@@ -195,7 +211,7 @@ module.exports = function(RED) {
         this.connecting = false;
         this.closing = false;
         this.options = {};
-        this.queue = [];
+        //this.queue = [];
         this.subscriptions = {};
 
         this.seq = 0;
@@ -211,45 +227,28 @@ module.exports = function(RED) {
             return this.seq++;
         };
 
-               /**
-         * 
-         * @param {object} payload object to encode 
-         * @returns a sparkplug B encoded Buffer
-         */
-        this.encode = function(payload) {
-            return payload;
-            //return spPayload.encodePayload(payload);
-        }
-        
-        /**
-         * 
-         * @param {Number[]} payload Sparkplug B encoded Payload
-         * @returns {Object} decoded JSON object
-         */
-        this.decode = function(payload) {
-            return payload;
-            var buffer = Buffer.from(payload);
-            return spPayload.decodePayload(buffer);
-        }
-
         /**
          * Create a sparkplug b complient message
+         * @param {string} deviceName the name of the device (leave blank for EoN messages)
          * @param {string} msgType the message type (DBIRTH, DDATA) 
          * @param {*} metrics The metrics to include in the payload
          * @returns a encoded sparkplug B message
          */
-        this.createMsg = function(name, msgType, metrics, done) {
+        this.createMsg = function(deviceName, msgType, metrics, done) {
             let that = this;
+            let topic = deviceName ? `spBv1.0/${this.deviceGroup}/${msgType}/${that.eonName}/${deviceName}` :
+                                     `spBv1.0/${this.deviceGroup}/${msgType}/${that.eonName}`;
             let msg = {
-                topic : `spBv1.0/${this.deviceGroup}/${msgType}/${name}`,
+                topic : topic,
                 payload : {
                     timestamp : new Date().getTime(),
                     seq : that.nextSeq(), 
                     metrics : metrics
                 }
             };
+
             try {
-                msg.payload = this.encode(msg.payload); 
+                msg.payload = sparkplugEncode(msg.payload); 
             }catch (e) {
                 // TODO
                 done(e);
@@ -369,9 +368,16 @@ module.exports = function(RED) {
             this.options.rejectUnauthorized = (this.verifyservercert == "true" || this.verifyservercert === true);
         }
 
+        // FIXME
+       let lastWillPayload = [
+            {
+                "name" : "bdSeq",
+                "type" : "Int8",
+                "value": 0,
+            }]; 
         this.options.will = {
             topic : `spBv1.0/${this.deviceGroup}/NDEATH/${this.eonName}`,
-            payload : "",
+            payload : JSON.stringify(lastWillPayload),
             qos : 0,
             retain : false
         };
@@ -423,6 +429,34 @@ module.exports = function(RED) {
         };
 
         /**
+         * Send Birth Message
+         */
+        this.sendBirth = function() {
+            this.seq = 0;
+            var birthMessageMetrics = [
+
+                {
+                    "name" : "Node Control/Rebirth",
+                    "type" : "Boolean",
+                    "value": false
+                },
+                {
+                    "name" : "bdSeq",
+                    "type" : "Int8",
+                    "value": 0,
+                }];
+            var nbirth = node.createMsg("", "NBIRTH", birthMessageMetrics, x=>{});
+            
+            node.publish(nbirth);
+            for (var id in node.users) {
+                if (node.users.hasOwnProperty(id)) {
+                    node.users[id].birthMessageSend = false;
+                    node.users[id].trySendBirth(x=>{});
+                }
+            }
+        }
+
+        /**
          * Connect to the MQTT Broker
          */
         this.connect = function () {
@@ -436,29 +470,7 @@ module.exports = function(RED) {
                     node.client.on('connect', function (connack) {
                         node.connecting = false;
                         node.connected = true;
-                        node.topicAliases = {};
                         node.log(RED._("mqtt.state.connected",{broker:(node.clientid?node.clientid+"@":"")+node.brokerurl}));
-                        if(node.options.protocolVersion == 5 && connack && connack.hasOwnProperty("properties")) {
-                            if(typeof connack.properties == "object") {
-                                //clean & assign all props sent from server.
-                                setIntProp(connack.properties, node.serverProperties, "topicAliasMaximum", 0);
-                                setIntProp(connack.properties, node.serverProperties, "receiveMaximum", 0);
-                                setIntProp(connack.properties, node.serverProperties, "sessionExpiryInterval", 0, 0xFFFFFFFF);
-                                setIntProp(connack.properties, node.serverProperties, "maximumQoS", 0, 2);
-                                setBoolProp(connack.properties, node.serverProperties, "retainAvailable",true);
-                                setBoolProp(connack.properties, node.serverProperties, "wildcardSubscriptionAvailable", true);
-                                setBoolProp(connack.properties, node.serverProperties, "subscriptionIdentifiersAvailable", true);
-                                setBoolProp(connack.properties, node.serverProperties, "sharedSubscriptionAvailable");
-                                setIntProp(connack.properties, node.serverProperties, "maximumPacketSize", 0);
-                                setIntProp(connack.properties, node.serverProperties, "serverKeepAlive");
-                                setStrProp(connack.properties, node.serverProperties, "responseInformation");
-                                setStrProp(connack.properties, node.serverProperties, "serverReference");
-                                setStrProp(connack.properties, node.serverProperties, "assignedClientIdentifier");
-                                setStrProp(connack.properties, node.serverProperties, "reasonString");
-                                setUserProperties(connack.properties, node.serverProperties);
-                                // node.debug("CONNECTED. node.serverProperties ==> "+JSON.stringify(node.serverProperties));//TODO: remove
-                            }
-                        }
                         for (var id in node.users) {
                             if (node.users.hasOwnProperty(id)) {
                                 node.users[id].status({fill:"green",shape:"dot",text:"node-red:common.status.connected"});
@@ -485,25 +497,17 @@ module.exports = function(RED) {
                             }
                         }
 
+                        let options = { qos: 0 };
+                        let subscribeTopic = `spBv1.0/${node.deviceGroup}/NCMD/${node.eonName}`;
+                        node.subscribe(subscribeTopic,options,function(topic_,payload_,packet) {
+                            node.handleNCMD(payload_);
+                        });
+ 
                         // Send Node Birth
                         
-
-                    this.seq = 0;
-                    // TODO: Ask each 
-                    var birthMessageMetrics = {
-                        "name" : "Node Control/Rebirth"
-                    }
-                    console.log(node.eonName);
-                    var nbirth = node.createMsg(node.eonName, "NBIRTH", birthMessageMetrics, x=>{});
-                    node.publish(nbirth);
-                    for (var id in node.users) {
-                        if (node.users.hasOwnProperty(id)) {
-                            node.users[id].birthMessageSend = false;
-                            node.users[id].trySendBirth(x=>{});
-                        }
-                    }
-
+                        node.sendBirth();
                     });
+
                     node.client.on("reconnect", function() {
                         for (var id in node.users) {
                             if (node.users.hasOwnProperty(id)) {
@@ -522,14 +526,14 @@ module.exports = function(RED) {
                     node.client.on('close', function () {
                         if (node.connected) {
                             node.connected = false;
-                            node.log(RED._("mqtt.state.disconnected",{broker:(node.clientid?node.clientid+"@":"")+node.brokerurl}));
+                            node.log(RED._("mqtt-sparkplug-plus.state.disconnected",{broker:(node.clientid?node.clientid+"@":"")+node.brokerurl}));
                             for (var id in node.users) {
                                 if (node.users.hasOwnProperty(id)) {
                                     node.users[id].status({fill:"red",shape:"ring",text:"node-red:common.status.disconnected"});
                                 }
                             }
                         } else if (node.connecting) {
-                            node.log(RED._("mqtt.state.connect-failed",{broker:(node.clientid?node.clientid+"@":"")+node.brokerurl}));
+                            node.log(RED._("mqtt-sparkplug-plus.state.connect-failed",{broker:(node.clientid?node.clientid+"@":"")+node.brokerurl}));
                         }
                     });
 
@@ -541,6 +545,37 @@ module.exports = function(RED) {
                     console.log(err);
                 }
             }
+        };
+
+        /**
+         * 
+         * @param {object} payload sparkplug encoded payload
+         */
+        this.handleNCMD = function(payload) {
+            try {
+                payload = sparkplugDecode(payload);
+
+                if (payload.metrics && array.isArray(payload.metrics)){
+                    payload.metrics.forEach(m => {
+                        if (m instanceof Object && m.hasOwnProperty("name") && m.name) {
+                            if (m.name.toLowerCase === "node control/rebirth") {
+                                node.sendBirth();
+                            }else 
+                            {
+                                node.warn(`NCMD command ${m.name} is not supported`);
+                            }
+                        }else {
+                            node.warn(`invalid NCMD received`);
+                        }
+                    })
+                }else {
+                    node.warn("Unknown NCMD Recieved");
+                }
+
+            }catch (e) {
+                node.error("Unable to decode NCMD", e);
+            }
+
         };
 
         this.subscriptionIds = {};
@@ -625,10 +660,8 @@ module.exports = function(RED) {
             // node.debug(_debug); //TODO: remove
 
         };
-        this.topicAliases = {};
-
         this.publish = function (msg,done) {
-            console.log(msg); //FIXME : Remove
+            console.log("Publish", msg); //FIXME : Remove
             if (node.connected) {
                 if (msg.payload === null || msg.payload === undefined) {
                     msg.payload = "";
@@ -643,29 +676,6 @@ module.exports = function(RED) {
                     qos: msg.qos || 0,
                     retain: msg.retain || false
                 };
-                //https://github.com/mqttjs/MQTT.js/blob/master/README.md#mqttclientpublishtopic-message-options-callback
-                if(node.options.protocolVersion == 5) {
-                    options.properties = options.properties || {};
-                    setStrProp(msg, options.properties, "responseTopic");
-                    setBufferProp(msg, options.properties, "correlationData");
-                    setStrProp(msg, options.properties, "contentType");
-                    setIntProp(msg, options.properties, "messageExpiryInterval", 0);
-                    setUserProperties(msg.userProperties, options.properties);
-                    setIntProp(msg, options.properties, "topicAlias", 1, node.serverProperties.topicAliasMaximum || 0);
-                    setBoolProp(msg, options.properties, "payloadFormatIndicator");
-                    //FUTURE setIntProp(msg, options.properties, "subscriptionIdentifier", 1, 268435455);
-                    if (options.properties.topicAlias) {
-                        if (!node.topicAliases.hasOwnProperty(options.properties.topicAlias) && msg.topic == "") {
-                            done("Invalid topicAlias");
-                            return
-                        }
-                        if (node.topicAliases[options.properties.topicAlias] === msg.topic) {
-                            msg.topic = ""
-                        } else {
-                            node.topicAliases[options.properties.topicAlias] = msg.topic
-                        }
-                    }
-                }
 
                 node.client.publish(msg.topic, msg.payload, options, function(err) {
                     done && done(err);
@@ -688,7 +698,6 @@ module.exports = function(RED) {
                 done();
             }
         });
-
     }
 
     RED.nodes.registerType("mqtt-sparkplug-broker",MQTTBrokerNode,{
