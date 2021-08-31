@@ -21,18 +21,6 @@ module.exports = function(RED) {
     var HttpsProxyAgent = require('https-proxy-agent');
     var url = require('url');
 
-    // Problems to solve : 
-    // When to send EoN Birth and Death
-    // When to send DBirth (Solved)
-    // 
-    // Tasks: 
-    // Handle NCMDs,
-    // (x) DCMDs
-    // () NCMDs
-    // (x) BIRTH
-    // (x) Last-Will
-
-    // MQTT Sparkplug B message
     /**
      * 
      * @param {object} payload object to encode 
@@ -144,7 +132,7 @@ module.exports = function(RED) {
             }
             node.brokerConn.register(node);
 
-            // Handle Input Messages
+            // Handle DCMD Messages
             let options = { qos: 0 };
             let subscribeTopic = `spBv1.0/${this.brokerConn.deviceGroup}/DCMD/${this.brokerConn.eonName}/${this.name}`;
             this.brokerConn.subscribe(subscribeTopic,options,function(topic_,payload_,packet) {
@@ -369,15 +357,18 @@ module.exports = function(RED) {
         }
 
         // FIXME
-       let lastWillPayload = [
-            {
-                "name" : "bdSeq",
-                "type" : "Int8",
-                "value": 0,
-            }]; 
+       let lastWillPayload = { 
+            timestamp : new Date().getTime(),
+            metrics: [
+                {
+                    "name" : "bdSeq",
+                    "type" : "Int8",
+                    "value": 0,
+                }
+            ]}; 
         this.options.will = {
             topic : `spBv1.0/${this.deviceGroup}/NDEATH/${this.eonName}`,
-            payload : JSON.stringify(lastWillPayload),
+            payload : sparkplugEncode(lastWillPayload),
             qos : 0,
             retain : false
         };
@@ -504,7 +495,6 @@ module.exports = function(RED) {
                         });
  
                         // Send Node Birth
-                        
                         node.sendBirth();
                     });
 
@@ -629,6 +619,12 @@ module.exports = function(RED) {
             }
         };
 
+        /**
+         * Unsubscribe from topic
+         * @param {string} topic 
+         * @param {object} ref 
+         * @param {*} removed not used ()
+         */
         this.unsubscribe = function (topic, ref, removed) {
             ref = ref||0;
             var sub = node.subscriptions[topic];
