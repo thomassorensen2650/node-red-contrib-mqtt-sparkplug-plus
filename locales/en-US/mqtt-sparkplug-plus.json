@@ -4,6 +4,8 @@
             "name" : "Name",
             "username": "Username",
             "password": "Password",
+            "device": "Device",
+            "metrics": "Metrics",
             "broker": "Server",
             "example": "e.g. localhost",
             "output": "Output",
@@ -78,11 +80,9 @@
         },
         "true": "true",
         "false": "false",
-        "tip": "Tip: Leave topic, qos or retain blank if you want to set them via msg properties.",
+        "tip": "Tip: Use '/' to group related metrics e.g. /Machine1/Speed",
         "errors": {
-            "not-defined": "topic not defined",
             "missing-config": "missing broker configuration",
-            "invalid-topic": "Invalid topic specified",
             "nonclean-missingclientid": "No client ID set, using clean session",
             "invalid-json-string": "Invalid JSON string",
             "invalid-json-parse": "Failed to parse JSON string"
