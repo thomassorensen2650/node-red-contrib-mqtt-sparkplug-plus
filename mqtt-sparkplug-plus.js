@@ -150,7 +150,7 @@ module.exports = function(RED) {
                 node.brokerConn.deregister(node, done);
             });
         } else {
-            this.error(RED._("mqtt.errors.missing-config"));
+            this.error(RED._("mqtt-sparkplug-plus.errors.missing-config"));
         }
     }
     RED.nodes.registerType("mqtt sparkplug device",MQTTSparkplugDeviceNode);
@@ -377,26 +377,8 @@ module.exports = function(RED) {
         if (typeof this.options.rejectUnauthorized === 'undefined') {
             this.options.rejectUnauthorized = (this.verifyservercert == "true" || this.verifyservercert === true);
         }
-
-        // FIXME
-       /*let lastWillPayload = { 
-            timestamp : new Date().getTime(),
-            metrics: [
-                {
-                    "name" : "bdSeq",
-                    "type" : "Int8",
-                    "value": 0,
-                }
-            ]}; */
-        console.log("last will");
         this.options.will = this.getDeathPayload();
-/*        {
-            topic : `spBv1.0/${this.deviceGroup}/NDEATH/${this.eonName}`,
-            payload : sparkplugEncode(lastWillPayload),
-            qos : 0,
-            retain : false
-        };*/
-     
+        
         // Define functions called by MQTT Devices
         var node = this;
         this.users = {};
@@ -427,19 +409,10 @@ module.exports = function(RED) {
             if (Object.keys(node.users).length === 0) {
                 if (node.client && node.client.connected) {
                     // Send close message
-                    console.log("Closing");
                     let msg = this.getDeathPayload();
                     node.publish(msg, function(err) {
                         node.client.end(done);
                     });
-
-                   /* if (node.closeMessage) {
-                        node.publish(node.closeMessage,function(err) {
-                            node.client.end(done);
-                        });
-                    } else {
-                        node.client.end(done);
-                    }*/
                     return;
                 } else {
                     node.client.end();
@@ -491,7 +464,7 @@ module.exports = function(RED) {
                     node.client.on('connect', function (connack) {
                         node.connecting = false;
                         node.connected = true;
-                        node.log(RED._("mqtt.state.connected",{broker:(node.clientid?node.clientid+"@":"")+node.brokerurl}));
+                        node.log(RED._("mqtt-sparkplug-plus.state.connected",{broker:(node.clientid?node.clientid+"@":"")+node.brokerurl}));
                         for (var id in node.users) {
                             if (node.users.hasOwnProperty(id)) {
                                 node.users[id].status({fill:"green",shape:"dot",text:"node-red:common.status.connected"});
@@ -686,7 +659,6 @@ module.exports = function(RED) {
 
         };
         this.publish = function (msg,done) {
-            console.log("Publish", msg); //FIXME : Remove
             if (node.connected) {
                 if (msg.payload === null || msg.payload === undefined) {
                     msg.payload = "";

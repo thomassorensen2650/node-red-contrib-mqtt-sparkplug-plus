@@ -1,0 +1,63 @@
+<script type="text/html" data-help-name="mqtt sparkplug device">
+   <p>
+    MQTT-Sparkplug-Plus is a Node-Red nodes that will enable Node-Red to act as a <a href="https://s3.amazonaws.com/ignition-modules/Current/Sparkplug+Specification.pdf">MQTT Sparkplug B</a> complient EoN Node.</p>
+    
+    <p>The client will connect to an MQTT Server and act as an MQTT Edge of Network (EoN) Node. The client current handles the following features:</p>
+    
+    <ul>
+        <li>DBIRTH</li>
+        <li>NCMD : REBIRTH</li>
+        <li>NDEATH</li>
+        <li>DDATA (from node input)</li>
+        <li>DCMD (send as output to Node-Red)</li>
+        <li>NBIRTH</li>
+    </ul>
+
+  <p>The following features are not supported yet:</p>
+    <ul>
+        <li>Non-metrics (body)</li>
+        <li>MQTT Broker redundancy</li>
+    </ul>
+
+    <h3>Inputs</h3>
+    <p>One or more metrics can be written to the device by passing the metrics information to the input of the device. A birth message will not be send before all metrics have been received at least once. so make sure to pass all metrics on start up.</p>
+        <p>Example:</p>
+    <pre>
+        msg.payload = {
+            "metrics": [
+                {
+                    "name": "testing/test1",
+                    "value": 11
+                },
+                {
+                    "name": "testing/test2",
+                    "value": 12
+                }
+            ]
+        };
+    </pre>
+
+   <h3>Outputs</h3>
+       <dl class="message-properties">
+       <dt>payload
+           <span class="property-type">object</span>
+       </dt>
+       <dd>The NCMD payload. See <a href="https://s3.amazonaws.com/ignition-modules/Current/Sparkplug+Specification.pdf">Sparkplug specification</a> for more information</dd>
+       </dl>
+
+       <h3>Sparkplug Message Types</h3>
+       The connection node will handle the following messages:
+       <h4>NBIRTH</h4>
+        <p>Node Birth will be send by the node when the node-red runtime has started and the node has a connection the the MQTT Broker. This message will also be send when a "Rebirth" NCMD is received</p>
+        <h4>NCMD</h4>
+        The MQTT Sparkplug Device node will handle the following messages:
+        <p>The node will handle incoming NCMD commands (currently only Rebirth is supported)</p>
+        <h4>NDEATH</h4>
+        <p>The node will send NDEATH when node-red runtime is stopped (it will be send on both a gracefull shutdown and a unexpected shutdown).</p>
+        <h4>DBIRTH</h4>
+        <p>Node Birth will be send by the node when all metrics have been received at least once, the node-red runtime has started and the node has a connection the the MQTT Broker. This message will also be send when a "Rebirth" NCMD is received</p>
+        <h4>DCMD</h4>
+        <p>NCMDs will be send to the node output port.</p>
+        <h4>DDEATH</h4>
+        <p>DDEATH is not currently supported.</p>    
+</script>
