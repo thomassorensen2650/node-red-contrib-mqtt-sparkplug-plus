@@ -16,7 +16,8 @@
   },
   "keywords": [
     "MQTT",
-    "Sparkplug"
+    "Sparkplug",
+    "node-red"
   ],
   "author": "Thomas Sørensen",
   "license": "ISC",
