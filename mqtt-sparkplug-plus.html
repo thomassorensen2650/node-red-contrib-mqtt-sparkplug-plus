@@ -17,49 +17,6 @@
         background: var(--red-ui-tertiary-background);
         padding-right: 75px;
     }
-
-    .mqtt-form-row-cols2 > input.mqtt-form-row-col1 {
-        width: calc(35% - 75px);
-    }
-    .mqtt-form-row-cols2 > select.mqtt-form-row-col1 {
-        width: calc(35% - 75px);
-    }
-
-    .mqtt-form-row-cols2 > label.mqtt-form-row-col2 {
-        width: 100px;
-        margin-left: 42px;
-        display: inline-block;
-    }
-    .mqtt-form-row-cols2 > input.mqtt-form-row-col2 {
-        width: calc(35% - 75px);
-        display: inline-block;
-    }
-    .mqtt-form-row-cols2 > select.mqtt-form-row-col2 {
-        width: calc(35% - 75px);
-        display: inline-block;
-    }
-    .form-row.mqtt5-out > label {
-        width: 130px;
-    }
-    .form-row.mqtt-flags-row > label {
-        vertical-align: top;
-    }
-    .form-row.mqtt-flags-row > .mqtt-flags {
-        display: inline-block;
-        width: 70%
-    }
-
-    .form-row.mqtt-flags-row > .mqtt-flags > .mqtt-flag > label {
-        display: block;
-        width: 100%;
-    }
-    .form-row.mqtt-flags-row > .mqtt-flags > .mqtt-flag > label > input {
-        position: relative;
-        vertical-align: bottom;
-        top: -2px;
-        width: 15px;
-        height: 15px;
-    }
 </style>
 
 <script type="text/html" data-template-name="mqtt-sparkplug-broker">
@@ -109,16 +66,8 @@
                             <span id="node-config-input-cleansession-label" data-i18n="mqtt-sparkplug-plus.label.cleansession"></span>
                         </label>
                     </div>
-                   <!-- <div class="form-row mqtt5">
-                        <label style="width:auto" for="node-config-input-sessionExpiry"><span data-i18n="mqtt-sparkplug-plus.label.sessionExpiry"></span></label>
-                        <input type="number" min="0" id="node-config-input-sessionExpiry" style="width: 100px" >
-                    </div>-->
                 </div>
             </div>
-           <!-- <div class="form-row mqtt5">
-                <label style="width: 125px;" for="node-config-input-userProps"><span data-i18n="mqtt-sparkplug-plus.label.userProperties"></span></label>
-                <input type="text" id="node-config-input-userProps" style="width: calc(100% - 166px);">
-            </div> -->
             <br>
         </div>
         <div id="mqtt-broker-tab-security" style="display:none">
@@ -134,7 +83,7 @@
          <div id="mqtt-broker-tab-sparkplug" style="display:none">
             <div class="form-row">
                 <label for="node-config-input-eonName"><i class="fa fa-tag"></i> <span data-i18n="mqtt-sparkplug-plus.label.name"></span></label>
-                <input type="text" id="node-config-input-eonName" data-i18n="[placeholder]mqtt-sparkplug-plus.label.name">
+                <input type="text" id="node-config-input-eonName" data-i18n="[placeholder]mqtt-sparkplug-plus.placeholder.eonname">
             </div>
 
             <div class="form-row">
@@ -147,15 +96,6 @@
 
 <script type="text/javascript">
 (function() {
-
-    var typedInputNoneOpt = { value: 'none', label: '', hasValue: false };
-    var makeTypedInputOpt = function(value){
-        return {
-            value: value,
-            label:value,
-            hasValue: false
-        }
-    }
 
     RED.nodes.registerType('mqtt-sparkplug-broker',{
         category: 'config',
@@ -176,26 +116,9 @@
             }},
             usetls: {value: false},
             verifyservercert: { value: false},
-            compatmode: { value: false},
             protocolVersion: { value: 4},
             keepalive: {value:60,validate:RED.validators.number()},
             cleansession: {value: true},
-            birthTopic: {value:""},
-            birthQos: {value:"0"},
-            birthRetain: {value:false},
-            birthPayload: {value:""},
-            birthMsg: { value: {}},
-            closeTopic: {value:""},
-            closeQos: {value:"0"},
-            closeRetain: {value:false},
-            closePayload: {value:""},
-            closeMsg: { value: {}},
-            willTopic: {value:""},
-            willQos: {value:"0"},
-            willRetain: {value:false},
-            willPayload: {value:""},
-            willMsg: { value: {}},
-            sessionExpiry: {value:0}
         },
         credentials: {
             user: {type:"text"},
@@ -232,59 +155,11 @@
                 label: this._("mqtt-sparkplug-plus.tabs-label.security")
             });
 
-           tabs.addTab({
+            tabs.addTab({
                 id: "mqtt-broker-tab-sparkplug",
                 label: this._("mqtt-sparkplug-plus.tabs-label.sparkplug")
             });
 
-          /*  function setUpSection(sectionId, v5Opts, isExpanded) {
-                var birthMessageSection = $("#mqtt-broker-section-"+sectionId);
-                var paletteHeader = birthMessageSection.find('.red-ui-palette-header');
-                var twistie = paletteHeader.find('i');
-                var sectionContent = birthMessageSection.find('.section-content');
-
-                function toggleSection(expanded) {
-                    twistie.toggleClass('expanded', expanded);
-                    sectionContent.toggle(expanded);
-                }
-                paletteHeader.on("click", function(e) {
-                    e.preventDefault();
-                    var isExpanded = twistie.hasClass('expanded');
-                    toggleSection(!isExpanded);
-                });
-                toggleSection(isExpanded);
-
-                $("#node-config-input-"+sectionId+"-props").val(v5Opts?v5Opts.userProps:"").typedInput({
-                    default:  !(v5Opts?v5Opts.userProps:null)? 'none':'json',
-                    types: [typedInputNoneOpt, 'json'],
-                });
-                $("#node-config-input-"+sectionId+"-respTopic").val(v5Opts?v5Opts.respTopic:"").typedInput({
-                    default:  !(v5Opts?v5Opts.respTopic:null)? 'none':'str',
-                    types: [typedInputNoneOpt, 'str'],
-                });
-                $("#node-config-input-"+sectionId+"-correl").val(v5Opts?v5Opts.correl:"").typedInput({
-                    default:  !(v5Opts?v5Opts.correl:null)? 'none':'str',
-                    types: [typedInputNoneOpt, 'str'],
-                });
-                $("#node-config-input-"+sectionId+"-expiry").val(v5Opts?v5Opts.expiry:"").typedInput({
-                    default:  !(v5Opts?v5Opts.expiry:null)? 'none':'num',
-                    types: [typedInputNoneOpt, 'num'],
-                });
-            } */
-
-            // show first section if none are set so the user gets the idea
-            /*var showBirthSection = this.birthTopic !== ""
-                || this.willTopic === ""
-                && this.birthTopic === ""
-                && this.closeTopic == "";
-            setUpSection('birth', this.birthMsg, showBirthSection);
-            setUpSection('close', this.closeMsg, this.closeTopic !== "");
-            setUpSection('will', this.willMsg, this.willTopic !== "");
-
-            if (this.willMsg) {
-                $("#node-config-input-will-delay").val(this.willMsg.delay);
-            }
-*/
             setTimeout(function() { tabs.resize(); },0);
             if (typeof this.cleansession === 'undefined') {
                 this.cleansession = true;
@@ -294,47 +169,12 @@
                 this.usetls = false;
                 $("#node-config-input-usetls").prop("checked",false);
             }
-            if (this.compatmode === 'true' || this.compatmode === true) {
-                delete this.compatmode;
-                this.protocolVersion = 4;
-            }
-            if (typeof this.protocolVersion === 'undefined') {
-                this.protocolVersion = 4;
-            }
             
             $("#node-config-input-protocolVersion").on("change", function() {
-                //var v5 = $("#node-config-input-protocolVersion").val() == "5";
-                //if(v5) {
-                //    $("#node-config-input-cleansession-label").text(RED._("node-red:mqtt.label.cleanstart"))
-                //    $("div.form-row.mqtt5").show();
-                //} else {
                 $("#node-config-input-cleansession-label").text(RED._("node-red:mqtt.label.cleansession"))
-                $("div.form-row.mqtt5").hide();
-                //}
             });
             $("#node-config-input-protocolVersion").val(this.protocolVersion);
-          /*  $("#node-config-input-userProps").typedInput({
-                default:  !this.userProps ? 'none':'json',
-                types: [typedInputNoneOpt, 'json']
-            });*/
-           /*if (typeof this.keepalive === 'undefined') {
-                this.keepalive = 15;
-                $("#node-config-input-keepalive").val(this.keepalive);
-            }
-            if (typeof this.birthQos === 'undefined') {
-                this.birthQos = "0";
-                $("#node-config-input-birthQos").val("0");
-            }
-            if (typeof this.closeQos === 'undefined') {
-                this.willQos = "0";
-                $("#node-config-input-willQos").val("0");
-            }
-            if (typeof this.willQos === 'undefined') {
-                this.willQos = "0";
-                $("#node-config-input-willQos").val("0");
-            }*/
-
-
+        
             function updateTLSOptions() {
                 if ($("#node-config-input-usetls").is(':checked')) {
                     $("#node-config-row-tls").show();
@@ -389,55 +229,6 @@
             if (!$("#node-config-input-usetls").is(':checked')) {
                 $("#node-config-input-tls").val("");
             }
-            /*
-            var v5 = $("#node-config-input-protocolVersion").val() == "5";
-
-            function saveV5Message(section) {
-                var msg = {};
-                if ($("#node-config-input-"+section+"Topic").val().trim().length > 0) {
-                    var contentType = $("#node-config-input-"+section+"-contentType").val().trim();
-                    if (contentType === '') {
-                        contentType = $("#node-config-input-"+section+"-contentType").typedInput('type');
-                        if (contentType === 'none' || contentType === 'other') {
-                            contentType = "";
-                        }
-                    }
-                    if (contentType) {
-                        msg.contentType = contentType;
-                    }
-                    var props = $("#node-config-input-"+section+"-props").val().trim();
-                    if (props) {
-                        msg.userProps = props;
-                    }
-                    var resp = $("#node-config-input-"+section+"-respTopic").val().trim();
-                    if (props) {
-                        msg.respTopic = resp;
-                    }
-                    var correl = $("#node-config-input-"+section+"-correl").val().trim();
-                    if (correl) {
-                        msg.correl = correl;
-                    }
-                    var expiry = $("#node-config-input-"+section+"-expiry").val().trim();
-                    if (expiry) {
-                        msg.expiry = expiry;
-                    }
-                }
-                return msg;
-            }
-
-            if (v5) {
-                this.birthMsg = saveV5Message("birth");
-                this.closeMsg = saveV5Message("close");
-                this.willMsg = saveV5Message("will");
-                var willDelay = $("#node-config-input-will-delay").val();
-                if (willDelay) {
-                    this.willMsg.delay = willDelay;
-                }
-            } else {
-                this.willMsg = {};
-                this.birthMsg = {};
-                this.closeMsg = {};
-            }*/
         }
     });
 })();
@@ -451,7 +242,7 @@
     </div>
     <div class="form-row">
         <label for="node-input-name"><i class="fa fa-tag"></i> <span data-i18n="mqtt-sparkplug-plus.label.device"></span></label>
-        <input type="text" id="node-input-name" data-i18n="[placeholder]My Device">
+        <input type="text" id="node-input-name" data-i18n="[placeholder]mqtt-sparkplug-plus.placeholder.name">
     </div>
 
     <div class="form-row sparkplug-input-metric-row" style="margin-bottom: 0px;">
@@ -499,7 +290,7 @@
         icon: "bridge.svg",
         align: "right",
         label: function() {
-            return this.name||"sparkplug device";
+            return this.name||"Sparkplug Device";
         },
         oneditprepare: function() {
             var that = this;

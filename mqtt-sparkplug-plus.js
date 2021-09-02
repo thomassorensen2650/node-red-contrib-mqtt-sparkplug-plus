@@ -58,7 +58,6 @@ module.exports = function(RED) {
         this.trySendBirth = function(done) {           
             let readyToSend = Object.keys(this.metrics).every(m => this.latestMetrics.hasOwnProperty(m));
             if (readyToSend) {
-                
                 let bMsg = node.brokerConn.createMsg(this.name, "DBIRTH", Object.values(this.latestMetrics), done);
                 if(bMsg) {
                     this.brokerConn.publish(bMsg, done);  // send the message 
@@ -181,7 +180,7 @@ module.exports = function(RED) {
 
         this.name = n.name||"Sparkplug Node";
         this.deviceGroup = n.deviceGroup||"Sparkplug Devices";
-        this.eonName = n.eonName||"EoN Node",
+        this.eonName = n.eonName||RED._("mqtt-sparkplug-plus.placeholder.eonname"),
         // Configuration options passed by Node Red
         this.broker = n.broker;
         this.port = n.port;
@@ -238,7 +237,7 @@ module.exports = function(RED) {
             try {
                 msg.payload = sparkplugEncode(msg.payload); 
             }catch (e) {
-                // TODO
+                node.error(`Unable to crate '${msgType}' Message`, e);
                 done(e);
                 return null;
             }
@@ -297,7 +296,6 @@ module.exports = function(RED) {
         if (process.env.HTTP_PROXY) { prox = process.env.HTTP_PROXY; }
         if (process.env.no_proxy) { noprox = process.env.no_proxy.split(","); }
         if (process.env.NO_PROXY) { noprox = process.env.NO_PROXY.split(","); }
-
 
         // Create the URL to pass in to the MQTT.js library
         if (this.brokerurl === "") {
@@ -561,7 +559,7 @@ module.exports = function(RED) {
                         }
                     })
                 }else {
-                    node.warn("Unknown NCMD Recieved");
+                    node.warn("Unknown NCMD Recieved (Metrics is not an Array)");
                 }
 
             }catch (e) {

@@ -61,9 +61,8 @@
         "placeholder": {
             "clientid": "Leave blank for auto generated",
             "clientid-nonclean":"Must be set for non-clean sessions",
-            "will-topic": "Leave blank to disable will message",
-            "birth-topic": "Leave blank to disable birth message",
-            "close-topic": "Leave blank to disable close message"
+            "eonname":"Node-Red",
+            "name": "Sparkplug Device"
         },
         "state": {
             "connected": "Connected to broker: __broker__",
@@ -80,7 +79,7 @@
         },
         "true": "true",
         "false": "false",
-        "tip": "Tip: Use '/' to group related metrics e.g. /Machine1/Speed",
+        "tip": "Tip: Use '/' to group related metrics e.g. Machine1/Speed",
         "errors": {
             "missing-config": "missing broker configuration",
             "nonclean-missingclientid": "No client ID set, using clean session",
