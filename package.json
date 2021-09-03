@@ -1,10 +1,10 @@
 {
   "name": "node-red-contrib-mqtt-sparkplug-plus",
-  "version": "0.0.3",
+  "version": "0.0.4",
   "repository": {
     "type": "git",
     "url": "https://github.com/thomassorensen2650/node-red-contrib-mqtt-sparkplug-plus.git"
-},
+  },
   "description": "A Node that implements MQTT Sparkplug for Node-Red",
   "node-red": {
     "nodes": {
@@ -12,7 +12,7 @@
     }
   },
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "mocha \"test/**/*_spec.js\""
   },
   "keywords": [
     "MQTT",
@@ -24,8 +24,12 @@
   "dependencies": {
     "https-proxy-agent": "5.0.0",
     "is-utf8": "0.2.1",
-    "mqtt": "4.2.8",
     "protobufjs": "6.11.2",
     "sparkplug-payload": "1.0.1"
+  },
+  "devDependencies": {
+    "mqtt": "^4.2.8",
+    "node-red": "^2.0.6",
+    "node-red-node-test-helper": "^0.2.7"
   }
 }

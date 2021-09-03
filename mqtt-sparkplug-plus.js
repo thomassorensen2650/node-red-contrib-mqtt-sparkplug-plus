@@ -664,26 +664,24 @@ module.exports = function(RED) {
 
         };
         this.publish = function (msg,done) {
-            if (node.connected) {
-                if (msg.payload === null || msg.payload === undefined) {
-                    msg.payload = "";
-                } else if (!Buffer.isBuffer(msg.payload)) {
-                    if (typeof msg.payload === "object") {
-                        msg.payload = JSON.stringify(msg.payload);
-                    } else if (typeof msg.payload !== "string") {
-                        msg.payload = "" + msg.payload;
-                    }
+            if (msg.payload === null || msg.payload === undefined) {
+                msg.payload = "";
+            } else if (!Buffer.isBuffer(msg.payload)) {
+                if (typeof msg.payload === "object") {
+                    msg.payload = JSON.stringify(msg.payload);
+                } else if (typeof msg.payload !== "string") {
+                    msg.payload = "" + msg.payload;
                 }
-                var options = {
-                    qos: msg.qos || 0,
-                    retain: msg.retain || false
-                };
-
-                node.client.publish(msg.topic, msg.payload, options, function(err) {
-                    done && done(err);
-                    return
-                });
             }
+            var options = {
+                qos: msg.qos || 0,
+                retain: msg.retain || false
+            };
+
+            node.client.publish(msg.topic, msg.payload, options, function(err) {
+                done && done(err);
+                return
+            });
         };
         this.on('close', function(done) {
             this.closing = true;
