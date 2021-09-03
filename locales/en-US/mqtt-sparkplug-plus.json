@@ -82,9 +82,15 @@
         "tip": "Tip: Use '/' to group related metrics e.g. Machine1/Speed",
         "errors": {
             "missing-config": "missing broker configuration",
+            "missing-attribute-name": "All metrics must have a name",
             "nonclean-missingclientid": "No client ID set, using clean session",
             "invalid-json-string": "Invalid JSON string",
-            "invalid-json-parse": "Failed to parse JSON string"
+            "invalid-json-parse": "Failed to parse JSON string",
+            "device-unknown-metric": "The metric '__name__' is not recognized by the device",
+            "device-no-metrics": "No metrics in DDATA payload",
+            "payload-type-object": "Payload must be of type object",
+            "unable-to-decode-message": "Unable to decode __type__ message. the error is : __error__",
+            "unable-to-encode-message": "Unable to encode __type__ message. the error is : __error__" 
         }
     }	
 }

@@ -1,6 +1,6 @@
 <script type="text/html" data-help-name="mqtt sparkplug device">
    <p>
-    MQTT-Sparkplug-Plus is a Node-Red nodes that will enable Node-Red to act as a <a href="https://s3.amazonaws.com/ignition-modules/Current/Sparkplug+Specification.pdf">MQTT Sparkplug B</a> complient EoN Node.</p>
+    MQTT-Sparkplug-Plus is a set of Node-Red nodes that will enable Node-Red to act as a <a href="https://s3.amazonaws.com/ignition-modules/Current/Sparkplug+Specification.pdf">MQTT Sparkplug B</a> complient EoN Node.</p>
     
     <p>The client will connect to an MQTT Server and act as an MQTT Edge of Network (EoN) Node. The client current handles the following features:</p>
     
@@ -15,18 +15,21 @@
 
   <p>The following features are not supported yet:</p>
     <ul>
-        <li>Non-metrics (body)</li>
+        <li>Non-metrics (body/Metadata)</li>
+        <li>Buffering (Primary SCADA)</li>
         <li>MQTT Broker redundancy</li>
     </ul>
 
     <h3>Inputs</h3>
     <p>One or more metrics can be written to the device by passing the metrics information to the input of the device. A birth message will not be send before all metrics have been received at least once. so make sure to pass all metrics on start up.</p>
-        <p>Example:</p>
+    <p>if a metric does not have a value then a "is_null" attribute is added to the metric</p>
+    <h4>Example:</h4>
     <pre>
         msg.payload = {
             "metrics": [
                 {
                     "name": "testing/test1",
+                    "timestamp" : new Date(), // Timestamp  is optional.
                     "value": 11
                 },
                 {

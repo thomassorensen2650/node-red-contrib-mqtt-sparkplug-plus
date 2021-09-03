@@ -1,6 +1,6 @@
 # MQTT Sparkplug implementation for Node-Red
 
-MQTT-Sparkplug-Plus is a set of Node-Red nodes, that will enable Node-Red to act as a [Sparkplug complient](https://s3.amazonaws.com/ignition-modules/Current/Sparkplug+Specification.pdf) EoN Node. 
+MQTT-Sparkplug-Plus is a set of Node-Red nodes, that will enable Node-Red to act as a [Sparkplug B complient](https://s3.amazonaws.com/ignition-modules/Current/Sparkplug+Specification.pdf) EoN Node. 
 
 
 The nodes handles most of the protocol specific messages. 
@@ -33,7 +33,7 @@ npm install node-red-contrib-mqtt-sparkplug-plus
 5. Configure downstream node-red nodes to handle NCMDs (write commands)
 
 ## Input
-The **mqtt sparkplug device** expects the metrics in the following input payload format
+The **mqtt sparkplug device** expects the metrics in the following input payload format. DataTypes can be added, but it will be added automaticly by the node if omitted
 
 ```
 msg.payload = {

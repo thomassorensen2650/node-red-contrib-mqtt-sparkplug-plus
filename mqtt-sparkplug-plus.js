@@ -21,14 +21,33 @@ module.exports = function(RED) {
     var HttpsProxyAgent = require('https-proxy-agent');
     var url = require('url');
 
+
     /**
-     * 
+     * Sparkplug dates are always send a Unix Time. This function attached the timestamp to the object
+     * and converts in to unix time (EPOC) if required. If timestsamp is invalid, then the current time will be added
+     * @param {object} object object to add timestamp to
+     * @param {Date|Number} timestamp the timestamp to add
+     * @returns Object with Timestamp
+     */
+    /*function addTimestampToObject(object, timestamp) {
+        // 
+        if (timestamp instanceof Date && !isNaN(timestamp)) {
+            timestamp = timestamp.getTime();
+        }else if (!isNaN(timestamp)){
+            timestamp = new Date().getTime(); //TODO : We should add a warning here
+        }
+        object.timestamp = timestamp;
+        return object;
+    }; */
+
+    /**
+     * Sparkplug Encode Payload
      * @param {object} payload object to encode 
      * @returns a sparkplug B encoded Buffer
      */
     function sparkplugEncode(payload) {
-            //return payload;
-            return spPayload.encodePayload(payload);
+        // return JSON.stringify(payload); // for debugging
+        return spPayload.encodePayload(payload);
     }
         
     /**
@@ -37,9 +56,8 @@ module.exports = function(RED) {
      * @returns {Object} decoded JSON object
      */
     function sparkplugDecode(payload_) {
-            //return payload;
-            var buffer = Buffer.from(payload_);
-            return spPayload.decodePayload(buffer);
+        var buffer = Buffer.from(payload_);
+        return spPayload.decodePayload(buffer);
     }
 
 
@@ -74,17 +92,22 @@ module.exports = function(RED) {
             this.on("input",function(msg,send,done) {
                 if (msg.hasOwnProperty("payload") && typeof msg.payload === 'object' || msg.payload !== null) {
 
-                    if (msg.payload.hasOwnProperty("metrics")) {
+                    if (msg.payload.hasOwnProperty("metrics") && Array.isArray(msg.payload.metrics)) {
                         let _metrics = [];
                         msg.payload.metrics.forEach(m => {
                             
                             if (!m.hasOwnProperty("name")){
-                                node.warn("Each metric must have a name attribute")
-                            } else if (!m.hasOwnProperty("value")) {
-                                //node.warn(`The metric ${m.name} can't be written without a value`);
-                                m.is_null = true;
+                                this.warn(RED._("mqtt-sparkplug-plus.errors.missing-attribute-name"));
                             } else if (this.metrics.hasOwnProperty(m.name)) {
-    
+                                
+                                if (!m.hasOwnProperty("value")) {
+                                    m.is_null = true;
+                                }
+                                // Sparkplug dates are always send a Unix Time
+                                if (m.timestamp instanceof Date && !isNaN(m.timestamp)) {
+                                    this.metrics.timestamp = this.metrics.timestamp.getTime();
+                                }
+
                                 // Type must be send on every message per the specicications (not sure why)
                                 // We already know then type, so lets append it if it not already there
                                 if (!m.hasOwnProperty("type")) {
@@ -99,7 +122,7 @@ module.exports = function(RED) {
                                 }
                                 _metrics.push(m);
                             }else {
-                                node.warn(`The metric ${m.name} is not known by the device`);
+                                node.warn(RED._("mqtt-sparkplug-plus.errors.device-unknown-metric", m));
                             }
                         });
 
@@ -108,20 +131,19 @@ module.exports = function(RED) {
                         }else if (_metrics.length > 0) { // SEND DDATA
                             let dMsg = this.brokerConn.createMsg(this.name, "DDATA", _metrics, done);
                             if (dMsg) {
+                        //        if (msg.payload.timestamp) {
+                        //           addTimestampToObject(dMsg, msg.payload.timestamp)
+                        //        }
                                 this.brokerConn.publish(dMsg, done); 
                             }
                         }
                     }else 
                     {
-                        node.warn("No metrics in payload");
+                        node.warn(RED._("mqtt-sparkplug-plus.errors.device-no-metrics"));
                         done();
                     }
-                } else if (msg.hasOwnProperty("toDecode")) {
-                    msg.decoded = sparkplugDecode(msg.toDecode);
-                    node.send(msg);
-                    done();
                 } else {
-                    node.warn("Payload must be of type object");
+                    node.warn(RED._("mqtt-sparkplug-plus.errors.payload-type-object"));
                     done();
                 }
             }); // end input
@@ -142,7 +164,7 @@ module.exports = function(RED) {
                     };
                     node.send(msg);
                 } catch (e) {
-                    node.error(`Unable to decode DCMD Sparkplug message: ${e.toString()}`);
+                    node.error(RED._("mqtt-sparkplug-plus.errors.unable-to-decode-message", {type : "DCMD", error: e.toString()}));
                 }
             });
             this.on('close', function(done) {
@@ -157,19 +179,6 @@ module.exports = function(RED) {
     function matchTopic(ts,t) {
         if (ts == "#") {
             return true;
-        }
-        /* The following allows shared subscriptions (as in MQTT v5)
-           http://docs.oasis-open.org/mqtt/mqtt/v5.0/cs02/mqtt-v5.0-cs02.html#_Toc514345522
-
-           4.8.2 describes shares like:
-           $share/{ShareName}/{filter}
-           $share is a literal string that marks the Topic Filter as being a Shared Subscription Topic Filter.
-           {ShareName} is a character string that does not include "/", "+" or "#"
-           {filter} The remainder of the string has the same syntax and semantics as a Topic Filter in a non-shared subscription. Refer to section 4.7.
-        */
-        else if(ts.startsWith("$share")){
-            ts = ts.replace(/^\$share\/[^#+/]+\/(.*)/g,"$1");
-
         }
         var re = new RegExp("^"+ts.replace(/([\[\]\?\(\)\\\\$\^\*\.|])/g,"\\$1").replace(/\+/g,"[^/]+").replace(/\/#$/,"(\/.*)?")+"$");
         return re.test(t);
@@ -204,7 +213,6 @@ module.exports = function(RED) {
         this.seq = 0;
 
         /**
-         * 
          * @returns the next sequence number for the payload
          */
         this.nextSeq = function() {
@@ -223,8 +231,8 @@ module.exports = function(RED) {
          */
         this.createMsg = function(deviceName, msgType, metrics, done) {
             let that = this;
-            let topic = deviceName ? `spBv1.0/${this.deviceGroup}/${msgType}/${that.eonName}/${deviceName}` :
-                                     `spBv1.0/${this.deviceGroup}/${msgType}/${that.eonName}`;
+            let topic = deviceName ? `spBv1.0/${this.deviceGroup}/${msgType}/${this.eonName}/${deviceName}` :
+                                     `spBv1.0/${this.deviceGroup}/${msgType}/${this.eonName}`;
             let msg = {
                 topic : topic,
                 payload : {
@@ -237,7 +245,7 @@ module.exports = function(RED) {
             try {
                 msg.payload = sparkplugEncode(msg.payload); 
             }catch (e) {
-                node.error(`Unable to crate '${msgType}' Message`, e);
+                node.error(RED._("mqtt-sparkplug-plus.errors.unable-to-encode-message", {type : msgType, error: e.toString()}));
                 done(e);
                 return null;
             }
@@ -539,7 +547,7 @@ module.exports = function(RED) {
         };
 
         /**
-         * 
+         * Handle NCMD commands from Broker
          * @param {object} payload sparkplug encoded payload
          */
         this.handleNCMD = function(payload) {
@@ -559,13 +567,12 @@ module.exports = function(RED) {
                         }
                     })
                 }else {
-                    node.warn("Unknown NCMD Recieved (Metrics is not an Array)");
+                    node.warn(RED._("mqtt-sparkplug-plus.errors.unable-to-decode-message", {type : "NCMD", error: "Metrics is not an Array"}));
                 }
 
             }catch (e) {
-                node.error("Unable to decode NCMD", e);
+                node.error(RED._("mqtt-sparkplug-plus.errors.unable-to-decode-message", {type : "NCMD", error: e.toString()}));
             }
-
         };
 
         this.subscriptionIds = {};
