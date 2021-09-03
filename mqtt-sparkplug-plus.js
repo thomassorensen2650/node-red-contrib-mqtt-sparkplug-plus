@@ -60,7 +60,6 @@ module.exports = function(RED) {
         return spPayload.decodePayload(buffer);
     }
 
-
     function MQTTSparkplugDeviceNode(n) {
         RED.nodes.createNode(this,n);
         this.broker = n.broker;

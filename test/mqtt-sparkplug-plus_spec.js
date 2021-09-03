@@ -3,6 +3,8 @@ var sparkplugNode = require("../mqtt-sparkplug-plus.js");
 var should = require("should");
 var mqtt = require("mqtt");
 var client = null;
+var spPayload = require('sparkplug-payload').get("spBv1.0");
+
 
 helper.init(require.resolve('node-red'));
 let testBroker = 'mqtt://localhost';//'mqtt://test.mosquitto.org';
@@ -62,21 +64,20 @@ describe('mqtt sparkplug device node', function () {
 		});
 	  });
 
-
-
 	  /**
-	   * FIXME : Clean up.
+	   * Verify NBirth is send when starting up Node-Red with a Device loaded.
 	   */
-	  it('should send NBirth message ', function (done) {
+	  it('should send NBirth message', function (done) {
 		client = mqtt.connect(testBroker);
 		let n1;
+		let b1;
 		client.on('connect', function () {
 			client.subscribe('#', function (err) {
 			  if (!err) {
 				helper.load(sparkplugNode, simpleFlow, function () {
 					try {
 						n1 = helper.getNode("n1");
-						var b1 = n1.brokerConn;
+						b1 = n1.brokerConn;
 					}catch (e) {
 						done(e);
 					}
@@ -86,8 +87,16 @@ describe('mqtt sparkplug device node', function () {
 		  });
 
 		  client.on('message', function (topic, message) {
-			// Verify that we sent a DBirth Message
+			// Verify that we sent a DBirth Message to the broker
 			if (topic === "spBv1.0/My Devices/NBIRTH/Node-Red"){
+				var buffer = Buffer.from(message);
+				var payload = spPayload.decodePayload(buffer);
+				payload.should.have.property("timestamp").which.is.a.Number();
+				payload.metrics.should.containDeep([
+					{ name: 'Node Control/Rebirth', type: 'Boolean', value: false },
+					{ name: 'bdSeq', type: 'Int8', value: 0 }
+				 ]);
+				payload.should.have.property("seq").which.is.eql(0);
 				done();
 				client.end();
 			}
@@ -99,7 +108,6 @@ describe('mqtt sparkplug device node', function () {
 	//   Test metric with no name
 	//   Test metrics as object (should be array)
 	//   Test unknown metric data type
-	//   Test 
 	//   Test metric date as Data Object (should be converted to EPOC)
 	//   Test DBIRTH
 	//   Test NDEATH
