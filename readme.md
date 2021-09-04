@@ -22,6 +22,15 @@ The following features are not yet supported:
 npm install node-red-contrib-mqtt-sparkplug-plus
 
 # Usage
+The easiest way to get started is to start with the example that is provided with the module
+## From Example
+1. Open the Node-Red Export Dialog
+2. Select the Examples Tab
+3. Navigate to Node-red-contrib-mqtt-sparkplug-plus, and select the Simple Device Example
+4. Deploy changes to Node-Red
+5. Press the "Send Metrics" Inject node to write metrics to the new device (You'll need a MQTT broker running on your local computer) 
+
+## Manual Configuration
 1. Drag a **mqtt sparkplug device** to the Node-Red Runtime. 
 2. Configure MQTT broker connection for the device
 3. Configure the name (this will be the name used in the messages) and the metrics

@@ -394,6 +394,8 @@ describe('mqtt sparkplug device node', function () {
 	// FIXME add unit testing:
 	//   Test unknown metric data type
 	//   Test NDEATH
+	//   Test Null Value
+	//   Test Invalid DCMD
 	//   
 });
 
