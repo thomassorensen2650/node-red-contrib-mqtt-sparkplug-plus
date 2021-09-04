@@ -396,6 +396,6 @@ describe('mqtt sparkplug device node', function () {
 	//   Test NDEATH
 	//   Test Null Value
 	//   Test Invalid DCMD
-	//   
+	//   Test Rebirth
 });
 
