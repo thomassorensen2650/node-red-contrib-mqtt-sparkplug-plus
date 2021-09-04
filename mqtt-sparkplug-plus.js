@@ -89,8 +89,8 @@ module.exports = function(RED) {
 
             this.status({fill:"red",shape:"ring",text:"node-red:common.status.disconnected"});
             this.on("input",function(msg,send,done) {
-                if (msg.hasOwnProperty("payload") && typeof msg.payload === 'object' || msg.payload !== null) {
-
+                if (msg.hasOwnProperty("payload") && typeof msg.payload === 'object' && msg.payload !== null && !Array.isArray(msg.payload)) {
+                 
                     if (msg.payload.hasOwnProperty("metrics") && Array.isArray(msg.payload.metrics)) {
                         let _metrics = [];
                         msg.payload.metrics.forEach(m => {
@@ -102,9 +102,10 @@ module.exports = function(RED) {
                                 if (!m.hasOwnProperty("value")) {
                                     m.is_null = true;
                                 }
+
                                 // Sparkplug dates are always send a Unix Time
                                 if (m.timestamp instanceof Date && !isNaN(m.timestamp)) {
-                                    this.metrics.timestamp = this.metrics.timestamp.getTime();
+                                    m.timestamp = m.timestamp.getTime();
                                 }
 
                                 // Type must be send on every message per the specicications (not sure why)
@@ -125,7 +126,12 @@ module.exports = function(RED) {
                             }
                         });
 
-                        if (!this.birthMessageSend) {    // Send DBIRTH
+                        if (!this.brokerConn.connected) {
+                            // we dont want to publish anything if we are not connected
+                            // if we publish here, then the messages will be queued by the MQTT Client
+                            // and we need NBIRTH to be seq 0
+                        }
+                        else if (!this.birthMessageSend) {    // Send DBIRTH
                             this.trySendBirth(done);
                         }else if (_metrics.length > 0) { // SEND DDATA
                             let dMsg = this.brokerConn.createMsg(this.name, "DDATA", _metrics, done);
@@ -138,11 +144,11 @@ module.exports = function(RED) {
                         }
                     }else 
                     {
-                        node.warn(RED._("mqtt-sparkplug-plus.errors.device-no-metrics"));
+                        node.error(RED._("mqtt-sparkplug-plus.errors.device-no-metrics"));
                         done();
                     }
                 } else {
-                    node.warn(RED._("mqtt-sparkplug-plus.errors.payload-type-object"));
+                    node.error(RED._("mqtt-sparkplug-plus.errors.payload-type-object"));
                     done();
                 }
             }); // end input
