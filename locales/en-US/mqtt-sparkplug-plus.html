@@ -19,7 +19,10 @@
         <li>Buffering (Primary SCADA)</li>
         <li>MQTT Broker redundancy</li>
     </ul>
-
+    <h3>Getting Started</h3>
+    <p>The easiest way to get started is to import the example node.</p>
+    
+    <p>You do that by pressing the Import button in Node-Red, and selecting the Examples Tab, and open the <i>node-red-contrib-mqtt-sparkplug-plus</i> - <b>Simple Device</b> Example</p>
     <h3>Inputs</h3>
     <p>One or more metrics can be published by the device by passing the metrics information to the input of the device. A birth message will not be send before all metrics have been received at least once. so make sure to pass all metrics on start up.</p>
     <p>if a metric does not have a value then a "is_null" attribute is added to the metric</p>
