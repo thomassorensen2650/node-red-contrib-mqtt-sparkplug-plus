@@ -22,7 +22,8 @@ The following features are not yet supported:
 npm install node-red-contrib-mqtt-sparkplug-plus
 
 # Usage
-The easiest way to get started is to start with the example that is provided with the module
+The easiest way to get started is to start with the example that is provided with the module.
+
 ## From Example
 1. Open the Node-Red Export Dialog
 2. Select the Examples Tab
