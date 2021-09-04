@@ -284,10 +284,10 @@
             metrics: {value:{}, required:true, validate : x => Object.keys(x).length > 0 },
             broker: {type:"mqtt-sparkplug-broker", required:true}
         },
-        color:"#d8bfd8",
+        color:"#2181a6",
         inputs:1,
         outputs:1,
-        icon: "bridge.svg",
+        icon: "sparkplug.svg",
         align: "right",
         label: function() {
             return this.name||"Sparkplug Device";
