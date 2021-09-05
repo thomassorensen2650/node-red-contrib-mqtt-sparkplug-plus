@@ -454,7 +454,7 @@ module.exports = function(RED) {
             
             node.publish(nbirth);
             for (var id in node.users) {
-                if (node.users.hasOwnProperty(id)) {
+                if (node.users.hasOwnProperty(id) && node.users[id].trySendBirth) {
                     node.users[id].birthMessageSend = false;
                     node.users[id].trySendBirth(x=>{});
                 }
@@ -710,5 +710,65 @@ module.exports = function(RED) {
             password: {type: "password"}
         }
     });
+
+    /**
+     * MQTT In node subscribes to MQTT Topics and output them to Node-Red as messages
+     * @param {object} n node 
+     * @returns 
+     */
+    function MQTTInNode(n) {
+        RED.nodes.createNode(this,n);
+        this.topic = n.topic;
+        this.qos = parseInt(n.qos);
+
+        if (isNaN(this.qos) || this.qos < 0 || this.qos > 2) {
+            this.qos = 2;
+        }
+        this.broker = n.broker;
+        this.brokerConn = RED.nodes.getNode(this.broker);
+        if (!/^(#$|(\+|[^+#]*)(\/(\+|[^+#]*))*(\/(\+|#|[^+#]*))?$)/.test(this.topic)) {
+            return this.warn(RED._("mqtt.errors.invalid-topic"));
+        }
+
+        var node = this;
+        if (this.brokerConn) {
+            this.status({fill:"red",shape:"ring",text:"node-red:common.status.disconnected"});
+            if (this.topic) {
+                node.brokerConn.register(this);
+                let options = { qos: this.qos };
+
+                this.brokerConn.subscribe(this.topic,options, function(topic,payload,packet) {
+                    
+                    // Decode Payload
+                    try {
+                        payload = sparkplugDecode(payload);
+                    } catch (e) {
+                        node.warn(e);
+                    }
+                    var msg = {topic:topic, payload:payload, qos:packet.qos, retain:packet.retain};
+
+                    if ((node.brokerConn.broker === "localhost")||(node.brokerConn.broker === "127.0.0.1")) {
+                        msg._topic = topic;
+                    }
+                    node.send(msg);
+                }, this.id);
+                if (this.brokerConn.connected) {
+                    node.status({fill:"green",shape:"dot",text:"node-red:common.status.connected"});
+                }
+            }
+            else {
+                this.error(RED._("mqtt.errors.not-defined"));
+            }
+            this.on('close', function(removed, done) {
+                if (node.brokerConn) {
+                    node.brokerConn.unsubscribe(node.topic,node.id, removed);
+                    node.brokerConn.deregister(node,done);
+                }
+            });
+        } else {
+            this.error(RED._("mqtt.errors.missing-config"));
+        }
+    }
+    RED.nodes.registerType("mqtt sparkplug in", MQTTInNode);
 
 };
