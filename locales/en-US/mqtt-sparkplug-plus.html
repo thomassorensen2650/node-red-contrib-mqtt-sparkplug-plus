@@ -1,8 +1,5 @@
 <script type="text/html" data-help-name="mqtt sparkplug device">
-   <p>
-    MQTT-Sparkplug-Plus is a set of Node-Red nodes that will enable Node-Red to act as a <a href="https://s3.amazonaws.com/ignition-modules/Current/Sparkplug+Specification.pdf">MQTT Sparkplug B</a> complient EoN Node.</p>
-    
-    <p>The client will connect to an MQTT Server and act as an MQTT Edge of Network (EoN) Node. The client current handles the following features:</p>
+    <p>This node will connect to an MQTT Server and act as an MQTT Edge of Network (EoN) Node. The node handles the following message types:</p>
     
     <ul>
         <li>DBIRTH</li>
@@ -13,7 +10,7 @@
         <li>NBIRTH</li>
     </ul>
 
-  <p>The following features are not supported yet:</p>
+  <p>The following features are not supported (yet):</p>
     <ul>
         <li>Non-metrics (body/Metadata)</li>
         <li>Buffering (Primary SCADA)</li>
@@ -34,7 +31,8 @@
             "metrics": [
                 {
                     "name": "testing/test1",
-                    "timestamp" : new Date(), // Timestamp  is optional.
+                    // Timestamp  is optional.
+                    "timestamp" : new Date(),
                     "value": 11
                 },
                 {

@@ -281,13 +281,15 @@
         category: 'network',
         defaults: {
             name: {value:"",  validate :x => /^[^/+#]*$/.test(x) },
-            metrics: {value:{}, required:true, validate : x => Object.keys(x).length > 0 },
+            metrics: {value:{}, required:true, validate : x => Object.keys(x).length > 0 }, // do regex matching of invalid charaters (e.g. # or +)
             broker: {type:"mqtt-sparkplug-broker", required:true}
         },
         color:"#2181a6",
         inputs:1,
         outputs:1,
         icon: "sparkplug.svg",
+        inputLabels: "DDATA Details",
+        outputLabels: "DCMD",
         align: "right",
         label: function() {
             return this.name||"Sparkplug Device";

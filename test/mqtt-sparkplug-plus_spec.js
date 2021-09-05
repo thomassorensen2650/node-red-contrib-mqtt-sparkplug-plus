@@ -2,9 +2,8 @@ var helper = require("node-red-node-test-helper");
 var sparkplugNode = require("../mqtt-sparkplug-plus.js");
 var should = require("should");
 var mqtt = require("mqtt");
-var client = null;
-var spPayload = require('sparkplug-payload').get("spBv1.0");
 
+var spPayload = require('sparkplug-payload').get("spBv1.0");
 
 helper.init(require.resolve('node-red'));
 let testBroker = 'mqtt://localhost';//'mqtt://test.mosquitto.org';
@@ -39,6 +38,7 @@ var simpleFlow = [
 		"credentials": {}
 	}
 ];
+var client = null;
 
 beforeEach(function (done) {
 	helper.startServer(done);
@@ -165,6 +165,79 @@ describe('mqtt sparkplug device node', function () {
 				//client.end();
 			}
 			
+		});
+
+	}); // it end 
+
+	it('should send REBIRTH messages', function (done) {
+		client = mqtt.connect(testBroker);
+		var initBirthDone = false;
+		let n1;
+		let b1;
+		client.on('connect', function () {
+			client.subscribe('#', function (err) {
+			  if (!err) {
+				helper.load(sparkplugNode, simpleFlow, function () {
+					try {
+						n1 = helper.getNode("n1");
+						b1 = n1.brokerConn;
+
+						// Send all metrics to trigger DBIRTH
+						n1.receive({
+							"payload" : {
+								"metrics": [
+									{
+										"name": "test",
+										"value": 11,
+									},
+									{
+										"name": "test2",
+										"value": 11
+									}
+								]}
+							}
+						);
+					}catch (e) {
+						done(e);
+					}
+				});
+			  }
+			})
+		  });
+
+		  client.on('message', function (topic, message) {
+			  
+			if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red") {
+				if (initBirthDone === true) {
+					var buffer = Buffer.from(message);
+					var payload = spPayload.decodePayload(buffer);
+					// Verify that we reset the seq to 0
+					payload.should.have.property("seq").which.is.eql(1);
+				}
+			} else if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TEST2"){
+					// Ready to issue rebirth
+					if (initBirthDone === true) {
+						var buffer = Buffer.from(message);
+						var payload = spPayload.decodePayload(buffer);
+						payload.should.have.property("seq").which.is.eql(1);
+						done();
+	
+					} else {
+						var rebirth = {
+							metrics : [
+							{
+								"name" : "Node Control/Rebirth",
+								"type" : "Boolean",
+								"value": true
+							},
+						]
+					}	
+					var payload = spPayload.encodePayload(rebirth);
+	
+					client.publish("spBv1.0/My Devices/NCMD/Node-Red",payload);
+					initBirthDone = true;
+					}
+				}
 		});
 
 	}); // it end 
@@ -373,10 +446,10 @@ describe('mqtt sparkplug device node', function () {
 		helper.load(sparkplugNode, simpleFlow, function () {
 		
 			let n1 = helper.getNode("n1");
-			n1.on('input', () => {
+			/*n1.on('input', () => {
 				n1.error.should.be.calledWithExactly("Metrics should be an Array");
 				done();
-			  });
+			  });*/
 			n1.receive({
 				"payload" : ["A", "B"]
 			});
@@ -391,11 +464,80 @@ describe('mqtt sparkplug device node', function () {
 		}); // end helper
 	}); // it end 
 
+	it('should error on DData invaid data type', function (done) {
+		client = mqtt.connect(testBroker);
+		let n1;
+		let b1;
+		client.on('connect', function () {
+			client.subscribe('#', function (err) {
+			  if (!err) {
+				helper.load(sparkplugNode, simpleFlow, function () {
+					try {
+						n1 = helper.getNode("n1");
+						b1 = n1.brokerConn;
+
+						// Send all metrics to trigger DBIRTH
+						n1.receive({
+							"payload" : {
+								"metrics": [
+									{
+										"name": "test",
+										"value": 11
+									},
+									{
+										"name": "test2",
+										"value": 11
+									}
+								]}
+							}
+						);
+					}catch (e) {
+						done(e);
+					}
+				});
+			  }
+			})
+		  });
+
+		  client.on('message', function (topic, message) {
+			// Verify that we sent a DBirth Message to the broker
+			//console.log("TOPIC:", topic);
+			if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TEST2"){
+				n1.receive({
+					"payload" : {
+						"metrics": [
+							{
+								"name": "test",
+								"value": 100,
+								"type": "Not my"
+								//"timestamp": new Date()
+							},
+						]}
+					}
+				);
+			} else if (topic === "spBv1.0/My Devices/DDATA/Node-Red/TEST2") {
+				var buffer = Buffer.from(message);
+				var payload = spPayload.decodePayload(buffer);
+				console.log(payload);
+				payload.should.have.property("timestamp").which.is.a.Number();
+				payload.metrics[0].should.have.property("name").which.is.eql("test");
+				payload.metrics[0].should.have.property("value").which.is.eql(100);
+				payload.metrics[0].should.have.property("type").which.is.eql("Int32");
+				//payload.metrics[0].should.have.property("timestamp").which.is.a.Number();
+				payload.metrics.length.should.eql(1);
+				Object.keys(payload.metrics[0]).length.should.eql(3);
+				payload.should.have.property("seq").which.is.eql(2); // 0 is NBIRTH, 1 is DBIRTH
+				done();
+				//client.end();
+			}
+			
+		});
+
+	}); // it end 
 	// FIXME add unit testing:
 	//   Test unknown metric data type
 	//   Test NDEATH
 	//   Test Null Value
 	//   Test Invalid DCMD
-	//   Test Rebirth
 });
 
