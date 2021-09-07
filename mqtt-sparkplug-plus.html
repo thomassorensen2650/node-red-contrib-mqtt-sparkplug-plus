@@ -11,7 +11,6 @@
   limitations under the License.
 -->
 <style>
-
     #sparkplug-input-metric-container-row .red-ui-editableList-header {
         display: flex;
         background: var(--red-ui-tertiary-background);
@@ -350,15 +349,17 @@
 <!-- MQTT Sparkplug Out -->
 <script type="text/html" data-template-name="mqtt sparkplug in">
     <div class="form-row">
-        <label for="node-input-broker"><i class="fa fa-globe"></i> <span data-i18n="mqtt.label.broker"></span></label>
+        <label for="node-input-broker"><i class="fa fa-globe"></i> <span data-i18n="[placeholder]Broker">Broker</span></label>
         <input type="text" id="node-input-broker">
     </div>
+
     <div class="form-row">
-        <label for="node-input-topic"><i class="fa fa-tasks"></i> <span data-i18n="common.label.topic"></span></label>
-        <input type="text" id="node-input-topic" data-i18n="[placeholder]common.label.topic">
+        <label for="node-input-name"><i class="fa fa-tag"></i> <span data-i18n="mqtt-sparkplug-plus.label.name"></span></label>
+        <input type="text" id="node-input-name" data-i18n="[placeholder]mqtt-sparkplug-plus.label.name">
     </div>
+
     <div class="form-row">
-        <label for="node-input-qos"><i class="fa fa-empire"></i> <span data-i18n="mqtt.label.qos"></span></label>
+        <label for="node-input-qos"><i class="fa fa-empire"></i> <span data-i18n="mqtt-sparkplug-plus.label.qos"></span></label>
         <select id="node-input-qos" style="width:125px !important">
             <option value="0">0</option>
             <option value="1">1</option>
@@ -367,9 +368,68 @@
     </div>
 
     <div class="form-row">
+       
+        <p>Apply the following topic filters:</p>
+    </div>
+
+    <!-- Group 
+    <div class="form-row">
+        <label for="node-input-group-all"><i class="fa fa-object-group"></i> <span data-i18n="mqtt-sparkplug-plus.label.group"></span></label>
+        <label for="node-input-group-all" style="width:70%">
+        <input type="checkbox" id="node-input-group-all" style="display:inline-block; width:22px; vertical-align:top;"><span data-i18n="mqtt-sparkplug-plus.label.allgroups"></span>
+        </label>
+    </div>-->
+    
+    <div class="form-row">
+        <label for="node-input-group-all"><i class="fa fa-object-group"></i> <span data-i18n="mqtt-sparkplug-plus.label.group"></span></label>
+        <input type="text" id="node-input-group" placeholder="+">
+    </div>
+
+
+    <!-- Node 
+    <div class="form-row">
+        <label for="node-input-node-all"><i class="fa fa-cube"></i> <span data-i18n="mqtt-sparkplug-plus.label.eon"></span></label>
+        <label for="node-input-node-all" style="width:70%">
+        <input type="checkbox" id="node-input-node-all" style="display:inline-block; width:22px; vertical-align:top;"><span data-i18n="mqtt-sparkplug-plus.label.allnodes"></span>
+        </label>
+    </div>-->
+
+    <div class="form-row">
+        <label for="node-input-node"><i class="fa fa-cube"></i> <span data-i18n="mqtt-sparkplug-plus.label.eon"></span></label>
+        <input type="text" id="node-input-node" placeholder="+">
+    </div>
+
+    <!-- Message Type 
+    <div class="form-row">
+        <label for="node-input-messagetype-all"><i class="fa fa-comments-o"></i> <span data-i18n="mqtt-sparkplug-plus.label.messagetype"></span></label>
+        <label for="node-input-messagetype-all" style="width:70%">
+        <input type="checkbox" id="node-input-messagetype-all" style="display:inline-block; width:22px; vertical-align:top;"><span data-i18n="mqtt-sparkplug-plus.label.allmessagetypes"></span>
+        </label>
+    </div> -->
+    <div class="form-row">
+        <label for="node-input-messagetype"><i class="fa fa-comments-o"></i> <span data-i18n="mqtt-sparkplug-plus.label.messagetype"></span></label>
+        <input type="text" id="node-input-messagetype" placeholder="NDATA">
+    </div>
+
+    <!-- Device 
+    <div class="form-row">
+        <label for="node-input-device-all"><i class="fa fa-microchip"></i> <span data-i18n="mqtt-sparkplug-plus.label.device"></span></label>
+        <label for="node-input-device-all" style="width:70%">
+        <input type="checkbox" id="node-input-device-all" style="display:inline-block; width:22px; vertical-align:top;"><span data-i18n="mqtt-sparkplug-plus.label.alldevices"></span>
+        </label>
+    </div>-->
+    <div class="form-row">
+        <label for="node-input-device"><i class="fa fa-microchip"></i> <span data-i18n="mqtt-sparkplug-plus.label.device"></span></label>
+        <input type="text" id="node-input-device" placeholder="+">
+    </div>
+
+
+    <!--
+    <div class="form-row">
         <label for="node-input-name"><i class="fa fa-tag"></i> <span data-i18n="common.label.name"></span></label>
         <input type="text" id="node-input-name" data-i18n="[placeholder]common.label.name">
-    </div>
+    </div> -->
+    <div class="form-tips"><span data-i18n="mqtt-sparkplug-plus.tipin"></span></div>
 </script>
 
 <script type="text/javascript">
@@ -377,8 +437,12 @@
         category: 'network',
         defaults: {
             name: {value:""},
-            topic: {value:"",required:true,validate: RED.validators.regex(/^(#$|(\+|[^+#]*)(\/(\+|[^+#]*))*(\/(\+|#|[^+#]*))?$)/)},
+            node: {value:"", validate: RED.validators.regex(/^[^/#]*$/)},
+            group: {value:"", validate: RED.validators.regex(/^[^/#]*$/)},
+            device: {value:"", validate: RED.validators.regex(/^[^/#]*$/)},
+            messagetype: {value:"", validate: RED.validators.regex(/^[^/#]*$/)},
             qos: {value: "2"},
+
             broker: {type:"mqtt-sparkplug-broker", required:true},
 
         },
@@ -387,7 +451,7 @@
         outputs:1,
         icon: "sparkplugio.svg",
         label: function() {
-            return this.name||this.topic||"sparkplug";
+            return this.name ? this.name : `spBv1.0/${this.group||"+"}/${this.messagetype||"DDATA"}/${this.node||"+"}/${this.device||"+"}`;
         },
         labelStyle: function() {
             return this.name?"node_label_italic":"";
@@ -396,6 +460,10 @@
             if (this.qos === undefined) {
                 $("#node-input-qos").val("2");
             }
+
+            let topicParts = this.topic.split("/");
+            his.topic = `spBv1.0/${this.group||"+"}/${this.messagetype||"DDATA"}/${this.node||"+"}/${this.device||"+"}`;
+
         }
     });
     </script>

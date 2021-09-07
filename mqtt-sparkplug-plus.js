@@ -720,6 +720,12 @@ module.exports = function(RED) {
         RED.nodes.createNode(this,n);
         this.topic = n.topic;
         this.qos = parseInt(n.qos);
+        this.name = n.name;
+        //this.device = n.device||"+";
+        //this.node = n.node||"+";
+        //this.group = n.group||"+";
+        //this.messagetype = n.messagetype||"NDATA";
+        //this.topic = `spBv1.0/${this.group||"+"}/${this.messagetype||"DDATA"}/${this.node||"+"}/${this.device||"+"}`;
 
         if (isNaN(this.qos) || this.qos < 0 || this.qos > 2) {
             this.qos = 2;
@@ -757,7 +763,7 @@ module.exports = function(RED) {
                 }
             }
             else {
-                this.error(RED._("mqtt.errors.not-defined"));
+                this.error(RED._("mqtt-sparkplug-plus.errors.not-defined"));
             }
             this.on('close', function(removed, done) {
                 if (node.brokerConn) {
@@ -766,7 +772,7 @@ module.exports = function(RED) {
                 }
             });
         } else {
-            this.error(RED._("mqtt.errors.missing-config"));
+            this.error(RED._("mqtt-sparkplug-plus.errors.missing-config"));
         }
     }
     RED.nodes.registerType("mqtt sparkplug in", MQTTInNode);
