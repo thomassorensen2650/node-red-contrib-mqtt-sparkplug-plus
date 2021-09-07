@@ -67,3 +67,23 @@
         <h4>DDEATH</h4>
         <p>DDEATH is not currently supported.</p>    
 </script>
+
+<script type="text/html" data-help-name="mqtt sparkplug in">
+    <p>Connects to a MQTT broker and subscribes to messages from the specified topic.</p>
+        <h3>Outputs</h3>
+        <dl class="message-properties">
+           <dt>payload <span class="property-type">string | buffer</span></dt>
+           <dd>a string unless detected as a binary buffer.</dd>
+           <dt>topic <span class="property-type">string</span></dt>
+           <dd>the MQTT topic, uses / as a hierarchy separator.</dd>
+           <dt>qos <span class="property-type">number</span> </dt>
+           <dd>0, fire and forget - 1, at least once - 2, once and once only.</dd>
+           <dt>retain <span class="property-type">boolean</span></dt>
+           <dd>true indicates the message was retained and may be old.</dd>
+        </dl>
+        <h3>Details</h3>
+        The subscription topic can include MQTT wildcards, + for one level, # for multiple levels.</p>
+        <p>This node requires a connection to a MQTT broker to be configured. This is configured by clicking
+        the pencil icon.</p>
+        <p>Several MQTT nodes (in or out) can share the same broker connection if required.</p>
+    </script>

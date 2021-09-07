@@ -733,7 +733,7 @@ module.exports = function(RED) {
         this.broker = n.broker;
         this.brokerConn = RED.nodes.getNode(this.broker);
         if (!/^(#$|(\+|[^+#]*)(\/(\+|[^+#]*))*(\/(\+|#|[^+#]*))?$)/.test(this.topic)) {
-            return this.warn(RED._("mqtt.errors.invalid-topic"));
+            return this.warn(RED._("mqtt-sparkplug-plus.errors.invalid-topic"));
         }
 
         var node = this;
@@ -748,15 +748,17 @@ module.exports = function(RED) {
                     // Decode Payload
                     try {
                         payload = sparkplugDecode(payload);
-                    } catch (e) {
-                        node.warn(e);
-                    }
-                    var msg = {topic:topic, payload:payload, qos:packet.qos, retain:packet.retain};
+                        var msg = {topic:topic, payload:payload, qos:packet.qos, retain:packet.retain};
 
-                    if ((node.brokerConn.broker === "localhost")||(node.brokerConn.broker === "127.0.0.1")) {
-                        msg._topic = topic;
+                        if ((node.brokerConn.broker === "localhost")||(node.brokerConn.broker === "127.0.0.1")) {
+                            msg._topic = topic;
+                        }
+                        node.send(msg);
+                    } catch (e) {
+                        //node.warn(e); // FIXME
+                        node.error(RED._("mqtt-sparkplug-plus.errors.unable-to-decode-message", {type : "", error: e.toString()}));
                     }
-                    node.send(msg);
+                    
                 }, this.id);
                 if (this.brokerConn.connected) {
                     node.status({fill:"green",shape:"dot",text:"node-red:common.status.connected"});

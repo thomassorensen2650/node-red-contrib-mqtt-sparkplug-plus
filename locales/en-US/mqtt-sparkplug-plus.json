@@ -3,6 +3,7 @@
         "label": {
             "name" : "Name",
             "username": "Username",
+            "topic": "Topic",
             "password": "Password",
             "device": "Device",
             "messagetype": "Msg. Type",
@@ -71,18 +72,18 @@
         "true": "true",
         "false": "false",
         "tip": "Tip: Use '/' to group related metrics e.g. Machine1/Speed",
-        "tipin": "Tip: Use '+' as a wildcard",
+        "tipin": "Topic format: namespace/group_id/message_type/edge_node_id/[device_id]",
         "errors": {
             "missing-config": "missing broker configuration",
             "missing-attribute-name": "All metrics must have a name",
             "nonclean-missingclientid": "No client ID set, using clean session",
-            "invalid-json-string": "Invalid JSON string",
-            "invalid-json-parse": "Failed to parse JSON string",
+            "invalid-topic": "The Topic is invalid",
             "device-unknown-metric": "The metric '__name__' is not recognized by the device",
             "device-no-metrics": "Metrics should be an Array",
             "payload-type-object": "Payload must be of type object",
             "unable-to-decode-message": "Unable to decode __type__ message. the error is : __error__",
-            "unable-to-encode-message": "Unable to encode __type__ message. the error is : __error__" 
+            "unable-to-encode-message": "Unable to encode __type__ message. the error is : __error__",
+            "not-defined": "Topic is not defined"
         }
     }	
 }
