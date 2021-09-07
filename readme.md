@@ -1,6 +1,6 @@
 # MQTT Sparkplug implementation for Node-Red
 
-MQTT-Sparkplug-Plus is a set of Node-Red nodes, that will enable Node-Red to communicate via MQTT Sparkplug. It contains the followings nodes:
+MQTT-Sparkplug-Plus is a set of Node-Red nodes, that will enable Node-Red to communicate using the sparkplug b protocol via MQTT. the package contains the followings nodes:
 
 ## mqtt sparkplug device
 The *mqtt sparkplug device * act as a [Sparkplug B complient](https://s3.amazonaws.com/ignition-modules/Current/Sparkplug+Specification.pdf) EoN Node. 
