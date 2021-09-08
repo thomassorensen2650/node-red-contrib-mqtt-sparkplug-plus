@@ -463,7 +463,7 @@ describe('mqtt sparkplug device node', function () {
 
 		}); // end helper
 	}); // it end 
-
+	/*
 	it('should error on DData invaid data type', function (done) {
 		client = mqtt.connect(testBroker);
 		let n1;
@@ -533,11 +533,92 @@ describe('mqtt sparkplug device node', function () {
 			
 		});
 
-	}); // it end 
+	}); // it end */
 	// FIXME add unit testing:
 	//   Test unknown metric data type
 	//   Test NDEATH
 	//   Test Null Value
 	//   Test Invalid DCMD
+
+
+	// MQTT IN
+	// Test that it works
+	// Test That filtering works
+	// That that it errors on invalid data
+	
+});
+
+
+var inExample = [
+    {
+        "id": "n2",
+        "type": "helper",
+    },
+    {
+        "id": "n1",
+        "type": "mqtt sparkplug in",
+        "name": "",
+        "topic": "#", //"spBv1.0/+/DDATA/+/+",
+        "qos": "2",
+        "broker": "b1",
+        "wires": [["n2"]]
+    },
+	{
+		"id": "b1",
+		"type": "mqtt-sparkplug-broker",
+		"name": "Local Host",
+		"deviceGroup": "My Devices",
+		"eonName": "Node-Red",
+		"broker": "localhost",
+		"port": "1883",
+		"clientid": "",
+		"usetls": false,
+		"protocolVersion": "4",
+		"keepalive": "60",
+		"cleansession": true,
+		"credentials": {}
+	}
+]
+
+ describe('mqtt sparkplug in node', function () {
+
+	var validMsg = {"timestamp":12345,"metrics":[{"name":"test","type":"Int32","value":100}],"seq":200}
+
+	// Connect to 
+	it('should ouput a subscribed topic', function (done) {
+
+		var testMsg = {
+			topic : "spBv1.0/My Devices/DDATA/Node-Red/TEST2",
+			payload : spPayload.encodePayload(validMsg)
+		}
+
+
+		client = mqtt.connect(testBroker);
+		client.on('connect', function () {
+			helper.load(sparkplugNode, inExample, function () {
+				
+				
+				var n2 = helper.getNode("n2");
+				n2.on("input", function (msg) {
+					try {
+					console.log("seq", msg.payload.seq);
+					msg.should.have.property('payload');
+					if (msg.payload.seq === 200) {
+						
+						msg.payload.should.deepEqual(validMsg);
+						done();
+					}else {
+						// Nasty hack, to make sure we publish after node is online. 
+						client.publish(testMsg.topic, testMsg.payload);
+					}
+					} catch(err) {
+						console.log("Error");
+					  done(err);
+					}
+				  });
+			});
+		});
+	});
+	
 });
 
