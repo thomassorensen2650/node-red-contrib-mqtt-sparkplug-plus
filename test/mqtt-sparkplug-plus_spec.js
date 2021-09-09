@@ -463,8 +463,9 @@ describe('mqtt sparkplug device node', function () {
 
 		}); // end helper
 	}); // it end 
-	/*
-	it('should error on DData invaid data type', function (done) {
+
+
+it('should add null_value on DData without value', function (done) {
 		client = mqtt.connect(testBroker);
 		let n1;
 		let b1;
@@ -508,27 +509,26 @@ describe('mqtt sparkplug device node', function () {
 						"metrics": [
 							{
 								"name": "test",
-								"value": 100,
-								"type": "Not my"
+								"value": null
 								//"timestamp": new Date()
 							},
 						]}
 					}
 				);
 			} else if (topic === "spBv1.0/My Devices/DDATA/Node-Red/TEST2") {
-				var buffer = Buffer.from(message);
-				var payload = spPayload.decodePayload(buffer);
-				console.log(payload);
-				payload.should.have.property("timestamp").which.is.a.Number();
-				payload.metrics[0].should.have.property("name").which.is.eql("test");
-				payload.metrics[0].should.have.property("value").which.is.eql(100);
-				payload.metrics[0].should.have.property("type").which.is.eql("Int32");
-				//payload.metrics[0].should.have.property("timestamp").which.is.a.Number();
-				payload.metrics.length.should.eql(1);
-				Object.keys(payload.metrics[0]).length.should.eql(3);
-				payload.should.have.property("seq").which.is.eql(2); // 0 is NBIRTH, 1 is DBIRTH
-				done();
-				//client.end();
+				try {
+					var buffer = Buffer.from(message);
+					var payload = spPayload.decodePayload(buffer);
+					console.log("Null value payload", payload);
+					payload.should.have.property("timestamp").which.is.a.Number();
+					payload.metrics[0].should.have.property("name").which.is.eql("test");
+					payload.metrics[0].should.have.property("value").which.is.eql(null);
+					payload.metrics[0].should.have.property("type").which.is.eql("Int32");
+					done();
+				} catch (e) {
+					done(e);
+				}
+
 			}
 			
 		});
@@ -549,6 +549,7 @@ describe('mqtt sparkplug device node', function () {
 });
 
 
+return;
 var inExample = [
     {
         "id": "n2",

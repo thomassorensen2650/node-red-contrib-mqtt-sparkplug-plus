@@ -98,9 +98,10 @@ module.exports = function(RED) {
                             if (!m.hasOwnProperty("name")){
                                 this.warn(RED._("mqtt-sparkplug-plus.errors.missing-attribute-name"));
                             } else if (this.metrics.hasOwnProperty(m.name)) {
-                                
+                               
                                 if (!m.hasOwnProperty("value")) {
-                                    m.is_null = true;
+                                    //m.is_null = true;
+                                    m.value = null; // the Sparkplug-payload module will create the isNull property
                                 }
 
                                 // Sparkplug dates are always send a Unix Time

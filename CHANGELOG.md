@@ -1,3 +1,20 @@
+### 0.0.6: Maintenance Release
+
+Fixed:
+- Null values are not correctly serialized.
+
+### 0.0.5: Maintenance Release
+
+Fixed:
+ - Updated documentation
+ - Standadized how invalid responses are handled
+ - Unit tests coverage is now 80%-90%
+ - majority of texts are from message catalog (i18n)
+
+New:
+ - Added _mqtt sparkplug in_ node (clone of mqtt in with sparkplug decoding builtin)
+ - Udated colors and logos of nodes.
+
 ### 0.0.4: Maintenance Release
 
 Fixed

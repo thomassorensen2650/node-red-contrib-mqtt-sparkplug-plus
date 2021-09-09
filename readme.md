@@ -3,7 +3,7 @@
 MQTT-Sparkplug-Plus is a set of Node-Red nodes, that will enable Node-Red to communicate with client over MQTT using the sparkplug b protocol. the package contains the followings nodes:
 
 ## mqtt sparkplug device
-The *mqtt sparkplug device * act as a [Sparkplug B complient](https://s3.amazonaws.com/ignition-modules/Current/Sparkplug+Specification.pdf) EoN Node. 
+The *mqtt sparkplug device* act as a [Sparkplug B complient](https://s3.amazonaws.com/ignition-modules/Current/Sparkplug+Specification.pdf) EoN Node. 
 
 The node will connect to an MQTT broker (server) and act as an MQTT Edge of Network (EoN) Node. The client current handles the following messages: 
 
@@ -23,7 +23,6 @@ The following features are not yet supported:
 The *mqtt sparkplug in* node makes it possible to subscribe to sparkplug b mqtt topics. the node functions the same way at the node-red *mqtt in* node, but it will decode the sparkplug/protobuf messages and deliver them in json.
 
 # Installation
-
 npm install node-red-contrib-mqtt-sparkplug-plus
 
 # Usage
