@@ -59,6 +59,14 @@ module.exports = function(RED) {
         return spPayload.decodePayload(buffer);
     }
 
+    function matchTopic(ts,t) {
+        if (ts == "#") {
+            return true;
+        }
+        var re = new RegExp("^"+ts.replace(/([\[\]\?\(\)\\\\$\^\*\.|])/g,"\\$1").replace(/\+/g,"[^/]+").replace(/\/#$/,"(\/.*)?")+"$");
+        return re.test(t);
+    }
+
     function MQTTSparkplugDeviceNode(n) {
         RED.nodes.createNode(this,n);
         this.broker = n.broker;
@@ -67,6 +75,7 @@ module.exports = function(RED) {
         this.metrics = n.metrics || {};
         this.birthMessageSend = false;
         
+        this.shouldBuffer = true; // hardcoded / Devices always buffers
         /**
          * try to send Sparkplug Birth Messages
          * @param {function} done Node-Red Done Function 
@@ -85,8 +94,6 @@ module.exports = function(RED) {
         this.brokerConn = RED.nodes.getNode(this.broker);
         var node = this;
         if (this.brokerConn) {
-
-            //this.status({fill:"red",shape:"ring",text:"node-red:common.status.disconnected"});
             this.on("input",function(msg,send,done) {
                 if (msg.hasOwnProperty("payload") && typeof msg.payload === 'object' && msg.payload !== null && !Array.isArray(msg.payload)) {
                  
@@ -156,8 +163,9 @@ module.exports = function(RED) {
             //if (this.brokerConn.connected) {
             //    node.status({fill:"green",shape:"dot",text:"node-red:common.status.connected"});
             // }
+          
             node.brokerConn.register(node);
-
+            
             // Handle DCMD Messages
             let options = { qos: 0 };
             let subscribeTopic = `spBv1.0/${this.brokerConn.deviceGroup}/DCMD/${this.brokerConn.eonName}/${this.name}`;
@@ -181,14 +189,6 @@ module.exports = function(RED) {
     }
     RED.nodes.registerType("mqtt sparkplug device",MQTTSparkplugDeviceNode);
 
-    function matchTopic(ts,t) {
-        if (ts == "#") {
-            return true;
-        }
-        var re = new RegExp("^"+ts.replace(/([\[\]\?\(\)\\\\$\^\*\.|])/g,"\\$1").replace(/\+/g,"[^/]+").replace(/\/#$/,"(\/.*)?")+"$");
-        return re.test(t);
-    }
-    
     function MQTTBrokerNode(n) {
         RED.nodes.createNode(this,n);
 
@@ -219,11 +219,12 @@ module.exports = function(RED) {
 
         // Get information about store forward
         this.enableStoreForward = n.enableStoreForward || false;
-        this.primaryScada = n.primaryScada;
+        this.primaryScada = n.primaryScada || "";
 
         // This will be set by primary SCADA and written via MQTT (OFFLINE or ONLINE)
         this.primaryScadaStatus = "OFFLINE";
 
+       
         // Queue to store events while 
         this.queue = this.context().get("queue");
         if (!this.queue){
@@ -245,18 +246,19 @@ module.exports = function(RED) {
         }
 
         this.setConnectionState = function(node, state) {
+        
             switch(state) {
                 case "CONNECTED":
                     node.status({fill:"green",shape:"dot",text:"node-red:common.status.connected"});
                     break;
                 case "DISCONNECTED":
-                    this.status({fill:"red",shape:"ring",text:"node-red:common.status.disconnected"});
-                break;
+                    node.status({fill:"red",shape:"ring",text:"node-red:common.status.disconnected"});
+                    break;
                 case "RECONNECTING":
                     node.status({fill:"yellow",shape:"ring",text:"node-red:common.status.connecting"});
                     break;
                 case "BUFFERING": // Online´
-                    node.status({fill:"blue",shape:"dot",text:"Buffering..."});
+                    node.status({fill:"blue",shape:"dot",text:"buffering"});
                     break;
                 default:
                     node.status({fill:"gray",shape:"dot",text:state}); // Unknown State
@@ -325,6 +327,34 @@ module.exports = function(RED) {
             };
             return msg;
         };
+
+        /**
+         * Send Birth Message
+         */
+        this.sendBirth = function() {
+            this.seq = 0;
+            var birthMessageMetrics = [
+
+                {
+                    "name" : "Node Control/Rebirth",
+                    "type" : "Boolean",
+                    "value": false
+                },
+                {
+                    "name" : "bdSeq",
+                    "type" : "Int8",
+                    "value": 0,
+                }];
+            var nbirth = node.createMsg("", "NBIRTH", birthMessageMetrics, x=>{});
+            
+            node.publish(nbirth);
+            for (var id in node.users) {
+                if (node.users.hasOwnProperty(id) && node.users[id].trySendBirth) {
+                    node.users[id].birthMessageSend = false;
+                    node.users[id].trySendBirth(x=>{});
+                }
+            }
+        }
 
         if (this.credentials) {
             this.username = this.credentials.user;
@@ -447,6 +477,7 @@ module.exports = function(RED) {
          * @param {object} mqttNode 
          */
         this.register = function(mqttNode) {
+            
             node.users[mqttNode.id] = mqttNode;
             let state = node.connected ? "CONNECTED" : "DISCONNECTED";
             node.setConnectionState(mqttNode, state);
@@ -483,34 +514,6 @@ module.exports = function(RED) {
         };
 
         /**
-         * Send Birth Message
-         */
-        this.sendBirth = function() {
-            this.seq = 0;
-            var birthMessageMetrics = [
-
-                {
-                    "name" : "Node Control/Rebirth",
-                    "type" : "Boolean",
-                    "value": false
-                },
-                {
-                    "name" : "bdSeq",
-                    "type" : "Int8",
-                    "value": 0,
-                }];
-            var nbirth = node.createMsg("", "NBIRTH", birthMessageMetrics, x=>{});
-            
-            node.publish(nbirth);
-            for (var id in node.users) {
-                if (node.users.hasOwnProperty(id) && node.users[id].trySendBirth) {
-                    node.users[id].birthMessageSend = false;
-                    node.users[id].trySendBirth(x=>{});
-                }
-            }
-        }
-
-        /**
          * Connect to the MQTT Broker
          */
         this.connect = function () {
@@ -527,9 +530,8 @@ module.exports = function(RED) {
                         node.log(RED._("mqtt-sparkplug-plus.state.connected",{broker:(node.clientid?node.clientid+"@":"")+node.brokerurl}));
                         for (var id in node.users) {
                             if (node.users.hasOwnProperty(id)) {
-                                let state = node.enableStoreForward && node.primaryScadaStatus === "OFFLINE" ? "BUFFERING" : "CONNECTED";
+                                let state = node.enableStoreForward && node.primaryScadaStatus === "OFFLINE"  && node.users[id].shouldBuffer === true ? "BUFFERING" : "CONNECTED";
                                 node.setConnectionState(node.users[id], state);
-                                //node.users[id].status({fill:"green",shape:"dot",text:"node-red:common.status.connected"});
                             }
                         }
 
@@ -567,24 +569,18 @@ module.exports = function(RED) {
                         if (node.enableStoreForward === true) {
                             let options = { qos: 0 };
                             let primaryScadaTopic = `STATE/${node.primaryScada}`;
-                            console.log("Primary SCADA Topic", primaryScadaTopic);
                             node.subscribe(primaryScadaTopic,options,function(topic_,payload_,packet) {
-                                //console.log("Primary SCADA Status", payload_.toString());
                                 let status = payload_.toString();
                                 node.primaryScadaStatus = status;
                                 for (var id in node.users) {
                                     if (node.users.hasOwnProperty(id)) {
-                                        if (status === "OFFLINE") {
-                                            node.setConnectionState(node.users[id], "BUFFERING");
-                                        }else {
-                                            node.setConnectionState(node.users[id], "CONNECTED");
-                                            node.emptyQueue();
-                                        }
+                                        let state = node.enableStoreForward && node.primaryScadaStatus === "OFFLINE"  && node.users[id].shouldBuffer === true ? "BUFFERING" : "CONNECTED";
+                                        node.setConnectionState(node.users[id], state);
                                     }
                                 }
+                                node.emptyQueue();
                             });
                         }
-
                         // Send Node Birth
                         node.sendBirth();
                     });
@@ -717,12 +713,8 @@ module.exports = function(RED) {
         this.unsubscribe = function (topic, ref, removed) {
             ref = ref||0;
             var sub = node.subscriptions[topic];
-            // var _debug = `unsubscribe for topic ${topic} called... ` ; //TODO: remove
             if (sub) {
-                // _debug += "sub found. " //TODO: remove
                 if (sub[ref]) {
-                    // debug(`this.unsubscribe - removing handler ref ${ref} for ${topic} `); //TODO: remove
-                    // _debug += `removing handler ref ${ref} for ${topic}. `
                     node.client.removeListener('message',sub[ref].handler);
                     delete sub[ref];
                 }
@@ -734,7 +726,6 @@ module.exports = function(RED) {
                         delete node.subscriptions[topic];
                         delete node.subscriptionIds[topic];
                         if (node.connected) {
-                            // _debug += `calling client.unsubscribe to remove topic ${topic}` //TODO: remove
                             node.client.unsubscribe(topic);
                         }
                     }
@@ -743,9 +734,16 @@ module.exports = function(RED) {
                 // _debug += "sub not found! "; //TODO: remove
             }
             // node.debug(_debug); //TODO: remove
-
+            
         };
-        this.publish = function (msg,done, bypassQueue) {
+
+        /**
+         * 
+         * @param {object} msg 
+         * @param {function} done 
+         * @param {boolean} bypassQueue 
+         */
+        this.publish = function (msg, done, bypassQueue) {
 
             if (node.connected && (!node.enableStoreForward || (node.primaryScadaStatus === "ONLINE" && node.queue.length === 0) || bypassQueue)) {
                 if (msg.payload === null || msg.payload === undefined) {
@@ -771,6 +769,7 @@ module.exports = function(RED) {
                 done && done();
             }
         };
+
         this.on('close', function(done) {
             this.closing = true;
             if (this.connected) {
@@ -787,7 +786,7 @@ module.exports = function(RED) {
         });
     }
 
-    RED.nodes.registerType("mqtt-sparkplug-broker",MQTTBrokerNode,{
+    RED.nodes.registerType("mqtt-sparkplug-broker", MQTTBrokerNode,{
         credentials: {
             user: {type:"text"},
             password: {type: "password"}
@@ -804,11 +803,8 @@ module.exports = function(RED) {
         this.topic = n.topic;
         this.qos = parseInt(n.qos);
         this.name = n.name;
-        //this.device = n.device||"+";
-        //this.node = n.node||"+";
-        //this.group = n.group||"+";
-        //this.messagetype = n.messagetype||"NDATA";
-        //this.topic = `spBv1.0/${this.group||"+"}/${this.messagetype||"DDATA"}/${this.node||"+"}/${this.device||"+"}`;
+
+        this.shouldBuffer = false; // hardcoded as in node will never write
 
         if (isNaN(this.qos) || this.qos < 0 || this.qos > 2) {
             this.qos = 2;
@@ -821,7 +817,6 @@ module.exports = function(RED) {
 
         var node = this;
         if (this.brokerConn) {
-            //this.status({fill:"red",shape:"ring",text:"node-red:common.status.disconnected"});
             if (this.topic) {
                 node.brokerConn.register(this);
                 let options = { qos: this.qos };
@@ -843,9 +838,6 @@ module.exports = function(RED) {
                     }
                     
                 }, this.id);
-                //if (this.brokerConn.connected) {
-                //    node.status({fill:"green",shape:"dot",text:"node-red:common.status.connected"});
-                //}
             }
             else {
                 this.error(RED._("mqtt-sparkplug-plus.errors.not-defined"));

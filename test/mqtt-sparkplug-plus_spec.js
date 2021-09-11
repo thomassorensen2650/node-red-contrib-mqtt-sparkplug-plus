@@ -2,11 +2,13 @@ var helper = require("node-red-node-test-helper");
 var sparkplugNode = require("../mqtt-sparkplug-plus.js");
 var should = require("should");
 var mqtt = require("mqtt");
+//const { FieldBase } = require("protobufjs");
 
 var spPayload = require('sparkplug-payload').get("spBv1.0");
 
 helper.init(require.resolve('node-red'));
-let testBroker = 'mqtt://localhost';//'mqtt://test.mosquitto.org';
+
+let testBroker = 'mqtt://localhost';
 var simpleFlow = [
 	{
 		"id": "n1",
@@ -20,24 +22,23 @@ var simpleFlow = [
 				"dataType": "Int32"
 			}
 		},
-		"broker": "b1",
+		"broker": "b1"
 	},
 	{
 		"id": "b1",
-		"type": "mqtt-sparkplug-broker",
-		"name": "Local Host",
-		"deviceGroup": "My Devices",
-		"eonName": "Node-Red",
-		"broker": "localhost",
-		"port": "1883",
-		"clientid": "",
-		"usetls": false,
-		"protocolVersion": "4",
-		"keepalive": "60",
-		"cleansession": true,
-		"enableStoreForward": false,
-        "primaryScada": "MY SCADA",
-		"credentials": {}
+        "type": "mqtt-sparkplug-broker",
+        "name": "Local Host",
+        "deviceGroup": "My Devices",
+        "eonName": "Node-Red",
+        "broker": "localhost",
+        "port": "1883",
+        "clientid": "",
+        "usetls": false,
+        "protocolVersion": "4",
+        "keepalive": "60",
+        "cleansession": true,
+        "enableStoreForward": false,
+        "primaryScada": "MY SCADA"
 	}
 ];
 var client = null;
@@ -142,7 +143,6 @@ describe('mqtt sparkplug device node', function () {
 
 		  client.on('message', function (topic, message) {
 			// Verify that we sent a DBirth Message to the broker
-			//console.log("TOPIC:", topic);
 			if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TEST2"){
 				var buffer = Buffer.from(message);
 				var payload = spPayload.decodePayload(buffer);
@@ -521,7 +521,6 @@ it('should add null_value on DData without value', function (done) {
 				try {
 					var buffer = Buffer.from(message);
 					var payload = spPayload.decodePayload(buffer);
-					console.log("Null value payload", payload);
 					payload.should.have.property("timestamp").which.is.a.Number();
 					payload.metrics[0].should.have.property("name").which.is.eql("test");
 					payload.metrics[0].should.have.property("value").which.is.eql(null);
@@ -541,6 +540,8 @@ it('should add null_value on DData without value', function (done) {
 
 	// STORE FORWARD TESTING
 	it('should buffer when primary SCADA IS OFFLINE', function (done) {
+
+		console.log("----- start ---------");
 		client = mqtt.connect(testBroker);
 
 		// WARN! We'll enable buffering for all tests
@@ -556,7 +557,8 @@ it('should add null_value on DData without value', function (done) {
 		let b1;
 		client.on('connect', function () {
 			client.publish("STATE/MY SCADA", "OFFLINE", true);
-
+			// Set Online after 250ms 
+			setTimeout(() => client.publish("STATE/MY SCADA", "ONLINE", true), 500);
 			client.subscribe('#', function (err) {
 			  if (!err) {
 				helper.load(sparkplugNode, simpleFlow, function () {
@@ -585,23 +587,24 @@ it('should add null_value on DData without value', function (done) {
 				});
 			  }
 			})
-			await new Promise(resolve => setTimeout(resolve, 250));
-			client.publish("STATE/MY SCADA", "ONLINE", true);
+			
+			
 		  });
 
 		  client.on('message', function (topic, message) {
-			  
+			console.log("On Message", topic);
 			if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red") {
 				var buffer = Buffer.from(message);
 				var payload = spPayload.decodePayload(buffer);
 				payload.should.have.property("seq").which.is.eql(0);
-				n1.primaryScadaStatus.should.eql("ONLINE");
+				n1.brokerConn.primaryScadaStatus.should.eql("ONLINE");
 
 			} else if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TEST2"){
 				var buffer = Buffer.from(message);
 				var payload = spPayload.decodePayload(buffer);
 				payload.should.have.property("seq").which.is.eql(1);
-				n1.primaryScadaStatus.should.eql("ONLINE");
+				n1.brokerConn.primaryScadaStatus.should.eql("ONLINE");
+				done();
 			}
 		});
 	}); // it end 
@@ -674,7 +677,6 @@ var inExample = [
 				var n2 = helper.getNode("n2");
 				n2.on("input", function (msg) {
 					try {
-					console.log("seq", msg.payload.seq);
 					msg.should.have.property('payload');
 					if (msg.payload.seq === 200) {
 						
@@ -692,5 +694,4 @@ var inExample = [
 			});
 		});
 	});
-	
 });
