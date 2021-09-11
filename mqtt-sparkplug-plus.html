@@ -89,6 +89,20 @@
                 <label for="node-config-input-deviceGroup"><i class="fa fa-tasks"></i> <span>Group</span></label>
                 <input type="text" id="node-config-input-deviceGroup" data-i18n="[placeholder]Sparkplug Devices">
             </div>
+
+            <!-- Add UI for Store forward -->
+            <div class="form-row">
+                <label for="node-config-input-enableStoreForward"> </label>
+                <label for="node-config-input-enableStoreForward" style="width:70%">
+                    <input type="checkbox" id="node-config-input-enableStoreForward" style="display:inline-block; width:22px; vertical-align:top;"><span data-i18n="mqtt-sparkplug-plus.label.storeforward"></span>
+                </label>
+                </div>
+            <div class="form-row" id="node-storeforward-line">
+                <label for="node-config-input-primaryScada"><i class="fa fa-desktop"></i> Destination</label>
+                <input id="node-config-input-primaryScada" type="text" placeholder="Primary SCADA Name">
+                <!-- <input id="node-input-statusVal" type="hidden">
+                <input id="node-input-statusType" type="hidden"> -->
+            </div>
         </div>
     </div>
 </script>
@@ -118,6 +132,8 @@
             protocolVersion: { value: 4},
             keepalive: {value:60,validate:RED.validators.number()},
             cleansession: {value: true},
+            enableStoreForward: {value: false},
+            primaryScada: {value:"",  validate :x =>  !$("#node-config-input-enableStoreForward").is(":checked") || /^[^/+#]+$/.test(x) },
         },
         credentials: {
             user: {type:"text"},
@@ -174,6 +190,16 @@
             });
             $("#node-config-input-protocolVersion").val(this.protocolVersion);
         
+            $("#node-storeforward-line").hide();
+            $("#node-config-input-enableStoreForward").on('change',function() {
+                if ($(this).is(":checked")) {
+                    $("#node-storeforward-line").show();
+                }
+                else {
+                    $("#node-storeforward-line").hide();
+                }
+            });
+
             function updateTLSOptions() {
                 if ($("#node-config-input-usetls").is(':checked')) {
                     $("#node-config-row-tls").show();

@@ -6,6 +6,7 @@
             "topic": "Topic",
             "password": "Password",
             "device": "Device",
+            "storeforward": "Enable Store Forward",
             "messagetype": "Msg. Type",
             "eon" : "Node",
             "group" : "Group",

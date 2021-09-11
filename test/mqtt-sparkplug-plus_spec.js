@@ -35,6 +35,8 @@ var simpleFlow = [
 		"protocolVersion": "4",
 		"keepalive": "60",
 		"cleansession": true,
+		"enableStoreForward": false,
+        "primaryScada": "MY SCADA",
 		"credentials": {}
 	}
 ];
@@ -534,6 +536,77 @@ it('should add null_value on DData without value', function (done) {
 		});
 
 	}); // it end */
+
+
+
+	// STORE FORWARD TESTING
+	it('should buffer when primary SCADA IS OFFLINE', function (done) {
+		client = mqtt.connect(testBroker);
+
+		// WARN! We'll enable buffering for all tests
+		simpleFlow[1].enableStoreForward = true;
+
+		// SET OFFLINE
+		// Send Birth
+		// SET SCADA ONLINE
+		// VERIFY BIRTH is send when ONLINE
+
+		var initBirthDone = false;
+		let n1;
+		let b1;
+		client.on('connect', function () {
+			client.publish("STATE/MY SCADA", "OFFLINE", true);
+
+			client.subscribe('#', function (err) {
+			  if (!err) {
+				helper.load(sparkplugNode, simpleFlow, function () {
+					try {
+						n1 = helper.getNode("n1");
+						b1 = n1.brokerConn;
+
+						// Send all metrics to trigger DBIRTH
+						n1.receive({
+							"payload" : {
+								"metrics": [
+									{
+										"name": "test",
+										"value": 11,
+									},
+									{
+										"name": "test2",
+										"value": 11
+									}
+								]}
+							}
+						);
+					}catch (e) {
+						done(e);
+					}
+				});
+			  }
+			})
+			await new Promise(resolve => setTimeout(resolve, 250));
+			client.publish("STATE/MY SCADA", "ONLINE", true);
+		  });
+
+		  client.on('message', function (topic, message) {
+			  
+			if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red") {
+				var buffer = Buffer.from(message);
+				var payload = spPayload.decodePayload(buffer);
+				payload.should.have.property("seq").which.is.eql(0);
+				n1.primaryScadaStatus.should.eql("ONLINE");
+
+			} else if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TEST2"){
+				var buffer = Buffer.from(message);
+				var payload = spPayload.decodePayload(buffer);
+				payload.should.have.property("seq").which.is.eql(1);
+				n1.primaryScadaStatus.should.eql("ONLINE");
+			}
+		});
+	}); // it end 
+
+
 	// FIXME add unit testing:
 	//   Test unknown metric data type
 	//   Test NDEATH
@@ -549,7 +622,6 @@ it('should add null_value on DData without value', function (done) {
 });
 
 
-return;
 var inExample = [
     {
         "id": "n2",
@@ -622,4 +694,3 @@ var inExample = [
 	});
 	
 });
-
