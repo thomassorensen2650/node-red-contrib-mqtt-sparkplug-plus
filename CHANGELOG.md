@@ -1,7 +1,11 @@
-### 0.0.6: Maintenance Release
+### 1.0.0: Major Release
 
 Fixed:
-- Null values are not correctly serialized.
+- Null values are now correctly serialized.
+
+New:
+- Store Forward when primary SCADA is offline can be enabled
+- Added documentation for the *mqtt-sparkplug-broker* configuration node
 
 ### 0.0.5: Maintenance Release
 
@@ -12,7 +16,7 @@ Fixed:
  - majority of texts are from message catalog (i18n)
 
 New:
- - Added _mqtt sparkplug in_ node (clone of mqtt in with sparkplug decoding builtin)
+ - Added _mqtt sparkplug in_ node (clone of mqtt in with sparkplug decoding)
  - Udated colors and logos of nodes.
 
 ### 0.0.4: Maintenance Release
@@ -29,5 +33,3 @@ Fixed
 #### 0.0.3: Initial Release
 
  - First released version. 
-
-

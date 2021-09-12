@@ -1,6 +1,6 @@
 # MQTT Sparkplug implementation for Node-Red
 
-MQTT-Sparkplug-Plus is a set of Node-Red nodes, that will enable Node-Red to communicate with client over MQTT using the sparkplug b protocol. the package contains the followings nodes:
+MQTT-Sparkplug-Plus is a set of Node-Red nodes, that will enable Node-Red to communicate with other client over MQTT using the sparkplug b protocol. The package contains the followings nodes:
 
 ## mqtt sparkplug device
 The *mqtt sparkplug device* act as a [Sparkplug B complient](https://s3.amazonaws.com/ignition-modules/Current/Sparkplug+Specification.pdf) EoN Node. 
@@ -13,14 +13,19 @@ The node will connect to an MQTT broker (server) and act as an MQTT Edge of Netw
 * NDEATH
 * DDATA (from node input)
 * DCMD (send as output to Node-Red)
+* Buffering when primary SCADA is not available
 
 The following features are not yet supported:
 * Non-metrics (body)
 * MQTT Broker redundancy
-* Buffering when primary SCADA is not available
+* DDEATH
+* Compression
 
 ## mqtt sparkplug in
-The *mqtt sparkplug in* node makes it possible to subscribe to sparkplug b mqtt topics. the node functions the same way at the node-red *mqtt in* node, but it will decode the sparkplug/protobuf messages and deliver them in json.
+The *mqtt sparkplug in* node makes it possible to subscribe to sparkplug b mqtt topics. The node is very simular to the default node-red *mqtt in* node, but it will decode the sparkplug/protobuf messages and deliver them in json.
+
+## mqtt sparkplug out
+The *mqtt sparkplug in* node makes it possible to publich sparkplug b mqtt messages. The node is very simular to the default node-red *mqtt out* node, but it will encode the sparkplug/protobuf payload before sending message.
 
 # Installation
 npm install node-red-contrib-mqtt-sparkplug-plus

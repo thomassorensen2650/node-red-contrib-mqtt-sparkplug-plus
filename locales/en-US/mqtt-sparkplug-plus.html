@@ -8,12 +8,12 @@
         <li>DDATA (from node input)</li>
         <li>DCMD (send as output to Node-Red)</li>
         <li>NBIRTH</li>
+        <li>Buffering when Primary SCADA is OFFLINE or Broker Connection is down</li>
     </ul>
 
   <p>The following features are not supported (yet):</p>
     <ul>
         <li>Non-metrics (body/Metadata)</li>
-        <li>Buffering (Primary SCADA)</li>
         <li>MQTT Broker redundancy</li>
     </ul>
     <h3>Getting Started</h3>
@@ -86,4 +86,29 @@
         <p>This node requires a connection to a MQTT broker to be configured. This is configured by clicking
         the pencil icon.</p>
         <p>Several MQTT nodes (in or out) can share the same broker connection if required.</p>
-    </script>
+</script>
+
+<script type="text/html" data-help-name="mqtt-sparkplug-broker">
+    <p>Configuration for a connection to an MQTT broker.</p>
+    <p>This configuration will create a single connection to the broker which can
+       then be reused by <code>MQTT Sparkplug In</code> and <code>MQTT Sparkplug Device</code> nodes.</p>
+    <p>The node will generate a random Client ID if one is not set and the
+       node is configured to use a Clean Session connection. If a Client ID is set,
+       it must be unique to the broker you are connecting to.</p>
+    <h4>WebSockets</h4>
+    <p>The node can be configured to use a WebSocket connection. To do so, the Server
+       field should be configured with a full URI for the connection. For example:</p>
+    <pre>ws://example.com:4000/mqtt</pre>
+
+    <h3>Sparkplug</h3>
+    <h4>Name</h4>
+    <p>This is the name of the EoN node. This name will be part of all topics. The name is used to identify the EoN node    </p>
+    <h4>Group</h4>
+    <p>This is the device group. This will be part of the Topic of all messages, and can be used to group related EoN nodes</p>
+    <h4>Enable Store Forward </h4>
+    <p>This will enable store forward if the Primary SCADA is offline</p>
+    <h4>Destination</h4>
+    <p>This is the name of the Primary SCADA. If store forward is enabled and the STATE/[PRIMARY SCADA NAME] is OFFLINE, then data will be buffered until connection is reestablished.</p>
+    <p>The data will be buffered via the <a href="https://nodered.org/docs/user-guide/context">Node-Red Context Store.</a>. The default Context store is only stored in memory, but it can be modified to be stored to Disk (or other places) by changing the default Context store location on Node-Red. See more about context <a href="https://nodered.org/docs/user-guide/context">here</a></p>
+    <p><b><u>The full set of buffered data will be kep in memory, so do not use this feature for high thoughput applications. (or make sure that you have a enough RAM)</u></b></p>
+</script>

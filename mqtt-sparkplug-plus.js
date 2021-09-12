@@ -833,7 +833,6 @@ module.exports = function(RED) {
                         }
                         node.send(msg);
                     } catch (e) {
-                        //node.warn(e); // FIXME
                         node.error(RED._("mqtt-sparkplug-plus.errors.unable-to-decode-message", {type : "", error: e.toString()}));
                     }
                     
@@ -854,4 +853,61 @@ module.exports = function(RED) {
     }
     RED.nodes.registerType("mqtt sparkplug in", MQTTInNode);
 
+    function MQTTOutNode(n) {
+        RED.nodes.createNode(this,n);
+        this.topic = n.topic;
+        this.qos = n.qos || null;
+        this.retain = n.retain;
+        this.broker = n.broker;
+        this.shouldBuffer = false; // hardcoded / buffering commands are a bad idea... if we enable, then it shnould come with a big warning.
+        
+        this.brokerConn = RED.nodes.getNode(this.broker);
+        var node = this;
+
+        if (this.brokerConn) {            
+            this.on("input",function(msg,send,done) {
+
+                // abort if not connected and node is not configured to buffer
+                if (!node.brokerConn.connected && this.shouldBuffer !== true) {
+                    return;
+                }
+
+                if (msg.qos) {
+                    msg.qos = parseInt(msg.qos);
+                    if ((msg.qos !== 0) && (msg.qos !== 1) && (msg.qos !== 2)) {
+                        msg.qos = null;
+                    }
+                }
+                msg.qos = Number(node.qos || msg.qos || 0);
+                msg.retain = node.retain || msg.retain || false;
+                msg.retain = ((msg.retain === true) || (msg.retain === "true")) || false;
+                /** If node property exists, override/set that to property in msg  */
+                let msgPropOverride = function(propName) { if(node[propName]) { msg[propName] = node[propName]; } }
+                msgPropOverride("topic");
+                
+                if ( msg.hasOwnProperty("payload")) {
+                    let topicOK = msg.hasOwnProperty("topic") && (typeof msg.topic === "string") && (msg.topic !== "");
+                    if (topicOK) { // topic must exist
+                        this.brokerConn.publish(msg, function(err) {
+                            let args = arguments;
+                            let l = args.length;
+                            done(err);
+                        }, true);  // send the message
+                    } else {
+                        node.warn(RED._("mqtt-sparkplug-plus.errors.invalid-topic"));
+                        done();
+                    }
+                } else {
+                    done();
+                }
+            });
+            node.brokerConn.register(node);
+            this.on('close', function(done) {
+                node.brokerConn.deregister(node,done);
+            });
+        } else {
+            this.error(RED._("mqtt-sparkplug-plus.errors.missing-config"));
+        }
+    }
+    RED.nodes.registerType("mqtt sparkplug out",MQTTOutNode);
 };

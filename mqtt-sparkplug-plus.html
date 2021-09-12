@@ -100,8 +100,6 @@
             <div class="form-row" id="node-storeforward-line">
                 <label for="node-config-input-primaryScada"><i class="fa fa-desktop"></i> Destination</label>
                 <input id="node-config-input-primaryScada" type="text" placeholder="Primary SCADA Name">
-                <!-- <input id="node-input-statusVal" type="hidden">
-                <input id="node-input-statusType" type="hidden"> -->
             </div>
         </div>
     </div>
@@ -277,7 +275,7 @@
         <ol id="sparkplug-input-metric-container"></ol>
     </div>
 
-    <div class="form-tips"><span data-i18n="mqtt-sparkplug-plus.tip"></span></div>
+    <div class="form-tips"><span data-i18n="mqtt-sparkplug-plus.tip.device"></span></div>
 </script>
 
 <script type="text/javascript">
@@ -372,7 +370,7 @@
 })();
 </script>
 
-<!-- MQTT Sparkplug Out -->
+<!-- MQTT Sparkplug In -->
 <script type="text/html" data-template-name="mqtt sparkplug in">
     <div class="form-row">
         <label for="node-input-broker"><i class="fa fa-globe"></i> <span data-i18n="[placeholder]Broker">Broker</span></label>
@@ -397,7 +395,7 @@
         <input type="text" id="node-input-name" data-i18n="[placeholder]mqtt-sparkplug-plus.label.name">
     </div>
 
-    <div class="form-tips"><span data-i18n="mqtt-sparkplug-plus.tipin"></span></div>
+    <div class="form-tips"><span data-i18n="mqtt-sparkplug-plus.tip.sparkplugformat"></span></div>
 </script>
 
 <script type="text/javascript">
@@ -430,6 +428,70 @@
 
         }
     });
-    </script>
-    
+</script>
 
+<!-- MQTT Sparkplug Out-->
+<script type="text/html" data-template-name="mqtt sparkplug out">
+    <div class="form-row">
+        <label for="node-input-broker"><i class="fa fa-globe"></i> <span data-i18n="mqtt-sparkplug-plus.label.broker"></span></label>
+        <input type="text" id="node-input-broker">
+    </div>
+    <div class="form-row">
+        <label for="node-input-topic"><i class="fa fa-tasks"></i> <span data-i18n="mqtt-sparkplug-plus.label.topic"></span></label>
+        <input type="text" id="node-input-topic" data-i18n="[placeholder]mqtt-sparkplug-plus.label.topic">
+    </div>
+
+    <div class="form-row mqtt-form-row-cols2">
+        <label for="node-input-qos" class="mqtt-form-row-col1"><i class="fa fa-empire"></i> <span data-i18n="mqtt-sparkplug-plus.label.qos"></span></label>
+        <select id="node-input-qos" class="mqtt-form-row-col1">
+            <option value=""></option>
+            <option value="0">0</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+        </select>
+
+        <label for="node-input-retain" class="mqtt-form-row-col2"><i class="fa fa-history"></i> <span data-i18n="mqtt-sparkplug-plus.retain"></span></label>
+        <select id="node-input-retain" class="mqtt-form-row-col2" >
+            <option value=""></option>
+            <option value="false" data-i18n="mqtt-sparkplug-plus.false"></option>
+            <option value="true" data-i18n="mqtt-sparkplug-plus.true"></option>
+        </select>
+    </div>
+  
+    <div class="form-row">
+        <label for="node-input-name"><i class="fa fa-tag"></i> <span data-i18n="mqtt-sparkplug-plus.label.name"></span></label>
+        <input type="text" id="node-input-name" data-i18n="[placeholder]mqtt-sparkplug-plus.label.name">
+    </div>
+    <div class="form-tips"><span data-i18n="mqtt-sparkplug-plus.tip.sparkplugformat"></span></div>
+</script>
+
+<script type="text/javascript">
+RED.nodes.registerType('mqtt sparkplug out',{
+    category: 'network',
+    defaults: {
+        name: {value:""},
+        topic: {value:"spBv1.0/My Devices/NCMD/EoN Name/My Device",required:true,validate: RED.validators.regex(/^(#$|(\+|[^+#]*)(\/(\+|[^+#]*))*(\/(\+|#|[^+#]*))?$)/)},
+        qos: {value:""},
+        retain: {value:""},
+        broker: {type:"mqtt-sparkplug-broker", required:true}
+    },
+    color:"#2181a6",
+    inputs:1,
+    outputs:0,
+    icon: "sparkplugio.svg",
+    align: "right",
+    label: function() {
+        return this.name||this.topic||"mqtt";
+    },
+    oneditprepare: function() {
+        var that = this;
+    },
+    oneditsave: function() {
+
+    },
+    labelStyle: function() {
+        return this.name?"node_label_italic":"";
+    }
+});
+
+</script>
