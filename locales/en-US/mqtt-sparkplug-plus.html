@@ -112,3 +112,30 @@
     <p>The data will be buffered via the <a href="https://nodered.org/docs/user-guide/context">Node-Red Context Store.</a>. The default Context store is only stored in memory, but it can be modified to be stored to Disk (or other places) by changing the default Context store location on Node-Red. See more about context <a href="https://nodered.org/docs/user-guide/context">here</a></p>
     <p><b><u>The full set of buffered data will be kep in memory, so do not use this feature for high thoughput applications. (or make sure that you have a enough RAM)</u></b></p>
 </script>
+
+<script type="text/html" data-help-name="mqtt sparkplug out">
+    <p>Connects to a MQTT broker and publishes messages.</p>
+    <h3>Inputs</h3>
+    <dl class="message-properties">
+       <dt>payload <span class="property-type">string | buffer</span></dt>
+       <dd> the payload to publish. If this property is not set, no message will be sent. To send a blank message, set this property to an empty String.</dd>
+       <dt class="optional">topic <span class="property-type">string</span></dt>
+       <dd> the MQTT topic to publish to.</dd>
+       <dt class="optional">qos <span class="property-type">number</span></dt>
+       <dd>0, fire and forget - 1, at least once - 2, once and once only. Default 0.</dd>
+       <dt class="optional">retain <span class="property-type">boolean</span></dt>
+       <dd>set to true to retain the message on the broker. Default false.</dd>
+    </dl>
+    <h3>Details</h3>
+    <code>msg.payload</code> is used as the payload of the published message.
+    If it contains an Object it will be converted to a JSON string before being sent.
+    If it contains a binary Buffer the message will be published as-is.</p>
+    <p>The topic used can be configured in the node or, if left blank, can be set by <code>msg.topic</code>.</p>
+    <p>Likewise the QoS and retain values can be configured in the node or, if left
+    blank, set by <code>msg.qos</code> and <code>msg.retain</code> respectively. To clear a previously
+    retained topic from the broker, send a blank message to that topic with the retain flag set.</p>
+    <p>This node requires a connection to a MQTT broker to be configured. This is configured by clicking
+    the pencil icon.</p>
+    <p>Several MQTT Sparkplug nodes (in, out or device) can share the same broker connection if required.</p>
+    <p>This node will not buffer by default</p>
+</script>
