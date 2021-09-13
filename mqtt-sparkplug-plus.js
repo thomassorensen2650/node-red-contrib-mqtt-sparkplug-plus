@@ -14,6 +14,8 @@
  * limitations under the License.
  **/
 
+const { encodePayload } = require("sparkplug-payload/lib/sparkplugbpayload");
+
 module.exports = function(RED) {
     "use strict";
     var mqtt = require("mqtt");
@@ -85,7 +87,7 @@ module.exports = function(RED) {
             if (readyToSend) {
                 let bMsg = node.brokerConn.createMsg(this.name, "DBIRTH", Object.values(this.latestMetrics), done);
                 if(bMsg) {
-                    this.brokerConn.publish(bMsg, done);  // send the message 
+                    this.brokerConn.publish(bMsg, !this.shouldBuffer, done);  // send the message 
                     this.birthMessageSend = true;
                 }
             }
@@ -146,7 +148,7 @@ module.exports = function(RED) {
                         //        if (msg.payload.timestamp) {
                         //           addTimestampToObject(dMsg, msg.payload.timestamp)
                         //        }
-                                this.brokerConn.publish(dMsg, done); 
+                                this.brokerConn.publish(dMsg, !this.shouldBuffer, done); 
                             }
                         }
                     }else 
@@ -159,11 +161,6 @@ module.exports = function(RED) {
                     done();
                 }
             }); // end input
-
-            //if (this.brokerConn.connected) {
-            //    node.status({fill:"green",shape:"dot",text:"node-red:common.status.connected"});
-            // }
-          
             node.brokerConn.register(node);
             
             // Handle DCMD Messages
@@ -224,12 +221,10 @@ module.exports = function(RED) {
         // This will be set by primary SCADA and written via MQTT (OFFLINE or ONLINE)
         this.primaryScadaStatus = "OFFLINE";
 
-       
         // Queue to store events while 
         this.queue = this.context().get("queue");
         if (!this.queue){
             this.queue = [];
-            //this.context().set("queue", this.queue); // parameters are always byRef in Javascript, no need to set
         }
 
         /**
@@ -239,7 +234,7 @@ module.exports = function(RED) {
             if (node.primaryScadaStatus === "ONLINE" && node.connected) {
                 var item = this.queue.shift();
                 while (item) {
-                    node.publish(item,null,true); // FIXME THIS IS A HACK
+                    node.publish(item, true);
                     item = this.queue.shift();
                 }
             } 
@@ -501,7 +496,7 @@ module.exports = function(RED) {
                 if (node.client && node.client.connected) {
                     // Send close message
                     let msg = this.getDeathPayload();
-                    node.publish(msg, function(err) {
+                    node.publish(msg, false, function(err) {
                         node.client.end(done);
                     });
                     return;
@@ -743,7 +738,7 @@ module.exports = function(RED) {
          * @param {function} done 
          * @param {boolean} bypassQueue 
          */
-        this.publish = function (msg, done, bypassQueue) {
+        this.publish = function (msg, bypassQueue, done) {
 
             if (node.connected && (!node.enableStoreForward || (node.primaryScadaStatus === "ONLINE" && node.queue.length === 0) || bypassQueue)) {
                 if (msg.payload === null || msg.payload === undefined) {
@@ -869,9 +864,9 @@ module.exports = function(RED) {
 
                 // abort if not connected and node is not configured to buffer
                 if (!node.brokerConn.connected && this.shouldBuffer !== true) {
+                    console.log("Abort", node.brokerConn.connected, this.shouldBuffer);
                     return;
                 }
-
                 if (msg.qos) {
                     msg.qos = parseInt(msg.qos);
                     if ((msg.qos !== 0) && (msg.qos !== 1) && (msg.qos !== 2)) {
@@ -884,15 +879,12 @@ module.exports = function(RED) {
                 /** If node property exists, override/set that to property in msg  */
                 let msgPropOverride = function(propName) { if(node[propName]) { msg[propName] = node[propName]; } }
                 msgPropOverride("topic");
-                
-                if ( msg.hasOwnProperty("payload")) {
+
+                if (msg.hasOwnProperty("payload")) {
                     let topicOK = msg.hasOwnProperty("topic") && (typeof msg.topic === "string") && (msg.topic !== "");
                     if (topicOK) { // topic must exist
-                        this.brokerConn.publish(msg, function(err) {
-                            let args = arguments;
-                            let l = args.length;
-                            done(err);
-                        }, true);  // send the message
+                        msg.payload =  sparkplugEncode(msg.payload);
+                        this.brokerConn.publish(msg, !this.shouldBuffer, done);  // send the message
                     } else {
                         node.warn(RED._("mqtt-sparkplug-plus.errors.invalid-topic"));
                         done();
