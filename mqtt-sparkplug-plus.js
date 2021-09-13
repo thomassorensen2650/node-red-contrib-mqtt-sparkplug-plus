@@ -214,6 +214,7 @@ module.exports = function(RED) {
 
         this.seq = 0;
 
+        this.maxQueueSize = 100000;
         // Get information about store forward
         this.enableStoreForward = n.enableStoreForward || false;
         this.primaryScada = n.primaryScada || "";
@@ -222,23 +223,31 @@ module.exports = function(RED) {
         this.primaryScadaStatus = "OFFLINE";
 
         // Queue to store events while 
-        this.queue = this.context().get("queue");
+        this.queue = []; //this.context().get("queue");
         if (!this.queue){
             this.queue = [];
+            this.context().set("queue", this.queue);
         }
 
         /**
          * empties the current queue
          */
-        this.emptyQueue = function() {
+        this.emptyQueue = async function() {
             if (node.primaryScadaStatus === "ONLINE" && node.connected) {
                 var item = this.queue.shift();
-                while (item) {
+                let count = 0;
+                while (item && node.primaryScadaStatus === "ONLINE" && node.connected) {
+                    
                     node.publish(item, true);
                     item = this.queue.shift();
+
+                    // Slow down queue empty
+                    if (++count % 500 === 0) {
+                        await new Promise(resolve => setTimeout(resolve, 250));
+                    }
                 }
             } 
-        }
+        };
 
         this.setConnectionState = function(node, state) {
         
@@ -253,14 +262,13 @@ module.exports = function(RED) {
                     node.status({fill:"yellow",shape:"ring",text:"node-red:common.status.connecting"});
                     break;
                 case "BUFFERING": // Online´
-                    node.status({fill:"blue",shape:"dot",text:"buffering"});
+                    node.status({fill:"blue",shape:"dot",text:"destination offline"});
                     break;
                 default:
                     node.status({fill:"gray",shape:"dot",text:state}); // Unknown State
             }
-        }
+        };
 
-        
         /**
          * @returns the next sequence number for the payload
          */
@@ -760,6 +768,12 @@ module.exports = function(RED) {
                     return;
                 });
             } else {
+                if (node.queue.length === node.maxQueueSize) {
+                    node.queue.shift();
+                    console.log("Queue Size", node.queue.length);
+                }else if (node.queue.length  === node.maxQueueSize-1) {
+                    node.warn(RED._("mqtt-sparkplug-plus.errors.buffer-full"));
+                }
                 node.queue.push(msg);
                 done && done();
             }

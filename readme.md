@@ -22,10 +22,10 @@ The following features are not yet supported:
 * Compression
 
 ## mqtt sparkplug in
-The *mqtt sparkplug in* node makes it possible to subscribe to sparkplug b mqtt topics. The node is very simular to the default node-red *mqtt in* node, but it will decode the sparkplug/protobuf messages and deliver them in json.
+The *mqtt sparkplug in* node makes it possible to subscribe to sparkplug b mqtt topics. The node is almost identical to the default node-red *mqtt in* node, but it will decode the sparkplug/protobuf messages and deliver them in json.
 
 ## mqtt sparkplug out
-The *mqtt sparkplug in* node makes it possible to publish sparkplug b mqtt messages. The node is very simular to the default node-red *mqtt out* node, but it will encode the sparkplug/protobuf payload before sending message.
+The *mqtt sparkplug in* node makes it possible to publish sparkplug b mqtt messages. The node almost identical to the default node-red *mqtt out* node, but it will encode the sparkplug/protobuf payload before sending message.
 
 # Installation
 npm install node-red-contrib-mqtt-sparkplug-plus

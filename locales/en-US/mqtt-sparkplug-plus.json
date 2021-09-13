@@ -78,6 +78,7 @@
         "true": "true",
         "false": "false",
         "errors": {
+            "buffer-full": "the buffer is full. older data will be lost",
             "missing-config": "missing broker configuration",
             "missing-attribute-name": "All metrics must have a name",
             "nonclean-missingclientid": "No client ID set, using clean session",
