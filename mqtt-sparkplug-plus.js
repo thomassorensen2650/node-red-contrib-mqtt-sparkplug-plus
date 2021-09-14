@@ -222,8 +222,8 @@ module.exports = function(RED) {
         // This will be set by primary SCADA and written via MQTT (OFFLINE or ONLINE)
         this.primaryScadaStatus = "OFFLINE";
 
-        // Queue to store events while 
-        this.queue = []; //this.context().get("queue");
+        // Queue to store events while prim. scada offline
+        this.queue = this.context().get("queue");
         if (!this.queue){
             this.queue = [];
             this.context().set("queue", this.queue);

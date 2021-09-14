@@ -386,12 +386,12 @@ describe('mqtt sparkplug device node', function () {
 	it('should warn when passing unknown NData metric', function (done) {
 		helper.load(sparkplugNode, simpleFlow, function () {
 		
-			let n1 = helper.getNode("n1");
+			const n1 = helper.getNode("n1");
 			n1.on('input', () => {
 				n1.warn.should.be.calledWithExactly("mqtt-sparkplug-plus.errors.device-unknown-metric");
 				done();
-			  });
-			n1.receive({
+			}); 
+			  n1.receive({
 				"payload" : {
 					"metrics": [
 						{
@@ -400,7 +400,7 @@ describe('mqtt sparkplug device node', function () {
 						},
 					]}
 				}
-			);
+			);			
 
 		}); // end helper
 	}); // it end 
@@ -653,6 +653,9 @@ var inExample = [
 	}
 ]
 
+/**
+ * MQTT Sparkplug B in testing
+ */
 describe('mqtt sparkplug in node', function () {
 
 	var validMsg = {"timestamp":12345,"metrics":[{"name":"test","type":"Int32","value":100}],"seq":200}
@@ -689,11 +692,11 @@ describe('mqtt sparkplug in node', function () {
 		});
 	});
 });
+
+
 /**  
  * mqtt sparkplug out testing
  */
-
-
 describe('mqtt sparkplug out node', function () {
 
 	var validMsg = {"timestamp":12345,"metrics":[{"name":"test","type":"Int32","value":100}],"seq":200}
