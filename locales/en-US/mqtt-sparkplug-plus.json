@@ -6,6 +6,7 @@
             "topic": "Topic",
             "password": "Password",
             "device": "Device",
+            "storeforward": "Enable Store Forward",
             "messagetype": "Msg. Type",
             "eon" : "Node",
             "group" : "Group",
@@ -39,6 +40,11 @@
             "session": "Session",
             "delay": "Delay"
         },
+        "tip": {
+            "storeforward" : "all the buffered values will be kept in memory. Do not use this for high thoughput applications.",
+            "device": "Tip: Use '/' to group related metrics e.g. Machine1/Speed",
+            "sparkplugformat": "Topic format: namespace/group_id/message_type/edge_node_id/[device_id]"
+        },
         "sections-label":{
             "birth-message": "Message sent on connection (birth message)",
             "will-message":"Message sent on an unexpected disconnection (will message)",
@@ -71,9 +77,8 @@
         },
         "true": "true",
         "false": "false",
-        "tip": "Tip: Use '/' to group related metrics e.g. Machine1/Speed",
-        "tipin": "Topic format: namespace/group_id/message_type/edge_node_id/[device_id]",
         "errors": {
+            "buffer-full": "the buffer is full. Older data will be lost",
             "missing-config": "missing broker configuration",
             "missing-attribute-name": "All metrics must have a name",
             "nonclean-missingclientid": "No client ID set, using clean session",

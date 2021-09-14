@@ -1,11 +1,11 @@
 {
   "name": "node-red-contrib-mqtt-sparkplug-plus",
-  "version": "0.0.5",
+  "version": "1.0.0",
   "repository": {
     "type": "git",
     "url": "https://github.com/thomassorensen2650/node-red-contrib-mqtt-sparkplug-plus.git"
   },
-  "description": "A Node that implements MQTT Sparkplug for Node-Red",
+  "description": "MQTT-Sparkplug-Plus is a set of Node-Red nodes, that will enable Node-Red to communicate with a MQTT Server using the sparkplug b protocol.",
   "node-red": {
     "nodes": {
       "mqtt-sparkplug-plus": "mqtt-sparkplug-plus.js"

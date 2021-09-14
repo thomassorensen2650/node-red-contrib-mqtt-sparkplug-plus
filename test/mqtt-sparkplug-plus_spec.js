@@ -2,11 +2,13 @@ var helper = require("node-red-node-test-helper");
 var sparkplugNode = require("../mqtt-sparkplug-plus.js");
 var should = require("should");
 var mqtt = require("mqtt");
+//const { FieldBase } = require("protobufjs");
 
 var spPayload = require('sparkplug-payload').get("spBv1.0");
 
 helper.init(require.resolve('node-red'));
-let testBroker = 'mqtt://localhost';//'mqtt://test.mosquitto.org';
+
+let testBroker = 'mqtt://localhost';
 var simpleFlow = [
 	{
 		"id": "n1",
@@ -20,22 +22,23 @@ var simpleFlow = [
 				"dataType": "Int32"
 			}
 		},
-		"broker": "b1",
+		"broker": "b1"
 	},
 	{
 		"id": "b1",
-		"type": "mqtt-sparkplug-broker",
-		"name": "Local Host",
-		"deviceGroup": "My Devices",
-		"eonName": "Node-Red",
-		"broker": "localhost",
-		"port": "1883",
-		"clientid": "",
-		"usetls": false,
-		"protocolVersion": "4",
-		"keepalive": "60",
-		"cleansession": true,
-		"credentials": {}
+        "type": "mqtt-sparkplug-broker",
+        "name": "Local Host",
+        "deviceGroup": "My Devices",
+        "eonName": "Node-Red",
+        "broker": "localhost",
+        "port": "1883",
+        "clientid": "",
+        "usetls": false,
+        "protocolVersion": "4",
+        "keepalive": "60",
+        "cleansession": true,
+        "enableStoreForward": false,
+        "primaryScada": "MY SCADA"
 	}
 ];
 var client = null;
@@ -140,7 +143,6 @@ describe('mqtt sparkplug device node', function () {
 
 		  client.on('message', function (topic, message) {
 			// Verify that we sent a DBirth Message to the broker
-			//console.log("TOPIC:", topic);
 			if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TEST2"){
 				var buffer = Buffer.from(message);
 				var payload = spPayload.decodePayload(buffer);
@@ -384,12 +386,12 @@ describe('mqtt sparkplug device node', function () {
 	it('should warn when passing unknown NData metric', function (done) {
 		helper.load(sparkplugNode, simpleFlow, function () {
 		
-			let n1 = helper.getNode("n1");
+			const n1 = helper.getNode("n1");
 			n1.on('input', () => {
 				n1.warn.should.be.calledWithExactly("mqtt-sparkplug-plus.errors.device-unknown-metric");
 				done();
-			  });
-			n1.receive({
+			}); 
+			  n1.receive({
 				"payload" : {
 					"metrics": [
 						{
@@ -398,7 +400,7 @@ describe('mqtt sparkplug device node', function () {
 						},
 					]}
 				}
-			);
+			);			
 
 		}); // end helper
 	}); // it end 
@@ -463,8 +465,9 @@ describe('mqtt sparkplug device node', function () {
 
 		}); // end helper
 	}); // it end 
-	/*
-	it('should error on DData invaid data type', function (done) {
+
+
+it('should add null_value on DData without value', function (done) {
 		client = mqtt.connect(testBroker);
 		let n1;
 		let b1;
@@ -508,32 +511,102 @@ describe('mqtt sparkplug device node', function () {
 						"metrics": [
 							{
 								"name": "test",
-								"value": 100,
-								"type": "Not my"
+								"value": null
 								//"timestamp": new Date()
 							},
 						]}
 					}
 				);
 			} else if (topic === "spBv1.0/My Devices/DDATA/Node-Red/TEST2") {
-				var buffer = Buffer.from(message);
-				var payload = spPayload.decodePayload(buffer);
-				console.log(payload);
-				payload.should.have.property("timestamp").which.is.a.Number();
-				payload.metrics[0].should.have.property("name").which.is.eql("test");
-				payload.metrics[0].should.have.property("value").which.is.eql(100);
-				payload.metrics[0].should.have.property("type").which.is.eql("Int32");
-				//payload.metrics[0].should.have.property("timestamp").which.is.a.Number();
-				payload.metrics.length.should.eql(1);
-				Object.keys(payload.metrics[0]).length.should.eql(3);
-				payload.should.have.property("seq").which.is.eql(2); // 0 is NBIRTH, 1 is DBIRTH
-				done();
-				//client.end();
+				try {
+					var buffer = Buffer.from(message);
+					var payload = spPayload.decodePayload(buffer);
+					payload.should.have.property("timestamp").which.is.a.Number();
+					payload.metrics[0].should.have.property("name").which.is.eql("test");
+					payload.metrics[0].should.have.property("value").which.is.eql(null);
+					payload.metrics[0].should.have.property("type").which.is.eql("Int32");
+					done();
+				} catch (e) {
+					done(e);
+				}
+
 			}
 			
 		});
 
 	}); // it end */
+
+
+
+	// STORE FORWARD TESTING
+	it('should buffer when primary SCADA IS OFFLINE', function (done) {
+		client = mqtt.connect(testBroker);
+
+		// WARN! We'll enable buffering for all tests
+		simpleFlow[1].enableStoreForward = true;
+
+		// SET OFFLINE
+		// Send Birth
+		// SET SCADA ONLINE
+		// VERIFY BIRTH is send when ONLINE
+
+		var initBirthDone = false;
+		let n1;
+		let b1;
+		client.on('connect', function () {
+			client.publish("STATE/MY SCADA", "OFFLINE", true);
+			// Set Online after 250ms 
+			setTimeout(() => client.publish("STATE/MY SCADA", "ONLINE", true), 500);
+			client.subscribe('#', function (err) {
+			  if (!err) {
+				helper.load(sparkplugNode, simpleFlow, function () {
+					try {
+						n1 = helper.getNode("n1");
+						b1 = n1.brokerConn;
+
+						// Send all metrics to trigger DBIRTH
+						n1.receive({
+							"payload" : {
+								"metrics": [
+									{
+										"name": "test",
+										"value": 11,
+									},
+									{
+										"name": "test2",
+										"value": 11
+									}
+								]}
+							}
+						);
+					}catch (e) {
+						done(e);
+					}
+				});
+			  }
+			})
+			
+			
+		  });
+
+		  client.on('message', function (topic, message) {
+			if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red") {
+				var buffer = Buffer.from(message);
+				var payload = spPayload.decodePayload(buffer);
+				payload.should.have.property("seq").which.is.eql(0);
+				n1.brokerConn.primaryScadaStatus.should.eql("ONLINE");
+
+			} else if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TEST2"){
+				var buffer = Buffer.from(message);
+				var payload = spPayload.decodePayload(buffer);
+				payload.should.have.property("seq").which.is.eql(1);
+				n1.brokerConn.primaryScadaStatus.should.eql("ONLINE");
+				done();
+			}
+		});
+	}); // it end 
+
+
 	// FIXME add unit testing:
 	//   Test unknown metric data type
 	//   Test NDEATH
@@ -580,7 +653,10 @@ var inExample = [
 	}
 ]
 
- describe('mqtt sparkplug in node', function () {
+/**
+ * MQTT Sparkplug B in testing
+ */
+describe('mqtt sparkplug in node', function () {
 
 	var validMsg = {"timestamp":12345,"metrics":[{"name":"test","type":"Int32","value":100}],"seq":200}
 
@@ -596,15 +672,11 @@ var inExample = [
 		client = mqtt.connect(testBroker);
 		client.on('connect', function () {
 			helper.load(sparkplugNode, inExample, function () {
-				
-				
 				var n2 = helper.getNode("n2");
 				n2.on("input", function (msg) {
 					try {
-					console.log("seq", msg.payload.seq);
 					msg.should.have.property('payload');
 					if (msg.payload.seq === 200) {
-						
 						msg.payload.should.deepEqual(validMsg);
 						done();
 					}else {
@@ -619,6 +691,95 @@ var inExample = [
 			});
 		});
 	});
-	
 });
 
+
+/**  
+ * mqtt sparkplug out testing
+ */
+describe('mqtt sparkplug out node', function () {
+
+	var validMsg = {"timestamp":12345,"metrics":[{"name":"test","type":"Int32","value":100}],"seq":200}
+	
+	outFlow = [
+		{
+			"id": "n1",
+			"type": "mqtt sparkplug out",
+			"topic": "spBv1.0/My Devices/DDATA/Node-Red/TEST2",
+			"broker": "b1",
+			"wires": []
+		},
+		{
+			"id": "b1",
+			"type": "mqtt-sparkplug-broker",
+			"name": "Local Host",
+			"deviceGroup": "My Devices",
+			"eonName": "Node-Red",
+			"broker": "localhost",
+			"port": "1883",
+			"clientid": "",
+			"usetls": false,
+			"protocolVersion": "4",
+			"keepalive": "60",
+			"cleansession": true,
+			"enableStoreForward": true,
+			"primaryScada": "MY SCADA",
+			"credentials": {}
+		}
+	]
+	/**
+	 * Verify that we outout a topic even though the primary SCADA is offline
+	 */
+	it('should ouput a publish topic', function (done) {
+
+		var n1 = null;
+		client = mqtt.connect(testBroker);
+		client.on('connect', function () {
+			client.subscribe("spBv1.0/My Devices/DDATA/Node-Red/TEST2", function (err) {
+				if (!err) {
+					helper.load(sparkplugNode, outFlow, function () {
+						n1 = helper.getNode("n1");
+						setTimeout(() => n1.receive({ payload: validMsg}), 500);
+					});
+				}
+			});
+		});
+
+		client.on('message', function (topic, message) {
+			var buffer = Buffer.from(message);
+			var payload = spPayload.decodePayload(buffer);
+			n1.brokerConn.primaryScadaStatus.should.eql("OFFLINE");
+			payload.should.deepEqual(validMsg);
+			done();
+		});
+	});
+
+	/**
+	 * Verify that we'll buffer if forced enabled,
+	 */
+	it('should buffer if publish topic', function (done) {
+
+		var n1 = null;
+		client = mqtt.connect(testBroker);
+		client.on('connect', function () {
+			client.subscribe("spBv1.0/My Devices/DDATA/Node-Red/TEST2", function (err) {
+				if (!err) {
+					helper.load(sparkplugNode, outFlow, function () {
+						n1 = helper.getNode("n1");
+						n1.shouldBuffer = true; // Force enable to buffer
+						setTimeout(() => n1.receive({ payload: validMsg}), 500);
+						setTimeout(() => client.publish("STATE/MY SCADA", "ONLINE", true), 1000);						});
+				}
+			});
+		});
+
+		client.on('message', function (topic, message) {
+			var buffer = Buffer.from(message);
+			var payload = spPayload.decodePayload(buffer);
+			n1.brokerConn.primaryScadaStatus.should.eql("ONLINE");
+			payload.should.deepEqual(validMsg);
+			done();
+		});
+	});
+
+});
