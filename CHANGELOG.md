@@ -8,7 +8,6 @@ New:
 - Added documentation for the *mqtt-sparkplug-broker* configuration node
 - Added new *mqtt sparkplug out* node
 
-
 ### 0.0.5: Maintenance Release
 
 Fixed:
