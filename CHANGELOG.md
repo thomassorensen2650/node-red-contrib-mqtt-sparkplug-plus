@@ -1,3 +1,8 @@
+### 1.0.1: Major Release
+
+Fixed:
+- Added missing dependency to MQTT that caused issues loading the nodes on some systems. 
+
 ### 1.0.0: Major Release
 
 Fixed:
