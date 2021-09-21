@@ -23,23 +23,74 @@ module.exports = function(RED) {
     var HttpsProxyAgent = require('https-proxy-agent');
     var url = require('url');
 
+    var pako = require('pako');
+    var compressed = "SPBV1.0_COMPRESSED";
+
     /**
-     * Sparkplug dates are always send a Unix Time. This function attached the timestamp to the object
-     * and converts in to unix time (EPOC) if required. If timestsamp is invalid, then the current time will be added
-     * @param {object} object object to add timestamp to
-     * @param {Date|Number} timestamp the timestamp to add
-     * @returns Object with Timestamp
+     * Try to decompress the payload if if compressed uuid is set on the payload
+     * @param {object} payload 
+     * @returns {object} payload
      */
-    /*function addTimestampToObject(object, timestamp) {
-        // 
-        if (timestamp instanceof Date && !isNaN(timestamp)) {
-            timestamp = timestamp.getTime();
-        }else if (!isNaN(timestamp)){
-            timestamp = new Date().getTime(); //TODO : We should add a warning here
+    function maybeDecompressPayload(payload) {
+        var shouldDecompress = (payload.uuid !== undefined && payload.uuid === compressed);
+        return shouldDecompress ? sparkplugDecode(decompressPayload(payload)) : payload;
+    };
+
+    /**
+     * Function will compress the payload and return the compressed payload as a new object.
+     * @param {object} payload The payload that should be compressed
+     * @param {object} options options for the compressPayload (algorithm)
+     * @throws Will throw an error if options['algorithm'] is not [DEFLATE|GZIP]
+     * @returns compressed payload (payload still needs to be protobuf encoded)
+     */
+    function compressPayload(payload, options) {
+        var metrics = payload.metrics;
+        var algorithm = options && options['algorithm'] ? options['algorithm'].toUpperCase() : "DEFLATE";
+        var resultPayload = {
+            "uuid" : compressed,
+            body : null,
+            metrics : [ {
+                "name" : "algorithm", 
+                "value" : algorithm.toUpperCase(), 
+                "type" : "string"
+            } ]
+        };
+
+        switch(algorithm) {
+            case "DEFLATE":
+                resultPayload.body = pako.deflate(payload);
+                break;
+            case "GZIP":
+                resultPayload.body = pako.gzip(payload);
+                break;
+            default:
+                throw new Error("Unknown or unsupported algorithm " + algorithm);
         }
-        object.timestamp = timestamp;
-        return object;
-    }; */
+        return resultPayload;
+    };
+
+    /**
+     * 
+     * @param {object} payload the compressed payload (payload should NOT be protobuf encoded)
+     * @throws Will throw an error unable to decompress
+     * @returns {object} the decoded payload
+     * 
+     */
+    function decompressPayload(payload) {
+         // Inflate will auto detect compression algorithm via the header.
+        return pako.inflate(payload.body);
+        
+        var metrics = payload.metrics;
+        var algorithm = metrics && Array.isArray(metrics) ? metrics.find(m => m.name == "algorithm")|| "DEFALTE" : "DEFALTE";
+
+        switch(algorithm) {
+            case "DEFLATE":
+            case "GZIP":
+                return pako.inflate(payload.body);
+            default:
+                throw new Error("Unknown or unsupported compression algorithm " + algorithm);
+        }
+    };
 
     /**
      * Sparkplug Encode Payload
@@ -834,12 +885,13 @@ module.exports = function(RED) {
                     
                     // Decode Payload
                     try {
-                        payload = sparkplugDecode(payload);
+                        payload = maybeDecompressPayload(sparkplugDecode(payload));
+
                         var msg = {topic:topic, payload:payload, qos:packet.qos, retain:packet.retain};
 
-                        if ((node.brokerConn.broker === "localhost")||(node.brokerConn.broker === "127.0.0.1")) {
-                            msg._topic = topic;
-                        }
+                        //if ((node.brokerConn.broker === "localhost")||(node.brokerConn.broker === "127.0.0.1")) {
+                        //    msg._topic = topic;
+                        //}
                         node.send(msg);
                     } catch (e) {
                         node.error(RED._("mqtt-sparkplug-plus.errors.unable-to-decode-message", {type : "", error: e.toString()}));

@@ -2,7 +2,8 @@ var helper = require("node-red-node-test-helper");
 var sparkplugNode = require("../mqtt-sparkplug-plus.js");
 var should = require("should");
 var mqtt = require("mqtt");
-//const { FieldBase } = require("protobufjs");
+var pako = require('pako');
+
 
 var spPayload = require('sparkplug-payload').get("spBv1.0");
 
@@ -691,6 +692,87 @@ describe('mqtt sparkplug in node', function () {
 			});
 		});
 	});
+
+		// Connect to 
+	it('should decompress a DEFLATE encoded topic', function (done) {
+
+		var testMsg = {
+			topic : "spBv1.0/My Devices/DDATA/Node-Red/TEST2",
+			payload : spPayload.encodePayload(validMsg)
+		}
+
+		var compressedPayload = {
+            "uuid" : "SPBV1.0_COMPRESSED",
+            body : pako.deflate(testMsg.payload),
+            metrics : [ {
+                "name" : "algorithm", 
+                "value" : "DEFLATE", 
+                "type" : "string"
+            } ]
+        };
+		compressedPayload = spPayload.encodePayload(compressedPayload);
+		client = mqtt.connect(testBroker);
+		client.on('connect', function () {
+			helper.load(sparkplugNode, inExample, function () {
+				var n2 = helper.getNode("n2");
+				n2.on("input", function (msg) {
+					try {
+					msg.should.have.property('payload');
+					if (msg.payload.seq === 200) {
+						msg.payload.should.deepEqual(validMsg);
+						done();
+					}else {
+						// Nasty hack, to make sure we publish after node is online. 
+						client.publish(testMsg.topic, compressedPayload);
+					}
+					} catch(err) {
+						console.log("Error");
+					  done(err);
+					}
+				  });
+			});
+		});
+	});
+	it('should decompress a GZIP encoded topic', function (done) {
+
+		var testMsg = {
+			topic : "spBv1.0/My Devices/DDATA/Node-Red/TEST2",
+			payload : spPayload.encodePayload(validMsg)
+		}
+
+		var compressedPayload = {
+            "uuid" : "SPBV1.0_COMPRESSED",
+            body : pako.gzip(testMsg.payload),
+            metrics : [ {
+                "name" : "algorithm", 
+                "value" : "DEFLATE", 
+                "type" : "string"
+            } ]
+        };
+		compressedPayload = spPayload.encodePayload(compressedPayload);
+		client = mqtt.connect(testBroker);
+		client.on('connect', function () {
+			helper.load(sparkplugNode, inExample, function () {
+				var n2 = helper.getNode("n2");
+				n2.on("input", function (msg) {
+					try {
+					msg.should.have.property('payload');
+					if (msg.payload.seq === 200) {
+						msg.payload.should.deepEqual(validMsg);
+						done();
+					}else {
+						// Nasty hack, to make sure we publish after node is online. 
+						client.publish(testMsg.topic, compressedPayload);
+					}
+					} catch(err) {
+						console.log("Error");
+					  done(err);
+					}
+				  });
+			});
+		});
+	});
+
 });
 
 
