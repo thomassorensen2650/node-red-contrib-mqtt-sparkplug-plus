@@ -25,6 +25,7 @@
     "https-proxy-agent": "5.0.0",
     "is-utf8": "0.2.1",
     "mqtt": "4.2.8",
+    "pako": "2.0.4",
     "protobufjs": "6.11.2",
     "sparkplug-payload": "1.0.1"
   },
