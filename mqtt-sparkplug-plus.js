@@ -29,7 +29,7 @@ module.exports = function(RED) {
     /**
      * Try to decompress the payload if if compressed uuid is set on the payload
      * @param {object} payload 
-     * @returns {object} payload
+     * @returns {object} payload 
      */
     function maybeDecompressPayload(payload) {
         return payload.uuid === compressed ? sparkplugDecode(decompressPayload(payload)) : payload;
