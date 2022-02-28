@@ -744,6 +744,79 @@ describe('mqtt sparkplug device node', function () {
 					}
 				);
 			} else if (topic === "spBv1.0/My Devices/DDATA/Node-Red/TEST2") {
+				try {
+					var buffer = Buffer.from(message);
+					var payload = spPayload.decodePayload(buffer);
+					payload.should.have.property("timestamp").which.is.a.Number();
+					payload.metrics[0].should.have.property("name").which.is.eql("test");
+					payload.metrics[0].should.have.property("value").which.is.eql(null);
+					payload.metrics[0].should.have.property("type").which.is.eql("Int32");
+					done();
+				} catch (e) {
+					done(e);
+				}
+
+			}
+			
+		});
+
+	}); // it end */
+
+
+
+	// STORE FORWARD TESTING
+	it('should buffer when primary SCADA IS OFFLINE', function (done) {
+		client = mqtt.connect(testBroker);
+
+		// WARN! We'll enable buffering for all tests
+		simpleFlow[1].enableStoreForward = true;
+
+		// SET OFFLINE
+		// Send Birth
+		// SET SCADA ONLINE
+		// VERIFY BIRTH is send when ONLINE
+
+		var initBirthDone = false;
+		let n1;
+		let b1;
+		client.on('connect', function () {
+			client.publish("STATE/MY SCADA", "OFFLINE", true);
+			// Set Online after 250ms 
+			setTimeout(() => client.publish("STATE/MY SCADA", "ONLINE", true), 500);
+			client.subscribe('#', function (err) {
+			  if (!err) {
+				helper.load(sparkplugNode, simpleFlow, function () {
+					try {
+						n1 = helper.getNode("n1");
+						b1 = n1.brokerConn;
+
+						// Send all metrics to trigger DBIRTH
+						n1.receive({
+							"payload" : {
+								"metrics": [
+									{
+										"name": "test",
+										"value": 11,
+									},
+									{
+										"name": "test2",
+										"value": 11
+									}
+								]}
+							}
+						);
+					}catch (e) {
+						done(e);
+					}
+				});
+			  }
+			})
+			
+			
+		  });
+
+		  client.on('message', function (topic, message) {
+			if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red") {
 				var buffer = Buffer.from(message);
 				var payload = spPayload.decodePayload(buffer);
 				payload = pako.inflate(payload.body);
@@ -761,11 +834,8 @@ describe('mqtt sparkplug device node', function () {
 
 				simpleFlow[1].compressAlgorithm = undefined;
 				done();
-				//client.end();
 			}
-			
 		});
-
 	}); // it end 
 
 	it('should warn and send uncompressed on unknown Compression Algorithm', function (done) {
