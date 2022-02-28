@@ -14,12 +14,12 @@ The node will connect to an MQTT broker (server) and act as an MQTT Edge of Netw
 * DDATA (from node input)
 * DCMD (send as output to Node-Red)
 * Buffering when primary SCADA is not available
-* Compression
 
 The following features are not yet supported:
 * Non-metrics (body)
 * MQTT Broker redundancy
 * DDEATH
+* Compression
 
 ## mqtt sparkplug in
 The *mqtt sparkplug in* node makes it possible to subscribe to sparkplug b mqtt topics. The node is almost identical to the default node-red *mqtt in* node, but it will decode the sparkplug/protobuf messages and deliver them in json.
