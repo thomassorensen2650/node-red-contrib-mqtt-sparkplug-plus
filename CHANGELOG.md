@@ -1,3 +1,15 @@
+### 1.1.0: Maintenance Release
+
+New:
+ - _mqtt sparkplug in_ and _mqtt sparkplug device_ node now supports decompression (DEFLATE and GZIP)
+ - _mqtt sparkplug out_ supports topic defined in input message
+ - Invalid mesasges to _mqtt sparkplug out_ without metric types, are not caught and a more friendly error message is now shown.
+ 
+### 1.0.1: Maintenance Release
+
+Fixed:
+- Added missing dependency to MQTT that caused issues loading the nodes on some systems. 
+
 ### 1.0.0: Major Release
 
 Fixed:

@@ -90,6 +90,16 @@
                 <input type="text" id="node-config-input-deviceGroup" data-i18n="[placeholder]Sparkplug Devices">
             </div>
 
+            <!-- Add UI for compress output -->
+            <div class="form-row">
+                <label for="node-config-input-compressAlgorithm"><i class="fa fa-compress"></i> Compress</label>
+                <select id="node-config-input-compressAlgorithm">
+                    <option value="">No</option>
+                    <option value="DEFLATE">Deflate</option>
+                    <option value="GZIP">Gzip</option>
+                </select>
+        </div>
+
             <!-- Add UI for Store forward -->
             <div class="form-row">
                 <label for="node-config-input-enableStoreForward"> </label>
@@ -131,6 +141,7 @@
             keepalive: {value:60,validate:RED.validators.number()},
             cleansession: {value: true},
             enableStoreForward: {value: false},
+            compressAlgorithm : {value: false},
             primaryScada: {value:"",  validate :x =>  !$("#node-config-input-enableStoreForward").is(":checked") || /^[^/+#]+$/.test(x) },
         },
         credentials: {
@@ -441,22 +452,6 @@
         <input type="text" id="node-input-topic" data-i18n="[placeholder]mqtt-sparkplug-plus.label.topic">
     </div>
 
-    <!-- Add UI for compress output -->
-    <div class="form-row">
-        <label for="node-config-input-compressOutput"> </label>
-        <label for="node-config-input-compressOutput" style="width:70%">
-            <input type="checkbox" id="node-config-input-compressOutput" style="display:inline-block; width:22px; vertical-align:top;"><span data-i18n="mqtt-sparkplug-plus.label.compressoutput"></span>
-        </label>
-        </div>
-    <div class="form-row" id="node-storeforward-line">
-        <label for="node-config-input-compressalgorithm"><i class="fa fa-desktop"></i> Algoritm</label>
-        <select id="node-input-compressalgorithm">
-            <option value="DEFLATE">Deflate</option>
-            <option value="GZIP">Gzip</option>
-        </select>
-    </div>
-    </div>
-
     <div class="form-row mqtt-form-row-cols2">
         <label for="node-input-qos" class="mqtt-form-row-col1"><i class="fa fa-empire"></i> <span data-i18n="mqtt-sparkplug-plus.label.qos"></span></label>
         <select id="node-input-qos" class="mqtt-form-row-col1">
@@ -486,7 +481,7 @@ RED.nodes.registerType('mqtt sparkplug out',{
     category: 'network',
     defaults: {
         name: {value:""},
-        topic: {value:"spBv1.0/My Devices/NCMD/EoN Name/My Device",required:true,validate: RED.validators.regex(/^(#$|(\+|[^+#]*)(\/(\+|[^+#]*))*(\/(\+|#|[^+#]*))?$)/)},
+        topic: {value:"spBv1.0/My Devices/NCMD/EoN Name/My Device",required:false,validate: RED.validators.regex(/^(#$|(\+|[^+#]*)(\/(\+|[^+#]*))*(\/(\+|#|[^+#]*))?$)/)},
         qos: {value:""},
         retain: {value:""},
         broker: {type:"mqtt-sparkplug-broker", required:true}

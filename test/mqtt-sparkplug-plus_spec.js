@@ -10,38 +10,6 @@ var spPayload = require('sparkplug-payload').get("spBv1.0");
 helper.init(require.resolve('node-red'));
 
 let testBroker = 'mqtt://localhost';
-var simpleFlow = [
-	{
-		"id": "n1",
-		"type": "mqtt sparkplug device",
-		"name": "TEST2",
-		"metrics": {
-			"test": {
-				"dataType": "Int32"
-			},
-			"test2": {
-				"dataType": "Int32"
-			}
-		},
-		"broker": "b1"
-	},
-	{
-		"id": "b1",
-        "type": "mqtt-sparkplug-broker",
-        "name": "Local Host",
-        "deviceGroup": "My Devices",
-        "eonName": "Node-Red",
-        "broker": "localhost",
-        "port": "1883",
-        "clientid": "",
-        "usetls": false,
-        "protocolVersion": "4",
-        "keepalive": "60",
-        "cleansession": true,
-        "enableStoreForward": false,
-        "primaryScada": "MY SCADA"
-	}
-];
 var client = null;
 
 beforeEach(function (done) {
@@ -58,6 +26,39 @@ afterEach(function (done) {
 });
 
 describe('mqtt sparkplug device node', function () {
+
+	var simpleFlow = [
+		{
+			"id": "n1",
+			"type": "mqtt sparkplug device",
+			"name": "TEST2",
+			"metrics": {
+				"test": {
+					"dataType": "Int32"
+				},
+				"test2": {
+					"dataType": "Int32"
+				}
+			},
+			"broker": "b1"
+		},
+		{
+			"id": "b1",
+			"type": "mqtt-sparkplug-broker",
+			"name": "Local Host",
+			"deviceGroup": "My Devices",
+			"eonName": "Node-Red",
+			"broker": "localhost",
+			"port": "1883",
+			"clientid": "",
+			"usetls": false,
+			"protocolVersion": "4",
+			"keepalive": "60",
+			"cleansession": true,
+			"enableStoreForward": false,
+			"primaryScada": "MY SCADA"
+		}
+	];
 
 	it('should be loaded', function (done) {
 		var flow = [{ id: "n1", type: "mqtt sparkplug device", name: "device" }];
@@ -467,77 +468,74 @@ describe('mqtt sparkplug device node', function () {
 		}); // end helper
 	}); // it end 
 
+	it('should add null_value on DData without value', function (done) {
+			client = mqtt.connect(testBroker);
+			let n1;
+			let b1;
+			client.on('connect', function () {
+				client.subscribe('#', function (err) {
+				if (!err) {
+					helper.load(sparkplugNode, simpleFlow, function () {
+						try {
+							n1 = helper.getNode("n1");
+							b1 = n1.brokerConn;
 
-it('should add null_value on DData without value', function (done) {
-		client = mqtt.connect(testBroker);
-		let n1;
-		let b1;
-		client.on('connect', function () {
-			client.subscribe('#', function (err) {
-			  if (!err) {
-				helper.load(sparkplugNode, simpleFlow, function () {
+							// Send all metrics to trigger DBIRTH
+							n1.receive({
+								"payload" : {
+									"metrics": [
+										{
+											"name": "test",
+											"value": 11
+										},
+										{
+											"name": "test2",
+											"value": 11
+										}
+									]}
+								}
+							);
+						}catch (e) {
+							done(e);
+						}
+					});
+				}
+				})
+			});
+
+			client.on('message', function (topic, message) {
+				// Verify that we sent a DBirth Message to the broker
+				//console.log("TOPIC:", topic);
+				if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TEST2"){
+					n1.receive({
+						"payload" : {
+							"metrics": [
+								{
+									"name": "test",
+									"value": null
+									//"timestamp": new Date()
+								},
+							]}
+						}
+					);
+				} else if (topic === "spBv1.0/My Devices/DDATA/Node-Red/TEST2") {
 					try {
-						n1 = helper.getNode("n1");
-						b1 = n1.brokerConn;
-
-						// Send all metrics to trigger DBIRTH
-						n1.receive({
-							"payload" : {
-								"metrics": [
-									{
-										"name": "test",
-										"value": 11
-									},
-									{
-										"name": "test2",
-										"value": 11
-									}
-								]}
-							}
-						);
-					}catch (e) {
+						var buffer = Buffer.from(message);
+						var payload = spPayload.decodePayload(buffer);
+						payload.should.have.property("timestamp").which.is.a.Number();
+						payload.metrics[0].should.have.property("name").which.is.eql("test");
+						payload.metrics[0].should.have.property("value").which.is.eql(null);
+						payload.metrics[0].should.have.property("type").which.is.eql("Int32");
+						done();
+					} catch (e) {
 						done(e);
 					}
-				});
-			  }
-			})
-		  });
 
-		  client.on('message', function (topic, message) {
-			// Verify that we sent a DBirth Message to the broker
-			//console.log("TOPIC:", topic);
-			if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TEST2"){
-				n1.receive({
-					"payload" : {
-						"metrics": [
-							{
-								"name": "test",
-								"value": null
-								//"timestamp": new Date()
-							},
-						]}
-					}
-				);
-			} else if (topic === "spBv1.0/My Devices/DDATA/Node-Red/TEST2") {
-				try {
-					var buffer = Buffer.from(message);
-					var payload = spPayload.decodePayload(buffer);
-					payload.should.have.property("timestamp").which.is.a.Number();
-					payload.metrics[0].should.have.property("name").which.is.eql("test");
-					payload.metrics[0].should.have.property("value").which.is.eql(null);
-					payload.metrics[0].should.have.property("type").which.is.eql("Int32");
-					done();
-				} catch (e) {
-					done(e);
 				}
-
-			}
-			
-		});
+				
+			});
 
 	}); // it end */
-
-
 
 	// STORE FORWARD TESTING
 	it('should buffer when primary SCADA IS OFFLINE', function (done) {
@@ -558,6 +556,72 @@ it('should add null_value on DData without value', function (done) {
 			client.publish("STATE/MY SCADA", "OFFLINE", true);
 			// Set Online after 250ms 
 			setTimeout(() => client.publish("STATE/MY SCADA", "ONLINE", true), 500);
+			client.subscribe('#', function (err) {
+			  if (!err) {
+				helper.load(sparkplugNode, simpleFlow, function () {
+					try {
+						n1 = helper.getNode("n1");
+						b1 = n1.brokerConn;
+						n1.on('call:error', call => {
+							console.log("ERROR", call.firstArg);
+							call.firstArg.should.eql("mqtt-sparkplug-plus.errors.payload-type-object")
+							done();
+						});
+						b1.on('call:error', call => {
+							console.log("ERROR1", call.firstArg);
+							call.firstArg.should.eql("mqtt-sparkplug-plus.errors.payload-type-object")
+							done();
+						});
+			
+						// Send all metrics to trigger DBIRTH
+						n1.receive({
+							"payload" : {
+								"metrics": [
+									{
+										"name": "test",
+										"value": 11,
+									},
+									{
+										"name": "test2",
+										"value": 11
+									}
+								]}
+						});
+						
+					}catch (e) {
+						done(e);
+					}
+				});
+			  }
+			})
+			
+			
+		  });
+
+		  client.on('message', function (topic, message) {
+			if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red") {
+				var buffer = Buffer.from(message);
+				var payload = spPayload.decodePayload(buffer);
+				payload.should.have.property("seq").which.is.eql(0);
+				n1.brokerConn.primaryScadaStatus.should.eql("ONLINE");
+
+			} else if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TEST2"){
+				var buffer = Buffer.from(message);
+				var payload = spPayload.decodePayload(buffer);
+				payload.should.have.property("seq").which.is.eql(1);
+				n1.brokerConn.primaryScadaStatus.should.eql("ONLINE");
+				simpleFlow[1].enableStoreForward = false;
+				done();
+			}
+		});
+	}); // it end 
+
+	it('should send valid DEFLATE NData in input2', function (done) {
+		client = mqtt.connect(testBroker);
+		simpleFlow[1].compressAlgorithm = "DEFLATE";
+		let n1;
+		let b1;
+		client.on('connect', function () {
 			client.subscribe('#', function (err) {
 			  if (!err) {
 				helper.load(sparkplugNode, simpleFlow, function () {
@@ -586,89 +650,268 @@ it('should add null_value on DData without value', function (done) {
 				});
 			  }
 			})
-			
-			
 		  });
 
 		  client.on('message', function (topic, message) {
-			if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red") {
+			// Verify that we sent a DBirth Message to the broker
+			//console.log("TOPIC:", topic);
+			if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TEST2"){
+				n1.receive({
+					"payload" : {
+						"metrics": [
+							{
+								"name": "test",
+								"value": 100,
+								//"timestamp": new Date()
+							},
+						]}
+					}
+				);
+			} else if (topic === "spBv1.0/My Devices/DDATA/Node-Red/TEST2") {
 				var buffer = Buffer.from(message);
 				var payload = spPayload.decodePayload(buffer);
-				payload.should.have.property("seq").which.is.eql(0);
-				n1.brokerConn.primaryScadaStatus.should.eql("ONLINE");
+				payload = pako.inflate(payload.body);
+				buffer = Buffer.from(payload);
+				payload = spPayload.decodePayload(buffer);
+	
+				payload.should.have.property("timestamp").which.is.a.Number();
+				payload.metrics[0].should.have.property("name").which.is.eql("test");
+				payload.metrics[0].should.have.property("value").which.is.eql(100);
+				payload.metrics[0].should.have.property("type").which.is.eql("Int32");
+				//payload.metrics[0].should.have.property("timestamp").which.is.a.Number();
+				payload.metrics.length.should.eql(1);
+				Object.keys(payload.metrics[0]).length.should.eql(3);
+				payload.should.have.property("seq").which.is.eql(2); // 0 is NBIRTH, 1 is DBIRTH
 
-			} else if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TEST2"){
-				var buffer = Buffer.from(message);
-				var payload = spPayload.decodePayload(buffer);
-				payload.should.have.property("seq").which.is.eql(1);
-				n1.brokerConn.primaryScadaStatus.should.eql("ONLINE");
+				simpleFlow[1].compressAlgorithm = undefined;
 				done();
+				//client.end();
 			}
+			
 		});
+
 	}); // it end 
 
+	it('should send valid GZIP NData in input2', function (done) {
+		client = mqtt.connect(testBroker);
+		simpleFlow[1].compressAlgorithm = "GZIP";
+		let n1;
+		let b1;
+		client.on('connect', function () {
+			client.subscribe('#', function (err) {
+			  if (!err) {
+				helper.load(sparkplugNode, simpleFlow, function () {
+					try {
+						n1 = helper.getNode("n1");
+						b1 = n1.brokerConn;
 
-	// FIXME add unit testing:
+						// Send all metrics to trigger DBIRTH
+						n1.receive({
+							"payload" : {
+								"metrics": [
+									{
+										"name": "test",
+										"value": 11,
+									},
+									{
+										"name": "test2",
+										"value": 11
+									}
+								]}
+							}
+						);
+					}catch (e) {
+						done(e);
+					}
+				});
+			  }
+			})
+		  });
+
+		  client.on('message', function (topic, message) {
+			// Verify that we sent a DBirth Message to the broker
+			//console.log("TOPIC:", topic);
+			if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TEST2"){
+				n1.receive({
+					"payload" : {
+						"metrics": [
+							{
+								"name": "test",
+								"value": 100,
+								//"timestamp": new Date()
+							},
+						]}
+					}
+				);
+			} else if (topic === "spBv1.0/My Devices/DDATA/Node-Red/TEST2") {
+				var buffer = Buffer.from(message);
+				var payload = spPayload.decodePayload(buffer);
+				payload = pako.inflate(payload.body);
+				buffer = Buffer.from(payload);
+				payload = spPayload.decodePayload(buffer);
+	
+				payload.should.have.property("timestamp").which.is.a.Number();
+				payload.metrics[0].should.have.property("name").which.is.eql("test");
+				payload.metrics[0].should.have.property("value").which.is.eql(100);
+				payload.metrics[0].should.have.property("type").which.is.eql("Int32");
+				//payload.metrics[0].should.have.property("timestamp").which.is.a.Number();
+				payload.metrics.length.should.eql(1);
+				Object.keys(payload.metrics[0]).length.should.eql(3);
+				payload.should.have.property("seq").which.is.eql(2); // 0 is NBIRTH, 1 is DBIRTH
+
+				simpleFlow[1].compressAlgorithm = undefined;
+				done();
+				//client.end();
+			}
+			
+		});
+
+	}); // it end 
+
+	it('should warn and send uncompressed on unknown Compression Algorithm', function (done) {
+		client = mqtt.connect(testBroker);
+		simpleFlow[1].compressAlgorithm = "WINZUP";
+		let n1;
+		let b1;
+		client.on('connect', function () {
+			client.subscribe('#', function (err) {
+			  if (!err) {
+				helper.load(sparkplugNode, simpleFlow, function () {
+					try {
+						n1 = helper.getNode("n1");
+						b1 = n1.brokerConn;
+
+						n1.on('call:warn', call => {
+							call.should.be.calledWithExactly('mqtt-sparkplug-plus.errors.unable-to-encode-message');
+							done();
+						  });
+
+						n1.on('input', () => {
+							
+							// FIXME: warn should be called, but its not! (works in node-red)
+							// need to fix test 
+							//n1.warn.should.be.calledWithExactly('mqtt-sparkplug-plus.errors.unable-to-encode-message');
+							
+						});
+						// Send all metrics to trigger DBIRTH
+						n1.receive({
+							"payload" : {
+								"metrics": [
+									{
+										"name": "test",
+										"value": 11,
+									},
+									{
+										"name": "test2",
+										"value": 11
+									}
+								]}
+							}
+						);
+					}catch (e) {
+
+
+						done(e);
+					}
+				});
+			  }
+			})
+		  });
+
+		  client.on('message', function (topic, message) {
+			// Verify that we sent a DBirth Message to the broker
+			//console.log("TOPIC:", topic);
+			if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TEST2"){
+				n1.receive({
+					"payload" : {
+						"metrics": [
+							{
+								"name": "test",
+								"value": 100,
+								//"timestamp": new Date()
+							},
+						]}
+					}
+				);
+			} else if (topic === "spBv1.0/My Devices/DDATA/Node-Red/TEST2") {
+				var buffer = Buffer.from(message);
+				var payload = spPayload.decodePayload(buffer);
+				//payload.should.have.property("uuid");
+				//payload.uuid.should.eql("SPBV1.0_COMPRESSED");
+
+				//payload = pako.inflate(payload.body);
+				//buffer = Buffer.from(payload);
+				//payload = spPayload.decodePayload(buffer);
+	
+				payload.should.have.property("timestamp").which.is.a.Number();
+				payload.metrics[0].should.have.property("name").which.is.eql("test");
+				payload.metrics[0].should.have.property("value").which.is.eql(100);
+				payload.metrics[0].should.have.property("type").which.is.eql("Int32");
+				//payload.metrics[0].should.have.property("timestamp").which.is.a.Number();
+				payload.metrics.length.should.eql(1);
+				Object.keys(payload.metrics[0]).length.should.eql(3);
+				payload.should.have.property("seq").which.is.eql(2); // 0 is NBIRTH, 1 is DBIRTH
+
+				simpleFlow[1].compressAlgorithm = undefined;
+				done();
+				//client.end();
+			}
+			
+		});
+
+	}); // it end 
+
+	// TODO:
 	//   Test unknown metric data type
 	//   Test NDEATH
-	//   Test Null Value
 	//   Test Invalid DCMD
-
-
-	// MQTT IN
-	// Test that it works
-	// Test That filtering works
-	// That that it errors on invalid data
 	
 });
 
-
-var inExample = [
-    {
-        "id": "n2",
-        "type": "helper",
-    },
-    {
-        "id": "n1",
-        "type": "mqtt sparkplug in",
-        "name": "",
-        "topic": "#", //"spBv1.0/+/DDATA/+/+",
-        "qos": "2",
-        "broker": "b1",
-        "wires": [["n2"]]
-    },
-	{
-		"id": "b1",
-		"type": "mqtt-sparkplug-broker",
-		"name": "Local Host",
-		"deviceGroup": "My Devices",
-		"eonName": "Node-Red",
-		"broker": "localhost",
-		"port": "1883",
-		"clientid": "",
-		"usetls": false,
-		"protocolVersion": "4",
-		"keepalive": "60",
-		"cleansession": true,
-		"credentials": {}
-	}
-]
 
 /**
  * MQTT Sparkplug B in testing
  */
 describe('mqtt sparkplug in node', function () {
 
+	var inExample = [
+		{
+			"id": "n2",
+			"type": "helper",
+		},
+		{
+			"id": "n1",
+			"type": "mqtt sparkplug in",
+			"name": "",
+			"topic": "#", //"spBv1.0/+/DDATA/+/+",
+			"qos": "2",
+			"broker": "b1",
+			"wires": [["n2"]]
+		},
+		{
+			"id": "b1",
+			"type": "mqtt-sparkplug-broker",
+			"name": "Local Host",
+			"deviceGroup": "My Devices",
+			"eonName": "Node-Red",
+			"broker": "localhost",
+			"port": "1883",
+			"clientid": "",
+			"usetls": false,
+			"protocolVersion": "4",
+			"keepalive": "60",
+			"cleansession": true,
+			"credentials": {}
+		}
+	]
 	var validMsg = {"timestamp":12345,"metrics":[{"name":"test","type":"Int32","value":100}],"seq":200}
 
-	// Connect to 
 	it('should ouput a subscribed topic', function (done) {
 
 		var testMsg = {
 			topic : "spBv1.0/My Devices/DDATA/Node-Red/TEST2",
 			payload : spPayload.encodePayload(validMsg)
 		}
-
 
 		client = mqtt.connect(testBroker);
 		client.on('connect', function () {
@@ -693,7 +936,6 @@ describe('mqtt sparkplug in node', function () {
 		});
 	});
 
-		// Connect to 
 	it('should decompress a DEFLATE encoded topic', function (done) {
 
 		var testMsg = {
@@ -733,6 +975,7 @@ describe('mqtt sparkplug in node', function () {
 			});
 		});
 	});
+
 	it('should decompress a GZIP encoded topic', function (done) {
 
 		var testMsg = {
@@ -745,7 +988,7 @@ describe('mqtt sparkplug in node', function () {
             body : pako.gzip(testMsg.payload),
             metrics : [ {
                 "name" : "algorithm", 
-                "value" : "DEFLATE", 
+                "value" : "GZIP", 
                 "type" : "string"
             } ]
         };
@@ -773,8 +1016,49 @@ describe('mqtt sparkplug in node', function () {
 		});
 	});
 
-});
+	it('should error on invalid compression topic', function (done) {
 
+		var compressedPayload = {
+            "uuid" : "SPBV1.0_COMPRESSED",
+            body : "Hello World!",
+            metrics : [ {
+                "name" : "algorithm", 
+                "value" : "DEFLATE", 
+                "type" : "string"
+            } ],
+			seq : 200
+        };
+		compressedPayload = spPayload.encodePayload(compressedPayload);
+		client = mqtt.connect(testBroker);
+		client.on('connect', function () {
+			helper.load(sparkplugNode, inExample, function () {
+				var n2 = helper.getNode("n2");
+				var n1 = helper.getNode("n1");
+				n1.on('call:error', call => {
+					call.should.be.calledWithExactly('mqtt-sparkplug-plus.errors.unable-to-decode-message');
+					done();
+				  });
+
+				n2.on("input", function (msg) {
+					try {
+					msg.should.have.property('payload');
+					if (msg.payload.seq === 200) {
+						console.log(payload);
+						done();
+					}else {
+						// Nasty hack, to make sure we publish after node is online. 
+						client.publish("spBv1.0/My Devices/DDATA/Node-Red/TEST2", compressedPayload);
+					}
+					} catch(err) {
+						console.log("Error");
+					  done(err);
+					}
+				  });
+			});
+		});
+	});
+
+});
 
 /**  
  * mqtt sparkplug out testing
@@ -809,6 +1093,33 @@ describe('mqtt sparkplug out node', function () {
 			"credentials": {}
 		}
 	]
+
+	outFlow2 = [
+		{
+			"id": "n1",
+			"type": "mqtt sparkplug out",
+			"topic": "spBv1.0/My Devices/DDATA/Node-Red/TEST2",
+			"broker": "b1",
+			"wires": []
+		},
+		{
+			"id": "b1",
+			"type": "mqtt-sparkplug-broker",
+			"name": "Local Host",
+			"deviceGroup": "My Devices",
+			"eonName": "Node-Red",
+			"broker": "localhost",
+			"port": "1883",
+			"clientid": "",
+			"usetls": false,
+			"protocolVersion": "4",
+			"keepalive": "60",
+			"cleansession": true,
+			"enableStoreForward": false,
+			"primaryScada": "MY SCADA",
+			"credentials": {}
+		}
+	]
 	/**
 	 * Verify that we outout a topic even though the primary SCADA is offline
 	 */
@@ -820,7 +1131,9 @@ describe('mqtt sparkplug out node', function () {
 			client.subscribe("spBv1.0/My Devices/DDATA/Node-Red/TEST2", function (err) {
 				if (!err) {
 					helper.load(sparkplugNode, outFlow, function () {
+					
 						n1 = helper.getNode("n1");
+						
 						setTimeout(() => n1.receive({ payload: validMsg}), 500);
 					});
 				}
@@ -863,5 +1176,4 @@ describe('mqtt sparkplug out node', function () {
 			done();
 		});
 	});
-
 });

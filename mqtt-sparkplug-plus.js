@@ -32,8 +32,7 @@ module.exports = function(RED) {
      * @returns {object} payload
      */
     function maybeDecompressPayload(payload) {
-        var shouldDecompress = (payload.uuid !== undefined && payload.uuid === compressed);
-        return shouldDecompress ? sparkplugDecode(decompressPayload(payload)) : payload;
+        return payload.uuid === compressed ? sparkplugDecode(decompressPayload(payload)) : payload;
     };
 
     /**
@@ -55,16 +54,16 @@ module.exports = function(RED) {
                 "type" : "string"
             } ]
         };
-
+     
         switch(algorithm) {
             case "DEFLATE":
-                resultPayload.body = pako.deflate(payload);
+                resultPayload.body = pako.deflate(encodePayload(payload));
                 break;
             case "GZIP":
-                resultPayload.body = pako.gzip(payload);
+                resultPayload.body = pako.gzip(encodePayload(payload));
                 break;
             default:
-                throw new Error("Unknown or unsupported algorithm " + algorithm);
+                throw new Error("Unknown or unsupported compression algorithm " + algorithm);
         }
         return resultPayload;
     };
@@ -80,7 +79,7 @@ module.exports = function(RED) {
          // Inflate will auto detect compression algorithm via the header.
         return pako.inflate(payload.body);
         
-        var metrics = payload.metrics;
+       /* var metrics = payload.metrics;
         var algorithm = metrics && Array.isArray(metrics) ? metrics.find(m => m.name == "algorithm")|| "DEFALTE" : "DEFALTE";
 
         switch(algorithm) {
@@ -89,7 +88,7 @@ module.exports = function(RED) {
                 return pako.inflate(payload.body);
             default:
                 throw new Error("Unknown or unsupported compression algorithm " + algorithm);
-        }
+        }*/
     };
 
     /**
@@ -99,6 +98,19 @@ module.exports = function(RED) {
      */
     function sparkplugEncode(payload) {
         // return JSON.stringify(payload); // for debugging
+      
+        // Verify that all metrics have a type (if people copy message from e.g. MQTT.FX, then the variable is not called type)
+        if (payload.hasOwnProperty("metrics")) {
+            if (!Array.isArray(payload.metrics)) {
+                throw RED._("mqtt-sparkplug-plus.errors.metrics-not-array");
+            } else {
+                payload.metrics.forEach(met => {
+                    if (!met.hasOwnProperty("type")) {
+                        throw RED._("mqtt-sparkplug-plus.errors.unable-to-encode-message", { type : "", error :  "Unable to encode message, all metrics must have a 'type' Attribute" });
+                    }
+                });
+            }
+        }
         return spPayload.encodePayload(payload);
     }
         
@@ -148,6 +160,21 @@ module.exports = function(RED) {
         var node = this;
         if (this.brokerConn) {
             this.on("input",function(msg,send,done) {
+
+                // This is a experimental and undocumented feature. it works, but it has not been fully tested, there are no unit test, and 
+                // there are no input validation at all, so use at own risk!
+                if (msg.hasOwnProperty("definition")) {
+                
+                    if (this.birthMessageSend) {
+                        // TODO: DO REBIRTH instead of warning
+                        this.warn("Unable to set metric definition after birth message has been sent");
+                    } else {
+                        // TODO : Check that definition is correct.
+                        // Set metric definition
+                        this.metrics = msg.definition;
+                    }
+                }
+                    
                 if (msg.hasOwnProperty("payload") && typeof msg.payload === 'object' && msg.payload !== null && !Array.isArray(msg.payload)) {
                  
                     if (msg.payload.hasOwnProperty("metrics") && Array.isArray(msg.payload.metrics)) {
@@ -196,9 +223,6 @@ module.exports = function(RED) {
                         }else if (_metrics.length > 0) { // SEND DDATA
                             let dMsg = this.brokerConn.createMsg(this.name, "DDATA", _metrics, done);
                             if (dMsg) {
-                        //        if (msg.payload.timestamp) {
-                        //           addTimestampToObject(dMsg, msg.payload.timestamp)
-                        //        }
                                 this.brokerConn.publish(dMsg, !this.shouldBuffer, done); 
                             }
                         }
@@ -221,7 +245,7 @@ module.exports = function(RED) {
                 try {
                     var msg = {
                         topic : topic_,
-                        payload : sparkplugDecode(payload_)
+                        payload : maybeDecompressPayload(sparkplugDecode(payload_))
                     };
                     node.send(msg);
                 } catch (e) {
@@ -253,6 +277,8 @@ module.exports = function(RED) {
         this.protocolVersion = n.protocolVersion;
         this.keepalive = n.keepalive;
         this.cleansession = n.cleansession;
+        
+        this.compressAlgorithm = n.compressAlgorithm;
 
         // Config node state
         this.brokerurl = "";
@@ -273,7 +299,7 @@ module.exports = function(RED) {
         // This will be set by primary SCADA and written via MQTT (OFFLINE or ONLINE)
         this.primaryScadaStatus = "OFFLINE";
 
-        // Queue to store events while prim. scada offline
+        // Queue to store events while primary scada offline
         this.queue = this.context().get("queue");
         if (!this.queue){
             this.queue = [];
@@ -349,14 +375,24 @@ module.exports = function(RED) {
                     metrics : metrics
                 }
             };
+            try {
+                if (node.compressAlgorithm) {
+                    msg.payload =  compressPayload(msg.payload, { algorithm : node.compressAlgorithm});
+                }
+            }catch (e) {
+                that.warn(RED._("mqtt-sparkplug-plus.errors.unable-to-encode-message", {type : msgType, error: e.toString()}));
+                done(e);
+            }
 
             try {
                 msg.payload = sparkplugEncode(msg.payload); 
             }catch (e) {
-                node.error(RED._("mqtt-sparkplug-plus.errors.unable-to-encode-message", {type : msgType, error: e.toString()}));
+                that.error(RED._("mqtt-sparkplug-plus.errors.unable-to-encode-message", {type : msgType, error: e.toString()}));
                 done(e);
                 return null;
             }
+
+            
             return msg;   
         };
 
@@ -400,14 +436,16 @@ module.exports = function(RED) {
                     "value": 0,
                 }];
             var nbirth = node.createMsg("", "NBIRTH", birthMessageMetrics, x=>{});
-            
-            node.publish(nbirth);
-            for (var id in node.users) {
-                if (node.users.hasOwnProperty(id) && node.users[id].trySendBirth) {
-                    node.users[id].birthMessageSend = false;
-                    node.users[id].trySendBirth(x=>{});
+            if (nbirth) {
+                node.publish(nbirth);
+                for (var id in node.users) {
+                    if (node.users.hasOwnProperty(id) && node.users[id].trySendBirth) {
+                        node.users[id].birthMessageSend = false;
+                        node.users[id].trySendBirth(x=>{});
+                    }
                 }
             }
+           
         }
 
         if (this.credentials) {
@@ -684,7 +722,7 @@ module.exports = function(RED) {
          */
         this.handleNCMD = function(payload) {
             try {
-                payload = sparkplugDecode(payload);
+                payload = maybeDecompressPayload(sparkplugDecode(payload));
                 if (payload.hasOwnProperty("metrics") && Array.isArray(payload.metrics)){
                     payload.metrics.forEach(m => {
                         if (typeof m === 'object' && m.hasOwnProperty("name") && m.name) {
@@ -821,7 +859,7 @@ module.exports = function(RED) {
             } else {
                 if (node.queue.length === node.maxQueueSize) {
                     node.queue.shift();
-                    console.log("Queue Size", node.queue.length);
+                    //console.log("Queue Size", node.queue.length);
                 }else if (node.queue.length  === node.maxQueueSize-1) {
                     node.warn(RED._("mqtt-sparkplug-plus.errors.buffer-full"));
                 }
@@ -863,7 +901,7 @@ module.exports = function(RED) {
         this.topic = n.topic;
         this.qos = parseInt(n.qos);
         this.name = n.name;
-
+        
         this.shouldBuffer = false; // hardcoded as in node will never write
 
         if (isNaN(this.qos) || this.qos < 0 || this.qos > 2) {
@@ -930,7 +968,6 @@ module.exports = function(RED) {
 
                 // abort if not connected and node is not configured to buffer
                 if (!node.brokerConn.connected && this.shouldBuffer !== true) {
-                    console.log("Abort", node.brokerConn.connected, this.shouldBuffer);
                     return;
                 }
                 if (msg.qos) {
@@ -949,8 +986,22 @@ module.exports = function(RED) {
                 if (msg.hasOwnProperty("payload")) {
                     let topicOK = msg.hasOwnProperty("topic") && (typeof msg.topic === "string") && (msg.topic !== "");
                     if (topicOK) { // topic must exist
-                        msg.payload =  sparkplugEncode(msg.payload);
-                        this.brokerConn.publish(msg, !this.shouldBuffer, done);  // send the message
+
+                        try{
+                            if (this.brokerConn.compressAlgorithm) {
+                                msg.payload =  compressPayload(msg.payload, { algorithm : this.brokerConn.compressAlgorithm});
+                            }
+                        }
+                        catch (e) {
+                            this.warn(RED._("mqtt-sparkplug-plus.errors.unable-to-encode-message", { error: e.toString()}));
+                        }
+
+                        try {
+                            msg.payload =  sparkplugEncode(msg.payload); 
+                            this.brokerConn.publish(msg, !this.shouldBuffer, done);  // send the message
+                        } catch (e) {
+                            done(e);
+                        }
                     } else {
                         node.warn(RED._("mqtt-sparkplug-plus.errors.invalid-topic"));
                         done();
