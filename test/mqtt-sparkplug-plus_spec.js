@@ -446,27 +446,6 @@ describe('mqtt sparkplug device node', function () {
 		}); // end helper
 	}); // it end 
 
-	it('should error when passing NData payload that is not object', function (done) {
-		helper.load(sparkplugNode, simpleFlow, function () {
-		
-			let n1 = helper.getNode("n1");
-			/*n1.on('input', () => {
-				n1.error.should.be.calledWithExactly("Metrics should be an Array");
-				done();
-			  });*/
-			n1.receive({
-				"payload" : ["A", "B"]
-			});
-
-			n1.on('call:error', call => {
-				// XXX
-				call.firstArg.should.eql("mqtt-sparkplug-plus.errors.payload-type-object")
-				done();
-			  });
-
-
-		}); // end helper
-	}); // it end 
 
 	it('should add null_value on DData without value', function (done) {
 			client = mqtt.connect(testBroker);
@@ -860,6 +839,233 @@ describe('mqtt sparkplug device node', function () {
 		});
 
 	}); // it end 
+
+	// Dynamic definition verification:
+	it('should output DBIRTH and Metric when definition is passed in message', function (done) {
+
+		client = mqtt.connect(testBroker);
+
+		client.on('connect', function () {
+			client.subscribe('#', function (err) {
+			  if (!err) {
+				helper.load(sparkplugNode, simpleFlow, function () {
+					try {
+						n1 = helper.getNode("n1");
+						b1 = n1.brokerConn;
+
+						n1.receive({
+							"definition" : {
+								"TEST/TEST" : {
+									"dataType" : "Int32"
+								}
+							},
+							"payload" : {
+								"metrics" : [
+								{
+									"name" : "TEST/TEST",
+									"value" : 5
+								}]
+						}});
+					}catch (e) {
+						done(e);
+					}
+				});
+			  }
+			})
+		  });
+
+		client.on('message', function (topic, message) {
+		// Verify that we sent a DBirth Message to the broker
+		if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TEST2"){
+			var buffer = Buffer.from(message);
+			var payload = spPayload.decodePayload(buffer);
+			payload.should.have.property("timestamp").which.is.a.Number();
+			
+			payload.metrics.should.containDeep([
+				{ name: 'TEST/TEST', type: 'Int32', value: 5 },
+				]);
+			done();
+			client.end();
+		}
+			/*n1.on('input', () => {
+				n1.error.should.be.calledWithExactly("Metrics should be an Array");
+				done();
+				});*/
+
+				
+
+			
+
+			n1.on('call:error', call => {
+				// XXX
+				call.firstArg.should.eql("mqtt-sparkplug-plus.errors.payload-type-object")
+				done();
+				});
+
+
+		}); // end helper
+	}); // it end 
+
+	
+	it('should error when definition has invalid dataType', function (done) {
+
+		client = mqtt.connect(testBroker);
+
+		client.on('connect', function () {
+			client.subscribe('#', function (err) {
+				if (!err) {
+				helper.load(sparkplugNode, simpleFlow, function () {
+					try {
+						n1 = helper.getNode("n1");
+						b1 = n1.brokerConn;
+
+						n1.on('call:error', call => {
+							//console.log(call);
+							call.should.be.calledWithExactly('mqtt-sparkplug-plus.errors.invalid-metric-definition');
+							done();
+						  });
+
+
+						n1.receive({
+							"definition" : {
+								"TEST/TEST" : {
+									"dataType" : "fooBar"
+								}
+							}
+							});
+					}catch (e) {
+						console.log(e);
+						done(e);
+					}
+				});
+				}
+			})
+			});
+	
+
+	}); // it end 
+
+	it('should error when definition does not have a dataType', function (done) {
+
+		client = mqtt.connect(testBroker);
+
+		client.on('connect', function () {
+			client.subscribe('#', function (err) {
+				if (!err) {
+				helper.load(sparkplugNode, simpleFlow, function () {
+					try {
+						n1 = helper.getNode("n1");
+						b1 = n1.brokerConn;
+
+						n1.on('call:error', call => {
+							call.should.be.calledWithExactly('mqtt-sparkplug-plus.errors.invalid-metric-definition');
+							done();
+						  });
+
+
+						n1.receive({
+							"definition" : {
+								"TEST/TEST" : {
+									"foo" : "bar"
+								}
+							}
+							});
+					}catch (e) {
+						console.log(e);
+						done(e);
+					}
+				});
+				}
+			})
+			});
+	
+
+	}); // it end 
+
+
+	it('should send REBIRTH messages on updated definition', function (done) {
+		client = mqtt.connect(testBroker);
+		var initBirthDone = false;
+		var deathDone = false;
+		let n1;
+		let b1;
+		client.on('connect', function () {
+			client.subscribe('#', function (err) {
+			  if (!err) {
+				helper.load(sparkplugNode, simpleFlow, function () {
+					try {
+						n1 = helper.getNode("n1");
+						b1 = n1.brokerConn;
+
+						// Send all metrics to trigger DBIRTH
+						n1.receive({
+							"payload" : {
+								"metrics": [
+									{
+										"name": "test",
+										"value": 11,
+									},
+									{
+										"name": "test2",
+										"value": 11
+									}
+								]}
+							}
+						);
+					}catch (e) {
+						done(e);
+					}
+				});
+			  }
+			})
+		  });
+
+		  client.on('message', function (topic, message) {
+			  
+			if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red") {
+				if (initBirthDone === true) {
+					var buffer = Buffer.from(message);
+					var payload = spPayload.decodePayload(buffer);
+					// Verify that we reset the seq to 0
+					payload.should.have.property("seq").which.is.eql(1);
+				}
+			} else if (topic === "spBv1.0/My Devices/DDEATH/Node-Red/TEST2"){
+				deathDone = true;
+			} else if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TEST2"){
+					// Ready to issue rebirth
+					if (initBirthDone === true) {
+						var buffer = Buffer.from(message);
+						var payload = spPayload.decodePayload(buffer);
+						deathDone.should.eql(true);
+						payload.metrics.should.containDeep([
+							{ name: 'TEST/TEST', type: 'Int32', value: 10 },
+							]);
+						done();
+	
+					} else {
+						// Here we should force a rebirth
+						n1.receive({
+							"definition" : {
+								"TEST/TEST" : {
+									"dataType" : "Int32"
+								}
+							},
+							"payload" : {
+								"metrics" : [
+								{
+									"name" : "TEST/TEST",
+									"value" : 10
+								}]
+						}});
+					initBirthDone = true;
+					}
+				}
+		});
+
+	}); // it end 
+
+
+	// Check Rebirth
 
 	// TODO:
 	//   Test unknown metric data type

@@ -315,9 +315,10 @@
         category: 'network',
         defaults: {
             name: {value:"",  validate :x => /^[^/+#]*$/.test(x) },
-            metrics: {value:{}, required:true, validate : x => Object.keys(x).length > 0 }, // do regex matching of invalid charaters (e.g. # or +)
+            metrics: {value:{}, required:true, /*validate : x => Object.keys(x).length > 0*/ }, // do regex matching of invalid charaters (e.g. # or +)
             broker: {type:"mqtt-sparkplug-broker", required:true}
         },
+        dataTypes : ["Int8", "Int16", "Int32", "Int64", "Float", "Double", "Boolean" , "String", "Unknown"],
         color:"#2181a6",
         inputs:1,
         outputs:1,
@@ -352,11 +353,11 @@
                         class : "sparkplug-input-metric-dateType"
                     }).appendTo(row);
                     var group0 = $('<optgroup/>', { label: "Datatypes" }).appendTo(selectField);
-                    var dataTypes = ["Int8", "Int16", "Int32", "Int64", "Float", "Double", "Boolean" , "String", "Unknown"]
-                    for (var d in dataTypes) {
-                        let option = $("<option></option>").val(d).text(dataTypes[d]);
+                   console.log("LORT");
+                    for (var d in that.dataTypes) {
+                        let option = $("<option></option>").val(d).text(that.dataTypes[d]);
                         group0.append(option);
-                        if (dataTypes[d] === opt.dataType || (Object.keys(opt).length === 0 && dataTypes[d] === "Int32")) {
+                        if (that.dataTypes[d] === opt.dataType || (Object.keys(opt).length === 0 && that.dataTypes[d] === "Int32")) {
                             option.attr('selected','selected')
                         }
                     }
