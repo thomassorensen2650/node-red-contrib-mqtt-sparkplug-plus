@@ -1032,38 +1032,121 @@ describe('mqtt sparkplug device node', function () {
 			} else if (topic === "spBv1.0/My Devices/DDEATH/Node-Red/TEST2"){
 				deathDone = true;
 			} else if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TEST2"){
-					// Ready to issue rebirth
-					if (initBirthDone === true) {
-						var buffer = Buffer.from(message);
-						var payload = spPayload.decodePayload(buffer);
-						deathDone.should.eql(true);
-						payload.metrics.should.containDeep([
-							{ name: 'TEST/TEST', type: 'Int32', value: 10 },
-							]);
-						done();
-	
-					} else {
-						// Here we should force a rebirth
-						n1.receive({
-							"definition" : {
-								"TEST/TEST" : {
-									"dataType" : "Int32"
-								}
-							},
-							"payload" : {
-								"metrics" : [
-								{
-									"name" : "TEST/TEST",
-									"value" : 10
-								}]
-						}});
-					initBirthDone = true;
-					}
-				}
-		});
+				// Ready to issue rebirth
+				if (initBirthDone === true) {
+					var buffer = Buffer.from(message);
+					var payload = spPayload.decodePayload(buffer);
+					deathDone.should.eql(true);
+					payload.metrics.should.containDeep([
+						{ name: 'TEST/TEST', type: 'Int32', value: 10 },
+					]);
+					done();
 
+				} else {
+					// Here we should force a rebirth
+					n1.receive({
+						"definition" : {
+							"TEST/TEST" : {
+								"dataType" : "Int32"
+							}
+						},
+						"payload" : {
+							"metrics" : [
+							{
+								"name" : "TEST/TEST",
+								"value" : 10
+							}]
+					}});
+					initBirthDone = true;
+				}
+			}
+		});
 	}); // it end 
 
+	it('should send REBIRTH messages on updated definition w cache sync.', function (done) {
+		client = mqtt.connect(testBroker);
+		var initBirthDone = false;
+		var deathDone = false;
+		let n1;
+		let b1;
+		client.on('connect', function () {
+			client.subscribe('#', function (err) {
+			  if (!err) {
+				helper.load(sparkplugNode, simpleFlow, function () {
+					try {
+						n1 = helper.getNode("n1");
+						b1 = n1.brokerConn;
+
+						// Send all metrics to trigger DBIRTH
+						n1.receive({
+							"payload" : {
+								"metrics": [
+									{
+										"name": "test",
+										"value": 11,
+									},
+									{
+										"name": "test2",
+										"value": 11
+									}
+								]}
+							}
+						);
+					}catch (e) {
+						done(e);
+					}
+				});
+			  }
+			})
+		  });
+
+		  client.on('message', function (topic, message) {
+			  
+			if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red") {
+				if (initBirthDone === true) {
+					var buffer = Buffer.from(message);
+					var payload = spPayload.decodePayload(buffer);
+					// Verify that we reset the seq to 0
+					payload.should.have.property("seq").which.is.eql(1);
+				}
+			} else if (topic === "spBv1.0/My Devices/DDEATH/Node-Red/TEST2"){
+				deathDone = true;
+			} else if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TEST2"){
+				// Ready to issue rebirth
+				if (initBirthDone === true) {
+					var buffer = Buffer.from(message);
+					var payload = spPayload.decodePayload(buffer);
+					deathDone.should.eql(true);
+					console.log(payload);
+					payload.metrics.should.containDeep([
+						{ name: 'TEST/TEST', type: 'Int32', value: 10 },
+						{ name: 'test2', type: 'Int32', value: 11 },
+					]);
+					done();
+
+				} else {
+					// Here we should force a rebirth
+					n1.receive({
+						"definition" : {
+							"TEST/TEST" : {
+								"dataType" : "Int32"
+							},
+							"test2"  : {
+								"dataType" : "Int32"
+							},
+						},
+						"payload" : {
+							"metrics" : [
+							{
+								"name" : "TEST/TEST",
+								"value" : 10
+							}]
+					}});
+					initBirthDone = true;
+				}
+			}
+		});
+	}); // it end 
 
 	// Check Rebirth
 
