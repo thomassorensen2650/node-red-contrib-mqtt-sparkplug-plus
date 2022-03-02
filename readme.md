@@ -51,7 +51,7 @@ The following example shows a message that also sets the definition. __DO NOT__ 
 The example belows shows how to set definitions via code (payload is optional):
 ```javascript
 msg = {
-    definition : {
+    "definition" : {
         "TEST/TEST" : {
             "dataType" : "Int32"
         }
