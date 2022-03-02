@@ -176,6 +176,7 @@ describe('mqtt sparkplug device node', function () {
 	it('should send REBIRTH messages', function (done) {
 		client = mqtt.connect(testBroker);
 		var initBirthDone = false;
+		var deathSend = false;
 		let n1;
 		let b1;
 		client.on('connect', function () {
@@ -210,7 +211,7 @@ describe('mqtt sparkplug device node', function () {
 		  });
 
 		  client.on('message', function (topic, message) {
-			  
+			
 			if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red") {
 				if (initBirthDone === true) {
 					var buffer = Buffer.from(message);
@@ -218,12 +219,15 @@ describe('mqtt sparkplug device node', function () {
 					// Verify that we reset the seq to 0
 					payload.should.have.property("seq").which.is.eql(1);
 				}
+			} else if (topic === "spBv1.0/My Devices/NDEATH/Node-Red"){
+				deathSend = true;
 			} else if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TEST2"){
 					// Ready to issue rebirth
 					if (initBirthDone === true) {
 						var buffer = Buffer.from(message);
 						var payload = spPayload.decodePayload(buffer);
 						payload.should.have.property("seq").which.is.eql(1);
+						deathSend.should.eql(true);
 						done();
 	
 					} else {

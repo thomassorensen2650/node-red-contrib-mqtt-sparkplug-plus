@@ -454,7 +454,7 @@ module.exports = function(RED) {
         };
 
         /**
-         * Send Birth Message
+         * Send NBirth Message
          */
         this.sendBirth = function() {
             this.seq = 0;
@@ -762,6 +762,12 @@ module.exports = function(RED) {
                     payload.metrics.forEach(m => {
                         if (typeof m === 'object' && m.hasOwnProperty("name") && m.name) {
                             if (m.name.toLowerCase() === "node control/rebirth") {
+                                
+                                let bMsg = node.createMsg("", "NDEATH", [], f => {});
+                                if(bMsg) {
+                                    node.publish(bMsg, !this.shouldBuffer, f => {});  // send the message 
+                                }
+
                                 node.sendBirth();
                             }else 
                             {

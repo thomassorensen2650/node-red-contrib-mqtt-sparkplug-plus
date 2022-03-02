@@ -1,3 +1,10 @@
+### 1.2.0: Maintenance Release
+New:
+ - _mqtt sparkplug device_ node now supports dynanic metrics (metrics can be defined via msg.definition)
+ 
+ Fixed:
+- _mqtt sparkplug device_ rebirth now sends correct NDEATH before NBIRTH
+
 ### 1.1.0: Maintenance Release
 
 New:

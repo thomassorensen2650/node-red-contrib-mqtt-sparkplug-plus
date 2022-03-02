@@ -14,12 +14,13 @@ The node will connect to an MQTT broker (server) and act as an MQTT Edge of Netw
 * DDATA (from node input)
 * DCMD (send as output to Node-Red)
 * Buffering when primary SCADA is not available
+* Compression
 
 The following features are not yet supported:
 * Non-metrics (body)
 * MQTT Broker redundancy
 * DDEATH
-* Compression
+
 
 ## mqtt sparkplug in
 The *mqtt sparkplug in* node makes it possible to subscribe to sparkplug b mqtt topics. The node is almost identical to the default node-red *mqtt in* node, but it will decode the sparkplug/protobuf messages and deliver them in json.
@@ -67,3 +68,24 @@ msg.payload = {
     ]
 }
 ```
+
+## Dynamic metric definitions
+
+Metrics will normally be setup via the UI. in some cases its more beneficial to set the metrics via code. This can be done by setting the metrics in the `msg.definition` attribute.
+
+```
+msg = {
+    definition = {
+        "TEST/TEST" : {
+            "dataType" : "Int32"
+        }
+    },
+    "payload" : {
+        "metrics" : [
+        {
+            "name" : "TEST/TEST",
+            "value" : 5
+        }]
+```
+
+if the definition set passed after the NBIRTH has been sent, the a REBIRTH is issued to notify clients about the new definition
