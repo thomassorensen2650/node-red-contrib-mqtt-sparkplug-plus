@@ -78,17 +78,6 @@ module.exports = function(RED) {
     function decompressPayload(payload) {
          // Inflate will auto detect compression algorithm via the header.
         return pako.inflate(payload.body);
-        
-       /* var metrics = payload.metrics;
-        var algorithm = metrics && Array.isArray(metrics) ? metrics.find(m => m.name == "algorithm")|| "DEFALTE" : "DEFALTE";
-
-        switch(algorithm) {
-            case "DEFLATE":
-            case "GZIP":
-                return pako.inflate(payload.body);
-            default:
-                throw new Error("Unknown or unsupported compression algorithm " + algorithm);
-        }*/
     };
 
     /**
@@ -134,6 +123,9 @@ module.exports = function(RED) {
 
     function MQTTSparkplugDeviceNode(n) {
         RED.nodes.createNode(this,n);
+        this.dataTypes = ["Int8", "Int16", "Int32", "Int64", "Float", "Double", "Boolean" , "String", "Unknown"],
+
+
         this.broker = n.broker;
         this.name = n.name||"Sparkplug Device";
         this.latestMetrics = {};
@@ -161,21 +153,62 @@ module.exports = function(RED) {
         if (this.brokerConn) {
             this.on("input",function(msg,send,done) {
 
-                // This is a experimental and undocumented feature. it works, but it has not been fully tested, there are no unit test, and 
-                // there are no input validation at all, so use at own risk!
+                let validPayload = msg.hasOwnProperty("payload") && typeof msg.payload === 'object' && msg.payload !== null && !Array.isArray(msg.payload);
+                
                 if (msg.hasOwnProperty("definition")) {
                 
-                    if (this.birthMessageSend) {
-                        // TODO: DO REBIRTH instead of warning
-                        this.warn("Unable to set metric definition after birth message has been sent");
-                    } else {
-                        // TODO : Check that definition is correct.
-                        // Set metric definition
+                    // Verify that all metric definitions are correct
+                    let definitionValid = typeof msg.definition === 'object' && msg.definition !== null && !Array.isArray(msg.definition);
+                    if (definitionValid) {
+                        for (const [key, value] of Object.entries(msg.definition)) {
+                            // Check name
+                            if (false) { // TODO: Is there any requirements for the metric name?
+                                this.error(`${key} is not a valid definition !!!`);
+                                definitionValid = false;
+                            }
+
+                            if (!value.hasOwnProperty("dataType")) {
+                                this.error(RED._("mqtt-sparkplug-plus.errors.invalid-metric-definition", { name : key, error: `datatype required` }));
+                                definitionValid = false;
+                            }else if (!node.dataTypes.includes(value.dataType)) {
+                                this.error(RED._("mqtt-sparkplug-plus.errors.invalid-metric-definition", { name : key, error: `Invalid datatype ${value.dataType}` }));
+                                definitionValid = false;
+                            }
+
+                        }
+                    }
+
+                    if (definitionValid) {
                         this.metrics = msg.definition;
+
+                        // Filter metrics cache to only include metrics from new definition
+                        var newMetric = {}
+                        for (const [key, value] of Object.entries(this.latestMetrics)) {
+                            if (msg.definition.hasOwnProperty(key)) {
+                                newMetric[key] = value;
+                            }
+                        }
+                        this.latestMetrics = newMetric;
+
+                        if (this.birthMessageSend) {
+
+                            //  if birth message has been sent then send DDEATH
+                            let dMsg = node.brokerConn.createMsg(this.name, "DDEATH", [], x=>{});
+                            if(dMsg) {
+                                this.brokerConn.publish(dMsg, !this.shouldBuffer, x=>{});  // send the message 
+                                this.birthMessageSend = false;
+                            }
+    
+                            // if there are no payload, then see if we can send a new birth message with the latest 
+                            // data, otherwise we'll try to send after the values have been updated
+                            if (!validPayload) {
+                                this.trySendBirth();
+                            }
+                        } 
                     }
                 }
                     
-                if (msg.hasOwnProperty("payload") && typeof msg.payload === 'object' && msg.payload !== null && !Array.isArray(msg.payload)) {
+                if (validPayload) {
                  
                     if (msg.payload.hasOwnProperty("metrics") && Array.isArray(msg.payload.metrics)) {
                         let _metrics = [];
@@ -232,7 +265,9 @@ module.exports = function(RED) {
                         done();
                     }
                 } else {
-                    node.error(RED._("mqtt-sparkplug-plus.errors.payload-type-object"));
+                    if (!msg.hasOwnProperty("definition")) { // Its ok there are no payload if we set the metric definition 
+                        node.error(RED._("mqtt-sparkplug-plus.errors.payload-type-object"));
+                    }
                     done();
                 }
             }); // end input
@@ -419,7 +454,7 @@ module.exports = function(RED) {
         };
 
         /**
-         * Send Birth Message
+         * Send NBirth Message
          */
         this.sendBirth = function() {
             this.seq = 0;
@@ -727,6 +762,12 @@ module.exports = function(RED) {
                     payload.metrics.forEach(m => {
                         if (typeof m === 'object' && m.hasOwnProperty("name") && m.name) {
                             if (m.name.toLowerCase() === "node control/rebirth") {
+                                
+                                let bMsg = node.createMsg("", "NDEATH", [], f => {});
+                                if(bMsg) {
+                                    node.publish(bMsg, !this.shouldBuffer, f => {});  // send the message 
+                                }
+
                                 node.sendBirth();
                             }else 
                             {
@@ -926,10 +967,6 @@ module.exports = function(RED) {
                         payload = maybeDecompressPayload(sparkplugDecode(payload));
 
                         var msg = {topic:topic, payload:payload, qos:packet.qos, retain:packet.retain};
-
-                        //if ((node.brokerConn.broker === "localhost")||(node.brokerConn.broker === "127.0.0.1")) {
-                        //    msg._topic = topic;
-                        //}
                         node.send(msg);
                     } catch (e) {
                         node.error(RED._("mqtt-sparkplug-plus.errors.unable-to-decode-message", {type : "", error: e.toString()}));
@@ -958,7 +995,7 @@ module.exports = function(RED) {
         this.qos = n.qos || null;
         this.retain = n.retain;
         this.broker = n.broker;
-        this.shouldBuffer = false; // hardcoded / buffering commands are a bad idea... if we enable, then it shnould come with a big warning.
+        this.shouldBuffer = false; // hardcoded - buffering NCMD/DCMD is a bad idea... if we enable, then it shnould come with a big warning.
         
         this.brokerConn = RED.nodes.getNode(this.broker);
         var node = this;
