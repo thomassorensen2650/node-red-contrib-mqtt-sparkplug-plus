@@ -1117,7 +1117,6 @@ describe('mqtt sparkplug device node', function () {
 					var buffer = Buffer.from(message);
 					var payload = spPayload.decodePayload(buffer);
 					deathDone.should.eql(true);
-					console.log(payload);
 					payload.metrics.should.containDeep([
 						{ name: 'TEST/TEST', type: 'Int32', value: 10 },
 						{ name: 'test2', type: 'Int32', value: 11 },
