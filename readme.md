@@ -66,7 +66,7 @@ msg = {
 };
 ```
 
-If the definition set set after the NBIRTH has been sent, them a REBIRTH is issued to notify clients about the new definition.
+_If the definition set set after the NBIRTH has been sent, them a REBIRTH is issued to notify clients about the new definition._
 
 ## mqtt sparkplug in
 The *mqtt sparkplug in* node makes it possible to subscribe to sparkplug b mqtt topics. The node is almost identical to the default node-red *mqtt in* node, but it will decode the sparkplug/protobuf messages and deliver them in json.
