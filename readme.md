@@ -26,7 +26,7 @@ One or more metrics can be written to the **mqtt sparkplug device** by passing t
 
 The **mqtt sparkplug device** expects the metrics in the following input payload format. DataTypes can be added, but it will also be added automaticly by the node if omitted. if a metric does not have a value then a "is_null" attribute is added to the metric. Timestamps are optional per the specification. If timetamp to the metrics are not supplied, the the current time will still be added to the DBIRTH message (nothing will be added to the DDATA). 
 
-```
+```javascript
 msg.payload = {
     "metrics": [
         {
@@ -49,7 +49,7 @@ Metrics should normally be setup via the UI, but in some cases its more benefici
 The following example shows a message that also sets the definition. __DO NOT__ include definition is each message, as it will trigger rebirth each eash time a valid `msg.definition` is processed by the node.
 
 The example belows shows how to set definitions via code (payload is optional):
-```
+```javascript
 msg = {
     definition : {
         "TEST/TEST" : {
