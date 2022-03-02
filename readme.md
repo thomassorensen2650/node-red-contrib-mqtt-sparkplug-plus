@@ -48,10 +48,10 @@ Metrics should normally be setup via the UI, but in some cases its more benefici
 
 The following example shows a message that also sets the definition. __DO NOT__ include definition is each message, as it will trigger rebirth each eash time a valid `msg.definition` is processed by the node.
 
-The example belows shows how to set definitions via code:
+The example belows shows how to set definitions via code (payload is optional):
 ```
 msg = {
-    definition = {
+    definition : {
         "TEST/TEST" : {
             "dataType" : "Int32"
         }
@@ -62,6 +62,8 @@ msg = {
             "name" : "TEST/TEST",
             "value" : 5
         }]
+    }
+};
 ```
 
 If the definition set set after the NBIRTH has been sent, them a REBIRTH is issued to notify clients about the new definition.
