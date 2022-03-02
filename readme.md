@@ -47,6 +47,8 @@ msg.payload = {
 Metrics should normally be setup via the UI, but in some cases its more beneficial to set the metrics via code. This can be done by configuring the metrics in the `msg.definition` attribute.
 
 The following example shows a message that also sets the definition. __DO NOT__ include definition is each message, as it will trigger rebirth each eash time a valid `msg.definition` is processed by the node.
+
+The example belows shows how to set definitions via code:
 ```
 msg = {
     definition = {
@@ -62,7 +64,7 @@ msg = {
         }]
 ```
 
-if the definition set passed after the NBIRTH has been sent, the a REBIRTH is issued to notify clients about the new definition
+If the definition set set after the NBIRTH has been sent, them a REBIRTH is issued to notify clients about the new definition.
 
 ## mqtt sparkplug in
 The *mqtt sparkplug in* node makes it possible to subscribe to sparkplug b mqtt topics. The node is almost identical to the default node-red *mqtt in* node, but it will decode the sparkplug/protobuf messages and deliver them in json.
