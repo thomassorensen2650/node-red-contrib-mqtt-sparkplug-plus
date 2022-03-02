@@ -46,7 +46,7 @@ msg.payload = {
 
 Metrics should normally be setup via the UI, but in some cases its more beneficial to set the metrics via code. This can be done by configuring the metrics in the `msg.definition` attribute.
 
-The following example shows a message that also sets the definition. ==DO NOT== include definition is each message, as it will trigger rebirth each eash time a valid `msg.definition` is processed by the node.
+The following example shows a message that also sets the definition. __DO NOT__ include definition is each message, as it will trigger rebirth each eash time a valid `msg.definition` is processed by the node.
 ```
 msg = {
     definition = {
