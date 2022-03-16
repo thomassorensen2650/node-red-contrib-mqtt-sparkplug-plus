@@ -148,6 +148,18 @@ module.exports = function(RED) {
             }
         }
 
+        /**
+         * Send DDeath message
+         * @param {function} done Node-Red Done Function 
+         */
+        this.sendDDeath = function(done) {
+            let dMsg = node.brokerConn.createMsg(this.name, "DDEATH", [], x=>{});
+            if(dMsg) {
+                this.brokerConn.publish(dMsg, !this.shouldBuffer, x=>{});  // send the message 
+                this.birthMessageSend = false;
+            }
+        }
+
         this.brokerConn = RED.nodes.getNode(this.broker);
         var node = this;
         if (this.brokerConn) {
@@ -191,14 +203,9 @@ module.exports = function(RED) {
                         this.latestMetrics = newMetric;
 
                         if (this.birthMessageSend) {
-
-                            //  if birth message has been sent then send DDEATH
-                            let dMsg = node.brokerConn.createMsg(this.name, "DDEATH", [], x=>{});
-                            if(dMsg) {
-                                this.brokerConn.publish(dMsg, !this.shouldBuffer, x=>{});  // send the message 
-                                this.birthMessageSend = false;
-                            }
-    
+                            
+                            this.sendDDeath();
+                            
                             // if there are no payload, then see if we can send a new birth message with the latest 
                             // data, otherwise we'll try to send after the values have been updated
                             if (!validPayload) {

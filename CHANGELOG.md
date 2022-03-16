@@ -1,4 +1,10 @@
 ### 1.2.0: Maintenance Release
+
+ Fixed:
+- _mqtt sparkplug device_ datatype were not added to UI.
+
+
+### 1.2.0: Maintenance Release
 New:
  - _mqtt sparkplug device_ node now supports dynanic metrics (metrics can be defined via msg.definition)
  
