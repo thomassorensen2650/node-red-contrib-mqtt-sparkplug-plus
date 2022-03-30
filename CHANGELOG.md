@@ -1,3 +1,8 @@
+### 1.3.0: Maintenance Release
+
+ New:
+- _mqtt sparkplug device_ added support for metric properties (property sets)
+
 ### 1.2.0: Maintenance Release
 
  Fixed:

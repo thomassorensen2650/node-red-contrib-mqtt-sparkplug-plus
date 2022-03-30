@@ -48,12 +48,20 @@ Metrics definitions should normally be setup via the UI, but in some cases its b
 
 The following example shows a message that also sets the definition. __DO NOT__ include definition is each message, as it will trigger rebirth each time a valid `msg.definition` is processed by the node.
 
+Setting metrics dynamicly also also allows you to set properties (like engineering units) for the metrics. This functionality is currently not supported when configuring metrics via the UI.
+
 The example belows shows how to set definitions via code (payload is optional):
 ```javascript
 msg = {
     "definition" : {
         "TEST/TEST" : {
-            "dataType" : "Int32"
+            "dataType" : "Int32",
+            "properties": {
+                "engUnits": {
+                    "type": "String",
+                    "value": "inHg"
+                }
+			}, 
         }
     },
     "payload" : {
