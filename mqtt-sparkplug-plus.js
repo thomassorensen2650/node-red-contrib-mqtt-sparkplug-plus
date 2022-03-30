@@ -149,10 +149,7 @@ module.exports = function(RED) {
                         lv.properties = value.properties;
                     }
                     birthMetrics.push(lv);
-                    //console.log(lv);
                 }
-
-                //let bMsg = node.brokerConn.createMsg(this.name, "DBIRTH", Object.values(this.latestMetrics), f => {});
                 let bMsg = node.brokerConn.createMsg(this.name, "DBIRTH", birthMetrics, f => {});
                 if(bMsg) {
                     this.brokerConn.publish(bMsg, !this.shouldBuffer, done);  // send the message 
