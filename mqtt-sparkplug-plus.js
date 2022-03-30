@@ -140,7 +140,20 @@ module.exports = function(RED) {
         this.trySendBirth = function(done) {           
             let readyToSend = Object.keys(this.metrics).every(m => this.latestMetrics.hasOwnProperty(m));
             if (readyToSend) {
-                let bMsg = node.brokerConn.createMsg(this.name, "DBIRTH", Object.values(this.latestMetrics), done);
+                let birthMetrics = [];
+             
+                for (const [key, value] of Object.entries(this.metrics)) {
+                    const lv = Object.assign({}, this.latestMetrics[key]);
+
+                    if (value.hasOwnProperty("properties")) {
+                        lv.properties = value.properties;
+                    }
+                    birthMetrics.push(lv);
+                    //console.log(lv);
+                }
+
+                //let bMsg = node.brokerConn.createMsg(this.name, "DBIRTH", Object.values(this.latestMetrics), f => {});
+                let bMsg = node.brokerConn.createMsg(this.name, "DBIRTH", birthMetrics, f => {});
                 if(bMsg) {
                     this.brokerConn.publish(bMsg, !this.shouldBuffer, done);  // send the message 
                     this.birthMessageSend = true;
@@ -155,7 +168,7 @@ module.exports = function(RED) {
         this.sendDDeath = function(done) {
             let dMsg = node.brokerConn.createMsg(this.name, "DDEATH", [], x=>{});
             if(dMsg) {
-                this.brokerConn.publish(dMsg, !this.shouldBuffer, x=>{});  // send the message 
+                this.brokerConn.publish(dMsg, !this.shouldBuffer, done);  // send the message 
                 this.birthMessageSend = false;
             }
         }
