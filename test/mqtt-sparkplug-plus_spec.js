@@ -67,12 +67,12 @@ describe('mqtt sparkplug device node', function () {
 			n1.should.have.property('name', 'device');
 			done();
 		});
-	  });
+	});
 
-	  /**
-	   * Verify NBirth is send when starting up Node-Red with a Device loaded.
-	   */
-	  it('should send NBirth message', function (done) {
+	/**
+	* Verify NBirth is send when starting up Node-Red with a Device loaded.
+	*/
+	it('should send NBirth message', function (done) {
 		client = mqtt.connect(testBroker);
 		let n1;
 		let b1;
@@ -167,6 +167,103 @@ describe('mqtt sparkplug device node', function () {
 				payload.should.have.property("seq").which.is.eql(1);
 				done();
 				//client.end();
+			}
+			
+		});
+
+	}); // it end 
+
+	it('should send Properties in DBIRTH message', function (done) {
+		client = mqtt.connect(testBroker);
+		let ts = Date.now();
+		let n1;
+		let b1;
+		client.on('connect', function () {
+			client.subscribe('#', function (err) {
+			  if (!err) {
+				helper.load(sparkplugNode, simpleFlow, function () {
+					try {
+						n1 = helper.getNode("n1");
+						b1 = n1.brokerConn;
+
+						n1.receive({
+							"definition": {
+								"TEST/TEST": {
+									"dataType": "Int32",
+									"properties": {
+										"engUnits": {
+											"type": "string",
+											"value": "inHg"
+										}
+									} // properties end
+								} // Metrics end
+							},
+							"payload" : {
+								"metrics" : [
+									{
+										"name": "TEST/TEST",
+										"value": 5,
+										"timestamp" : ts
+									  
+									}]
+							}
+						});
+					}catch (e) {
+						done(e);
+					}
+				});
+			  }
+			})
+		  });
+
+		  client.on('message', function (topic, message) {
+			// Verify that we sent a DBirth Message with properties to the broker
+			
+			if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TEST2"){
+				var buffer = Buffer.from(message);
+				var payload = spPayload.decodePayload(buffer);
+				payload.should.have.property("timestamp").which.is.a.Number();
+				payload.metrics.should.containDeep([{
+					name: 'TEST/TEST',
+					type: 'Int32',
+					value: 5,
+					"properties": {
+						"engUnits": {
+							"type": "String",
+							"value": "inHg"
+						}
+					}, // properties end
+					timestamp: ts
+					}
+				]);
+				payload.should.have.property("seq").which.is.eql(1);
+				helper.getNode("n1").receive({
+					"payload" : {
+						"metrics" : [
+							{
+								"name": "TEST/TEST",
+								"value": 15,
+								"timestamp" : ts
+							  
+							}]
+					}
+				});
+				
+			}
+			else if (topic === "spBv1.0/My Devices/DDATA/Node-Red/TEST2") {
+				// Verify that DDATA is not send on first metrics (with value 5)
+				// Verify that Properties are not send on DDATA
+				var buffer = Buffer.from(message);
+				var payload = spPayload.decodePayload(buffer);
+				payload.should.have.property("timestamp").which.is.a.Number();
+				payload.metrics.should.containDeep([{
+					name: 'TEST/TEST',
+					type: 'Int32',
+					value: 15,
+					timestamp: ts
+					}
+				]);
+				done();
 			}
 			
 		});

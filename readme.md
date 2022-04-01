@@ -48,12 +48,20 @@ Metrics definitions should normally be setup via the UI, but in some cases its b
 
 The following example shows a message that also sets the definition. __DO NOT__ include definition is each message, as it will trigger rebirth each time a valid `msg.definition` is processed by the node.
 
+Setting metrics dynamicly also also allows you to set properties (like engineering units) for the metrics. This functionality is currently not supported when configuring metrics via the UI.
+
 The example belows shows how to set definitions via code (payload is optional):
 ```javascript
 msg = {
     "definition" : {
         "TEST/TEST" : {
-            "dataType" : "Int32"
+            "dataType" : "Int32",
+            "properties": {
+                "engUnits": {
+                    "type": "String",
+                    "value": "inHg"
+                }
+			}, 
         }
     },
     "payload" : {
@@ -85,7 +93,9 @@ The easiest way to get started is to start with the example that is provided wit
 2. Select the Examples Tab
 3. Navigate to Node-red-contrib-mqtt-sparkplug-plus, and select the Simple Device Example
 4. Deploy changes to Node-Red
-5. Press the "Send Metrics" Inject node to write metrics to the new device (You'll need a MQTT broker running on your local computer) 
+5. Press the "Send Metrics" Inject node to write metrics to the new device (This will trigger a DBIRTH and NDATA first and pressed and a NDATA each time after that)
+
+ You'll need a MQTT broker running on your local computer
 
 ## Manual Configuration
 1. Drag a **mqtt sparkplug device** to the Node-Red Runtime. 
