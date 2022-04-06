@@ -9,12 +9,14 @@
         <li>DCMD (send as output to Node-Red)</li>
         <li>NBIRTH</li>
         <li>Buffering when Primary SCADA is OFFLINE or Broker Connection is down</li>
+        <li>Compression</li>
     </ul>
 
   <p>The following features are not supported (yet):</p>
     <ul>
         <li>Non-metrics (body/Metadata)</li>
         <li>MQTT Broker redundancy</li>
+        <li>DDEATH</li>
     </ul>
     <h3>Getting Started</h3>
     <p>The easiest way to get started is to import the example node.</p>
@@ -43,7 +45,34 @@
         };
     </pre>
 
-   <h3>Outputs</h3>
+    <h4>Dynamic Inputs</h4>
+    <p>Metrics definitions should normally be setup via the UI, but in some cases its beneficial to configure the metrics via code. This can be done by configuring the metrics using the msg.definition attribute.</p>
+    <p>The following example shows a message that also sets the definition. DO NOT include definition is each message, as it will trigger rebirth each time a valid msg.definition is processed by the node.</p>
+    <p>Setting metrics dynamicly also also allows you to set properties (like engineering units) for the metrics. This functionality is currently not supported when configuring metrics via the UI.</p>
+    <p>The example belows shows how to set definitions via code (payload is optional):</p>
+    <pre>
+        msg = {
+            "definition" : {
+                "TEST/TEST" : {
+                    "dataType" : "Int32",
+                    "properties": {
+                        "engUnits": {
+                            "type": "String",
+                            "value": "inHg"
+                        }
+                    }, 
+                }
+            },
+            "payload" : {
+                "metrics" : [
+                {
+                    "name" : "TEST/TEST",
+                    "value" : 5
+                }]
+            }
+        };
+    </pre>
+    <h3>Outputs</h3>
        <dl class="message-properties">
        <dt>payload
            <span class="property-type">object</span>

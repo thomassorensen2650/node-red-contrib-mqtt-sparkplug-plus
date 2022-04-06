@@ -271,7 +271,7 @@ module.exports = function(RED) {
                         else if (!this.birthMessageSend) {    // Send DBIRTH
                             this.trySendBirth(done);
                         }else if (_metrics.length > 0) { // SEND DDATA
-                            let dMsg = this.brokerConn.createMsg(this.name, "DDATA", _metrics, done);
+                            let dMsg = this.brokerConn.createMsg(this.name, "DDATA", _metrics, f => {});
                             if (dMsg) {
                                 this.brokerConn.publish(dMsg, !this.shouldBuffer, done); 
                             }
