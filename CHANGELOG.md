@@ -1,13 +1,21 @@
 ### 1.3.0: Maintenance Release
 
  New:
+- _mqtt sparkplug device_ support for device commands
+
+ Fixed:
+- MQTT Close event was not handled correctly after upgrading MQTT dependency. (timeout on close)'- 
+- RECONNECT status was not not using message catalog.
+
+### 1.3.0: Maintenance Release
+
+ New:
 - _mqtt sparkplug device_ added support for metric properties (property sets)
 
 ### 1.2.0: Maintenance Release
 
  Fixed:
 - _mqtt sparkplug device_ datatype were not added to UI.
-
 
 ### 1.2.0: Maintenance Release
 New:

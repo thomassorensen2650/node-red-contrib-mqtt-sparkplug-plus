@@ -150,7 +150,7 @@ module.exports = function(RED) {
                     }
                     birthMetrics.push(lv);
                 }
-                let bMsg = node.brokerConn.createMsg(this.name, "DBIRTH", birthMetrics, f => {});
+                let bMsg = node.brokerConn.createMsg(this.name, "DBIRTH", birthMetrics);
                 if(bMsg) {
                     this.brokerConn.publish(bMsg, !this.shouldBuffer, done);  // send the message 
                     this.birthMessageSend = true;
@@ -163,7 +163,7 @@ module.exports = function(RED) {
          * @param {function} done Node-Red Done Function 
          */
         this.sendDDeath = function(done) {
-            let dMsg = node.brokerConn.createMsg(this.name, "DDEATH", [], x=>{});
+            let dMsg = node.brokerConn.createMsg(this.name, "DDEATH", []);
             if(dMsg) {
                 this.brokerConn.publish(dMsg, !this.shouldBuffer, done);  // send the message 
                 this.birthMessageSend = false;
@@ -174,9 +174,25 @@ module.exports = function(RED) {
         var node = this;
         if (this.brokerConn) {
             this.on("input",function(msg,send,done) {
+                // Handle Command
+                if (msg.hasOwnProperty("command")) {
+                    if (msg.command.hasOwnProperty("device")) {
+                        if (msg.command.device.rebirth) {
+                            if (this.birthMessageSend) {
+                                this.sendDDeath();    
+                            }
+                            this.trySendBirth();
+                        }
+                        if (msg.command.device.death) {
+                            if (this.birthMessageSend) {
+                                this.sendDDeath();
+                            }
+                        }
 
-                let validPayload = msg.hasOwnProperty("payload") && typeof msg.payload === 'object' && msg.payload !== null && !Array.isArray(msg.payload);
-                
+                    };
+                }
+
+                let validPayload = msg.hasOwnProperty("payload") && typeof msg.payload === 'object' && msg.payload !== null && !Array.isArray(msg.payload);    
                 if (msg.hasOwnProperty("definition")) {
                 
                     // Verify that all metric definitions are correct
@@ -271,7 +287,7 @@ module.exports = function(RED) {
                         else if (!this.birthMessageSend) {    // Send DBIRTH
                             this.trySendBirth(done);
                         }else if (_metrics.length > 0) { // SEND DDATA
-                            let dMsg = this.brokerConn.createMsg(this.name, "DDATA", _metrics, done);
+                            let dMsg = this.brokerConn.createMsg(this.name, "DDATA", _metrics);
                             if (dMsg) {
                                 this.brokerConn.publish(dMsg, !this.shouldBuffer, done); 
                             }
@@ -282,7 +298,7 @@ module.exports = function(RED) {
                         done();
                     }
                 } else {
-                    if (!msg.hasOwnProperty("definition")) { // Its ok there are no payload if we set the metric definition 
+                    if (!msg.hasOwnProperty("definition") && !msg.hasOwnProperty("command")) { // Its ok there are no payload if we set the metric definition 
                         node.error(RED._("mqtt-sparkplug-plus.errors.payload-type-object"));
                     }
                     done();
@@ -339,6 +355,10 @@ module.exports = function(RED) {
         this.closing = false;
         this.options = {};
      
+        // This is a new parameter in MQTT.JS 4.x
+        // Need to look more into it, if false then the node-red close event will timeout.
+        this.forceCloseConnection = true;
+
         this.subscriptions = {};
 
         this.seq = 0;
@@ -387,7 +407,7 @@ module.exports = function(RED) {
                 case "DISCONNECTED":
                     node.status({fill:"red",shape:"ring",text:"node-red:common.status.disconnected"});
                     break;
-                case "RECONNECTING":
+                case "RECONNECT":
                     node.status({fill:"yellow",shape:"ring",text:"node-red:common.status.connecting"});
                     break;
                 case "BUFFERING": // Online´
@@ -415,7 +435,7 @@ module.exports = function(RED) {
          * @param {*} metrics The metrics to include in the payload
          * @returns a encoded sparkplug B message
          */
-        this.createMsg = function(deviceName, msgType, metrics, done) {
+        this.createMsg = function(deviceName, msgType, metrics) {
             let that = this;
             let topic = deviceName ? `spBv1.0/${this.deviceGroup}/${msgType}/${this.eonName}/${deviceName}` :
                                      `spBv1.0/${this.deviceGroup}/${msgType}/${this.eonName}`;
@@ -433,18 +453,15 @@ module.exports = function(RED) {
                 }
             }catch (e) {
                 that.warn(RED._("mqtt-sparkplug-plus.errors.unable-to-encode-message", {type : msgType, error: e.toString()}));
-                done(e);
+                return null;
             }
 
             try {
                 msg.payload = sparkplugEncode(msg.payload); 
             }catch (e) {
                 that.error(RED._("mqtt-sparkplug-plus.errors.unable-to-encode-message", {type : msgType, error: e.toString()}));
-                done(e);
                 return null;
             }
-
-            
             return msg;   
         };
 
@@ -487,7 +504,7 @@ module.exports = function(RED) {
                     "type" : "Int8",
                     "value": 0,
                 }];
-            var nbirth = node.createMsg("", "NBIRTH", birthMessageMetrics, x=>{});
+            var nbirth = node.createMsg("", "NBIRTH", birthMessageMetrics);
             if (nbirth) {
                 node.publish(nbirth);
                 for (var id in node.users) {
@@ -646,12 +663,14 @@ module.exports = function(RED) {
                     // Send close message
                     let msg = this.getDeathPayload();
                     node.publish(msg, false, function(err) {
-                        node.client.end(done);
+                        //node.client.end(done);
+                        node.client.end(node.forceCloseConnection, {}, done);
                     });
                     return;
                 } else {
                     node.client.end();
-                    return done();
+                    done();
+                    //return done();
                 }
             }
             done();
@@ -761,6 +780,7 @@ module.exports = function(RED) {
                     // Register connect error handler
                     // The client's own reconnect logic will take care of errors
                     node.client.on('error', function (error) {
+                        console.log(error);
                     });
                 }catch(err) {
                     console.log(err);
@@ -780,7 +800,7 @@ module.exports = function(RED) {
                         if (typeof m === 'object' && m.hasOwnProperty("name") && m.name) {
                             if (m.name.toLowerCase() === "node control/rebirth") {
                                 
-                                let bMsg = node.createMsg("", "NDEATH", [], f => {});
+                                let bMsg = node.createMsg("", "NDEATH", []);
                                 if(bMsg) {
                                     node.publish(bMsg, !this.shouldBuffer, f => {});  // send the message 
                                 }
@@ -917,7 +937,6 @@ module.exports = function(RED) {
             } else {
                 if (node.queue.length === node.maxQueueSize) {
                     node.queue.shift();
-                    //console.log("Queue Size", node.queue.length);
                 }else if (node.queue.length  === node.maxQueueSize-1) {
                     node.warn(RED._("mqtt-sparkplug-plus.errors.buffer-full"));
                 }
@@ -927,14 +946,17 @@ module.exports = function(RED) {
         };
 
         this.on('close', function(done) {
+            
+         
             this.closing = true;
             if (this.connected) {
-                this.client.once('close', function() {
+                this.client.on('close', function() {
                     done();
                 });
+
+                this.client.end(node.forceCloseConnection, {}, done);
+            } else if (this.connecting || this.client.reconnecting) {
                 this.client.end();
-            } else if (this.connecting || node.client.reconnecting) {
-                node.client.end();
                 done();
             } else {
                 done();
@@ -997,7 +1019,7 @@ module.exports = function(RED) {
             this.on('close', function(removed, done) {
                 if (node.brokerConn) {
                     node.brokerConn.unsubscribe(node.topic,node.id, removed);
-                    node.brokerConn.deregister(node,done);
+                    node.brokerConn.deregister(node,done);                 
                 }
             });
         } else {

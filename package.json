@@ -10,7 +10,7 @@
   },
   "description": "MQTT-Sparkplug-Plus is a set of Node-Red nodes, that will enable Node-Red to communicate with a MQTT Server using the sparkplug b protocol.",
   "node-red": {
-    "version": ">=1.2.4",
+    "version": ">=1.1.0",
     "nodes": {
       "mqtt-sparkplug-plus": "mqtt-sparkplug-plus.js"
     }
