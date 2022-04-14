@@ -646,7 +646,8 @@ module.exports = function(RED) {
                     // Send close message
                     let msg = this.getDeathPayload();
                     node.publish(msg, false, function(err) {
-                        node.client.end(done);
+                        //node.client.end(done);
+                        node.client.end(true, {}, done);
                     });
                     return;
                 } else {
