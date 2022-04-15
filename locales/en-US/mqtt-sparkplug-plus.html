@@ -1,77 +1,109 @@
 <script type="text/html" data-help-name="mqtt sparkplug device">
-    <p>This node will connect to an MQTT Server and act as an MQTT Edge of Network (EoN) Node. The node handles the following message types:</p>
+    <p>This node will connect to an MQTT Server and act as an MQTT Edge of Network (EoN) Node.</p>
     
-    <ul>
-        <li>DBIRTH</li>
-        <li>NCMD : REBIRTH</li>
-        <li>NDEATH</li>
-        <li>DDATA (from node input)</li>
-        <li>DCMD (send as output to Node-Red)</li>
-        <li>NBIRTH</li>
-        <li>Buffering when Primary SCADA is OFFLINE or Broker Connection is down</li>
-        <li>Compression</li>
-    </ul>
-
-  <p>The following features are not supported (yet):</p>
-    <ul>
-        <li>Non-metrics (body/Metadata)</li>
-        <li>MQTT Broker redundancy</li>
-        <li>DDEATH</li>
-    </ul>
     <h3>Getting Started</h3>
     <p>The easiest way to get started is to import the example node.</p>
     
     <p>You do that by pressing the Import button in Node-Red, and selecting the Examples Tab, and open the <i>node-red-contrib-mqtt-sparkplug-plus</i> - <b>Simple Device</b> Example</p>
+    
     <h3>Inputs</h3>
-    <p>One or more metrics can be published by the device by passing the metrics information to the input of the device. A birth message will not be send before all metrics have been received at least once. so make sure to pass all metrics on start up.</p>
-    <p>if a metric does not have a value then a "is_null" attribute is added to the metric</p>
-    <p> Metric timestamps are optional per the specification. If timetamp are not supplied, then the current time will still be added to the DBIRTH message (nothing will be added to the DDATA). </p>
 
-    <h4>Example:</h4>
-    <pre>
-        msg.payload = {
-            "metrics": [
-                {
-                    "name": "testing/test1",
-                    // Timestamp  is optional.
-                    "timestamp" : new Date(),
-                    "value": 11
-                },
-                {
-                    "name": "testing/test2",
-                    "value": 12
+    <dl class="message-properties">
+        <dt>payload
+            <span class="property-type">object</span>
+        </dt>
+        <dd>
+            Metric data to publish. 
+
+            <p>if a metric does not have a value then a "is_null" attribute is added to the metric</p>
+            <p> Metric timestamps are optional per the specification. If timetamp are not supplied, then the current time will still be added to the DBIRTH message (nothing will be added to the DDATA). </p>
+        
+            <h4>Example:</h4>
+            <pre>
+msg.payload = {
+    "metrics": [
+        {
+            "name": "testing/test1",
+            // Timestamp  is optional.
+            "timestamp" : new Date(),
+            "value": 11
+        },
+        {
+            "name": "testing/test2",
+            "value": 12
+        }
+    ]
+};
+            </pre>   
+        </dd>
+    
+
+        <dt>definition
+            <span class="property-type">object</span>
+        </dt>
+        <dd>
+            <p>One or more metrics can be published by the device by passing the metrics information to the input of the device. A birth message will not be send before all metrics have been received at least once. so make sure to pass all metrics on start up.</p>
+
+            <p>Metrics definitions should normally be setup via the UI, but in some cases its beneficial to configure the metrics via code. This can be done by configuring the metrics using the msg.definition attribute.</p>
+            <p>The following example shows a message that also sets the definition. DO NOT include definition is each message, as it will trigger rebirth each time a valid msg.definition is processed by the node.</p>
+            <p>Setting metrics dynamicly also also allows you to set properties (like engineering units) for the metrics. This functionality is currently not supported when configuring metrics via the UI.</p>
+            <p>The example belows shows how to set definitions via code (payload is optional):</p>
+            <pre>
+msg = {
+    "definition" : {
+        "TEST/TEST" : {
+            "dataType" : "Int32",
+            "properties": {
+                "engUnits": {
+                    "type": "String",
+                    "value": "inHg"
                 }
-            ]
-        };
+            }, 
+        }
+    },
+    "payload" : {
+        "metrics" : [
+        {
+            "name" : "TEST/TEST",
+            "value" : 5
+        }]
+    }
+};
+            </pre>
+
+        </dd>
+    
+        <dt>command
+            <span class="property-type">object</span>
+        </dt>
+        <dd>Commands to send to the Device
+            Commands can be send to force REBIRTH or to send DDEATH.  Sending DDEATH is a good way to indicate that the connected hardware is offline.
+
+    Rebirth Example:
+    <pre>
+msg = {
+    "command" : {
+        "device" : {
+            "rebirth" : true
+        }
+    }   
+};
     </pre>
 
-    <h4>Dynamic Inputs</h4>
-    <p>Metrics definitions should normally be setup via the UI, but in some cases its beneficial to configure the metrics via code. This can be done by configuring the metrics using the msg.definition attribute.</p>
-    <p>The following example shows a message that also sets the definition. DO NOT include definition is each message, as it will trigger rebirth each time a valid msg.definition is processed by the node.</p>
-    <p>Setting metrics dynamicly also also allows you to set properties (like engineering units) for the metrics. This functionality is currently not supported when configuring metrics via the UI.</p>
-    <p>The example belows shows how to set definitions via code (payload is optional):</p>
+    Device Death Example:
     <pre>
-        msg = {
-            "definition" : {
-                "TEST/TEST" : {
-                    "dataType" : "Int32",
-                    "properties": {
-                        "engUnits": {
-                            "type": "String",
-                            "value": "inHg"
-                        }
-                    }, 
-                }
-            },
-            "payload" : {
-                "metrics" : [
-                {
-                    "name" : "TEST/TEST",
-                    "value" : 5
-                }]
-            }
-        };
-    </pre>
+msg = {
+    "command" : {
+        "device" : {
+            "death" : true
+        }
+    }   
+};
+        </pre>
+        </dd>
+    </dl>
+
+
     <h3>Outputs</h3>
        <dl class="message-properties">
        <dt>payload
@@ -94,7 +126,7 @@
         <h4>DCMD</h4>
         <p>NCMDs will be send to the node output port.</p>
         <h4>DDEATH</h4>
-        <p>DDEATH is not currently supported.</p>    
+        <p>DDEATH can be sending msg.command.device.death = true</p>    
 </script>
 
 <script type="text/html" data-help-name="mqtt sparkplug in">
