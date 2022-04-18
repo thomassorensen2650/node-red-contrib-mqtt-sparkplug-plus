@@ -1,0 +1,100 @@
+[
+    {
+        "id": "239c9025714089d3",
+        "type": "tab",
+        "label": "MQTT Publish & Subscribe",
+        "disabled": false,
+        "info": "Example on how MQTT Sparkplug out and MQTT Sparkplug in nodes can be used"
+    },
+    {
+        "id": "9d1c7a8cf6909762",
+        "type": "mqtt sparkplug in",
+        "z": "239c9025714089d3",
+        "name": "",
+        "topic": "spBv1.0/+/+/#",
+        "qos": "2",
+        "broker": "0d831bd9ba588536",
+        "x": 210,
+        "y": 100,
+        "wires": [
+            [
+                "d34cd297becb6078"
+            ]
+        ]
+    },
+    {
+        "id": "ac1434142dd6fe0a",
+        "type": "mqtt sparkplug out",
+        "z": "239c9025714089d3",
+        "name": "",
+        "topic": "spBv1.0/My Devices/NCMD/Node-Red",
+        "qos": "",
+        "retain": "",
+        "broker": "0d831bd9ba588536",
+        "x": 500,
+        "y": 200,
+        "wires": []
+    },
+    {
+        "id": "829cbe0b130463ac",
+        "type": "inject",
+        "z": "239c9025714089d3",
+        "name": "Send Rebirth Request",
+        "props": [
+            {
+                "p": "payload"
+            },
+            {
+                "p": "topic",
+                "vt": "str"
+            }
+        ],
+        "repeat": "",
+        "crontab": "",
+        "once": false,
+        "onceDelay": 0.1,
+        "topic": "",
+        "payload": "{\"metrics\":[{\"name\":\"Node Control/Rebirth\",\"value\":true,\"type\":\"Boolean\"}]}",
+        "payloadType": "json",
+        "x": 180,
+        "y": 200,
+        "wires": [
+            [
+                "ac1434142dd6fe0a"
+            ]
+        ]
+    },
+    {
+        "id": "d34cd297becb6078",
+        "type": "debug",
+        "z": "239c9025714089d3",
+        "name": "",
+        "active": true,
+        "tosidebar": true,
+        "console": false,
+        "tostatus": false,
+        "complete": "false",
+        "statusVal": "",
+        "statusType": "auto",
+        "x": 410,
+        "y": 100,
+        "wires": []
+    },
+    {
+        "id": "0d831bd9ba588536",
+        "type": "mqtt-sparkplug-broker",
+        "name": "Local Host",
+        "deviceGroup": "My Devices",
+        "eonName": "Node-Red",
+        "broker": "localhost",
+        "port": "1883",
+        "clientid": "",
+        "usetls": false,
+        "protocolVersion": "4",
+        "keepalive": "60",
+        "cleansession": true,
+        "enableStoreForward": false,
+        "compressAlgorithm": "",
+        "primaryScada": "MY SCADA"
+    }
+]
