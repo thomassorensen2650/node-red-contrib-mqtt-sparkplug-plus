@@ -5,21 +5,24 @@ MQTT-Sparkplug-Plus is a set of Node-Red nodes, that will enable Node-Red to com
 ## mqtt sparkplug device
 The *mqtt sparkplug device* act as a [Sparkplug B complient](https://s3.amazonaws.com/ignition-modules/Current/Sparkplug+Specification.pdf) EoN Node. 
 
-The node will connect to an MQTT broker (server) and act as an MQTT Edge of Network (EoN) Node. The client current handles the following messages and features: 
+The node will connect to an MQTT broker (server) and act as an MQTT Edge of Network (EoN) Node. 
+
+The client will handle the following message types automatically: 
 
 * NBIRTH
 * DBIRTH
 * NCMD : REBIRTH
 * NDEATH
+
+The following message types can be implemented by the user:
+
 * DDATA (from node input)
 * DCMD (send as output to Node-Red)
+* DDEATH (set via a msg command)
+
+The following sparkplug featues can also be handled by the node:
 * Buffering when primary SCADA is not available
 * Compression
-
-The following features are not yet supported:
-* Non-metrics (body)
-* MQTT Broker redundancy
-* DDEATH
 
 ### Input
 One or more metrics can be written to the **mqtt sparkplug device** by passing the metrics details to the input of the **mqtt sparkplug device**. A birth message will not be send before all metrics have been received at least once. so make sure to pass all metrics as soon as possible on start up.
@@ -78,7 +81,7 @@ _If the definition set set after the NBIRTH has been sent, them a REBIRTH is iss
 
 ### Commands
 
-Commands can be send to force REBIRTH or to send DDEATH.  Sending DDEATH is a good way to indicate that a connected device is offline.
+Commands can be used to force REBIRTH or to send DDEATH to a device.  Sending DDEATH is a good way to indicate that a connected device is offline. If a DDEANTH is send, a new birth message will be send on the next metric payload to the device or when a rebirth command is send.
 
 Rebirth Example:
 ```javascript    
