@@ -1006,7 +1006,6 @@ describe('mqtt sparkplug device node', function () {
 
 		}); // end helper
 	}); // it end 
-
 	
 	it('should error when definition has invalid dataType', function (done) {
 
@@ -1249,6 +1248,147 @@ describe('mqtt sparkplug device node', function () {
 	}); // it end 
 
 	// Check Rebirth
+	it('should send REBIRTH on REBIRTH Command', function (done) {
+		client = mqtt.connect(testBroker);
+		var initBirthDone = false;
+		var deathDone = false;
+		let n1;
+		let b1;
+
+		client.on('connect', function () {
+			client.subscribe('#', function (err) {
+			  if (!err) {
+				helper.load(sparkplugNode, simpleFlow, function () {
+					try {
+						n1 = helper.getNode("n1");
+						b1 = n1.brokerConn;
+
+						// Send all metrics to trigger DBIRTH
+						n1.receive({
+							"payload" : {
+								"metrics": [
+									{
+										"name": "test",
+										"value": 11,
+									},
+									{
+										"name": "test2",
+										"value": 11
+									}
+								]}
+							}
+						);
+					}catch (e) {
+						done(e);
+					}
+				});
+			  }
+			})
+		  });
+
+		  client.on('message', function (topic, message) {
+			  
+			
+			if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red") {
+				if (initBirthDone === true) {
+					var buffer = Buffer.from(message);
+					var payload = spPayload.decodePayload(buffer);
+					// Verify that we reset the seq to 0
+					payload.should.have.property("seq").which.is.eql(1);
+				}
+			} else if (topic === "spBv1.0/My Devices/DDEATH/Node-Red/TEST2"){
+				deathDone = true;
+			} else if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TEST2"){
+				// Ready to issue rebirth
+				if (initBirthDone === true) {
+					var buffer = Buffer.from(message);
+					var payload = spPayload.decodePayload(buffer);
+					deathDone.should.eql(true);
+					done();
+
+				} else {
+					// Here we should force a rebirth
+					n1.receive({
+						"command" : {
+							"device" : {
+								"rebirth" : true
+							}
+						}   
+					});
+					initBirthDone = true;
+				}
+			}
+		});
+	}); // it end 
+
+	// Check DEATH command will send DDEATH 
+	it('should send DDEATH on DEATH Command', function (done) {
+		client = mqtt.connect(testBroker);
+		var initBirthDone = false;
+		var deathDone = false;
+		let n1;
+		let b1;
+
+		client.on('connect', function () {
+			client.subscribe('#', function (err) {
+			  if (!err) {
+				helper.load(sparkplugNode, simpleFlow, function () {
+					try {
+						n1 = helper.getNode("n1");
+						b1 = n1.brokerConn;
+
+						// Send all metrics to trigger DBIRTH
+						n1.receive({
+							"payload" : {
+								"metrics": [
+									{
+										"name": "test",
+										"value": 11,
+									},
+									{
+										"name": "test2",
+										"value": 11
+									}
+								]}
+							}
+						);
+					}catch (e) {
+						done(e);
+					}
+				});
+			  }
+			})
+		  });
+
+		  client.on('message', function (topic, message) {
+			  
+			
+			if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red") {
+				if (initBirthDone === true) {
+					var buffer = Buffer.from(message);
+					var payload = spPayload.decodePayload(buffer);
+					// Verify that we reset the seq to 0
+					payload.should.have.property("seq").which.is.eql(1);
+				}
+			} else if (topic === "spBv1.0/My Devices/DDEATH/Node-Red/TEST2"){
+				done();
+			} else if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TEST2"){
+				// Here we should force a rebirth
+				n1.receive({
+					"command" : {
+						"device" : {
+							"death" : true
+						}
+					}   
+				});
+				initBirthDone = true;
+				
+			}
+		});
+	}); // it end 
+
+	// Check that 
+
 
 	// TODO:
 	//   Test unknown metric data type

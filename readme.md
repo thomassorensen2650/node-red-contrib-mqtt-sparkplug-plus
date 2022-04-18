@@ -76,6 +76,30 @@ msg = {
 
 _If the definition set set after the NBIRTH has been sent, them a REBIRTH is issued to notify clients about the new definition._
 
+### Commands
+
+Commands can be send to force REBIRTH or to send DDEATH.  Sending DDEATH is a good way to indicate that a connected device is offline.
+
+Rebirth Example:
+```javascript    
+msg = {
+    "command" : {
+        "device" : {
+            "rebirth" : true
+        }
+    }   
+```
+
+Death Example:
+```javascript  
+msg = {
+    "command" : {
+        "device" : {
+            "death" : true
+        }
+    }   
+```
+
 ## mqtt sparkplug in
 The *mqtt sparkplug in* node makes it possible to subscribe to sparkplug b mqtt topics. The node is almost identical to the default node-red *mqtt in* node, but it will decode the sparkplug/protobuf messages and deliver them in json.
 

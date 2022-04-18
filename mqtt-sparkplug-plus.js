@@ -174,6 +174,23 @@ module.exports = function(RED) {
         var node = this;
         if (this.brokerConn) {
             this.on("input",function(msg,send,done) {
+                // Handle Command
+                if (msg.hasOwnProperty("command")) {
+                    if (msg.command.hasOwnProperty("device")) {
+                        if (msg.command.device.rebirth) {
+                            if (this.birthMessageSend) {
+                                this.sendDDeath();    
+                            }
+                            this.trySendBirth();
+                        }
+                        if (msg.command.device.death) {
+                            if (this.birthMessageSend) {
+                                this.sendDDeath();
+                            }
+                        }
+
+                    };
+                }
 
                 let validPayload = msg.hasOwnProperty("payload") && typeof msg.payload === 'object' && msg.payload !== null && !Array.isArray(msg.payload);
                 
@@ -282,7 +299,7 @@ module.exports = function(RED) {
                         done();
                     }
                 } else {
-                    if (!msg.hasOwnProperty("definition")) { // Its ok there are no payload if we set the metric definition 
+                    if (!msg.hasOwnProperty("definition") && !msg.hasOwnProperty("command")) { // Its ok there are no payload if we set the metric definition 
                         node.error(RED._("mqtt-sparkplug-plus.errors.payload-type-object"));
                     }
                     done();
