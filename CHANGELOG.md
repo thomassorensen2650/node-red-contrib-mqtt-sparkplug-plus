@@ -1,3 +1,11 @@
+### 1.3.1: Maintenance Release
+
+ New:
+- Added support for device command (rebirth and death)
+
+Fixed:
+- Fixed minor issue that would make close on node-red redeply timeout.
+
 ### 1.3.0: Maintenance Release
 
  New:
