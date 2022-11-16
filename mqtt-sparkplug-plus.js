@@ -348,7 +348,7 @@ module.exports = function(RED) {
         this.cleansession = n.cleansession;
         
         this.compressAlgorithm = n.compressAlgorithm;
-
+        this.aliasMetrics = true; // FIXME: Hardcoded
         // Config node state
         this.brokerurl = "";
         this.connected = false;
@@ -444,6 +444,10 @@ module.exports = function(RED) {
                     metrics : metrics
                 }
             };
+
+            if (node.aliasMetrics) {
+                node.addAliasMetrics(msgType, msg.payload.metrics);
+            }
             try {
                 if (node.compressAlgorithm) {
                     msg.payload =  compressPayload(msg.payload, { algorithm : node.compressAlgorithm});
@@ -460,10 +464,27 @@ module.exports = function(RED) {
                 done(e);
                 return null;
             }
-
-            
             return msg;   
         };
+
+        this.nextMetricAlias = 0;
+        this.metricsAliasMap = {};
+        /**
+         * Convert metric names to metric aliases. 
+         * This method expect that the metrics attribute name exists
+         */
+        this.addAliasMetrics = function(msgType, metrics) {
+            metrics.forEach(metric => {
+                if (!metricsAliasMap.hasOwnProperty(metric.name)) {
+                    metricsAliasMap[metric.name] = ++nextMetricAlias;  
+                }
+                var alias = metricsAliasMap[metric.name];
+                if (msgType != "NBIRTH" && msgType != "DBIRTH") {
+                    delete metric.name;
+                }
+                metric.alias = alias;
+            });
+        }
 
         /**
          * 
