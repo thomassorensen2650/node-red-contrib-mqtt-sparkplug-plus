@@ -87,7 +87,7 @@ module.exports = function(RED) {
      */
     function sparkplugEncode(payload) {
         // return JSON.stringify(payload); // for debugging
-      
+
         // Verify that all metrics have a type (if people copy message from e.g. MQTT.FX, then the variable is not called type)
         if (payload.hasOwnProperty("metrics")) {
             if (!Array.isArray(payload.metrics)) {
@@ -348,7 +348,7 @@ module.exports = function(RED) {
         this.cleansession = n.cleansession;
         
         this.compressAlgorithm = n.compressAlgorithm;
-        this.aliasMetrics = true; // FIXME: Hardcoded
+        this.aliasMetrics = n.aliasMetrics;
         // Config node state
         this.brokerurl = "";
         this.connected = false;
@@ -475,10 +475,10 @@ module.exports = function(RED) {
          */
         this.addAliasMetrics = function(msgType, metrics) {
             metrics.forEach(metric => {
-                if (!metricsAliasMap.hasOwnProperty(metric.name)) {
-                    metricsAliasMap[metric.name] = ++nextMetricAlias;  
+                if (!node.metricsAliasMap.hasOwnProperty(metric.name)) {
+                    node.metricsAliasMap[metric.name] = ++node.nextMetricAlias;  
                 }
-                var alias = metricsAliasMap[metric.name];
+                var alias = node.metricsAliasMap[metric.name];
                 if (msgType != "NBIRTH" && msgType != "DBIRTH") {
                     delete metric.name;
                 }
