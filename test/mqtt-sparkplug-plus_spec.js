@@ -1082,7 +1082,6 @@ describe('mqtt sparkplug device node', function () {
 
 	}); // it end 
 
-
 	it('should send REBIRTH messages on updated definition', function (done) {
 		client = mqtt.connect(testBroker);
 		var initBirthDone = false;
@@ -1385,6 +1384,94 @@ describe('mqtt sparkplug device node', function () {
 				
 			}
 		});
+	}); // it end 
+
+
+	it('should alias metrics if enabled', function (done) {
+		client = mqtt.connect(testBroker);
+		let n1;
+		let b1;
+		client.on('connect', function () {
+			client.subscribe('#', function (err) {
+			  if (!err) {
+				simpleFlow[1].aliasMetrics = true;
+				helper.load(sparkplugNode, simpleFlow, function () {
+					try {
+						n1 = helper.getNode("n1");
+						b1 = n1.brokerConn;
+
+						// Send all metrics to trigger DBIRTH
+						n1.receive({
+							"payload" : {
+								"metrics": [
+									{
+										"name": "test",
+										"value": 11,
+									},
+									{
+										"name": "test2",
+										"value": 11
+									}
+								]}
+							}
+						);
+					}catch (e) {
+						done(e);
+					}
+				});
+			  }
+			})
+		  });
+
+		  client.on('message', function (topic, message) {
+			// Verify that we sent a DBirth Message to the broker
+			//console.log("TOPIC:", topic);
+			if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TEST2"){
+
+				var buffer = Buffer.from(message);
+				var payload = spPayload.decodePayload(buffer);
+
+				payload.should.have.property("timestamp").which.is.a.Number();
+				payload.metrics[0].should.have.property("name").which.is.eql("test");
+				payload.metrics[0].should.have.property("value");
+				payload.metrics[0].should.have.property("type").which.is.eql("Int32");
+				//payload.metrics[0].should.have.property("alias").which.is.eql(1);
+				alias = payload.metrics[0].alias.toNumber();
+				alias.should.eql(3);
+				n1.receive({
+					"payload" : {
+						"metrics": [
+							{
+								"name": "test",
+								"value": 100,
+								//"timestamp": new Date()
+							},
+						]}
+					}
+				);
+			} else if (topic === "spBv1.0/My Devices/DDATA/Node-Red/TEST2") {
+				var buffer = Buffer.from(message);
+				var payload = spPayload.decodePayload(buffer);
+
+				payload.should.have.property("timestamp").which.is.a.Number();
+				payload.metrics[0].should.have.property("name").which.is.eql(""); // name is decoded to "" if missing
+				payload.metrics[0].should.have.property("value");
+				payload.metrics[0].should.have.property("type").which.is.eql("Int32");
+				payload.metrics[0].should.have.property("alias");
+
+				alias = payload.metrics[0].alias.toNumber();
+				alias.should.eql(3);
+				
+				//payload.metrics[0].should.have.property("timestamp").which.is.a.Number();
+				payload.metrics.length.should.eql(1);
+				Object.keys(payload.metrics[0]).length.should.eql(4);
+				payload.should.have.property("seq").which.is.eql(2); // 0 is NBIRTH, 1 is DBIRTH
+				done();
+				//client.end();
+			}
+			
+		});
+
 	}); // it end 
 
 	// Check that 

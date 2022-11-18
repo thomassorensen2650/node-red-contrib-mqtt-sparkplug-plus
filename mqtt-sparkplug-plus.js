@@ -87,7 +87,7 @@ module.exports = function(RED) {
      */
     function sparkplugEncode(payload) {
         // return JSON.stringify(payload); // for debugging
-      
+
         // Verify that all metrics have a type (if people copy message from e.g. MQTT.FX, then the variable is not called type)
         if (payload.hasOwnProperty("metrics")) {
             if (!Array.isArray(payload.metrics)) {
@@ -348,7 +348,7 @@ module.exports = function(RED) {
         this.cleansession = n.cleansession;
         
         this.compressAlgorithm = n.compressAlgorithm;
-
+        this.aliasMetrics = n.aliasMetrics;
         // Config node state
         this.brokerurl = "";
         this.connected = false;
@@ -444,6 +444,10 @@ module.exports = function(RED) {
                     metrics : metrics
                 }
             };
+
+            if (node.aliasMetrics) {
+                node.addAliasMetrics(msgType, msg.payload.metrics);
+            }
             try {
                 if (node.compressAlgorithm) {
                     msg.payload =  compressPayload(msg.payload, { algorithm : node.compressAlgorithm});
@@ -460,10 +464,27 @@ module.exports = function(RED) {
                 done(e);
                 return null;
             }
-
-            
             return msg;   
         };
+
+        this.nextMetricAlias = 0;
+        this.metricsAliasMap = {};
+        /**
+         * Convert metric names to metric aliases. 
+         * This method expect that the metrics attribute name exists
+         */
+        this.addAliasMetrics = function(msgType, metrics) {
+            metrics.forEach(metric => {
+                if (!node.metricsAliasMap.hasOwnProperty(metric.name)) {
+                    node.metricsAliasMap[metric.name] = ++node.nextMetricAlias;  
+                }
+                var alias = node.metricsAliasMap[metric.name];
+                if (msgType != "NBIRTH" && msgType != "DBIRTH") {
+                    delete metric.name;
+                }
+                metric.alias = alias;
+            });
+        }
 
         /**
          * 
