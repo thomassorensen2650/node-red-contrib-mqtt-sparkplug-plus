@@ -1,3 +1,9 @@
+### 1.3.2: Maintenance Release
+
+ New:
+- Added support metric alias
+
+
 ### 1.3.1: Maintenance Release
 
  New:

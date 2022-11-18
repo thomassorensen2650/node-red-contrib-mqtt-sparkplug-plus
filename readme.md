@@ -23,6 +23,7 @@ The following message types can be implemented by the user:
 The following sparkplug featues can also be handled by the node:
 * Buffering when primary SCADA is not available
 * Compression
+* Metric Alias
 
 ### Input
 One or more metrics can be written to the **mqtt sparkplug device** by passing the metrics details to the input of the **mqtt sparkplug device**. A birth message will not be send before all metrics have been received at least once. so make sure to pass all metrics as soon as possible on start up.
