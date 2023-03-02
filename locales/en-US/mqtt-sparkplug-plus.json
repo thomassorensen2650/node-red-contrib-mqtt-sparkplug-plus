@@ -40,7 +40,8 @@
             "maximumPacketSize": "Max Packet Size",
             "receiveMaximum": "Receive Max",
             "session": "Session",
-            "delay": "Delay"
+            "delay": "Delay",
+            "templates" : "Templates"
         },
         "tip": {
             "storeforward" : "all the buffered values will be kept in memory. Do not use this for high thoughput applications.",
@@ -54,7 +55,7 @@
         },
         "tabs-label": {
             "connection": "Connection",
-            "security": "Security",
+            "advanced": "Advanced",
             "sparkplug": "Sparkplug"
         },
         "placeholder": {
@@ -91,7 +92,8 @@
             "unable-to-decode-message": "Unable to decode __type__ message. the error is : __error__",
             "unable-to-encode-message": "Unable to encode __type__ message. the error is : __error__",
             "not-defined": "Topic is not defined",
-            "invalid-metric-definition": "Unable to use '__name__' as a metric. the error is : __error__"
+            "invalid-metric-definition": "Unable to use '__name__' as a metric. the error is : __error__",
+            "unable-to-deserialize-templates" : "Unable to parse templates. The error is : __error__"
         }
     }	
 }

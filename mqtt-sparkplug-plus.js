@@ -43,7 +43,6 @@ module.exports = function(RED) {
      * @returns compressed payload (payload still needs to be protobuf encoded)
      */
     function compressPayload(payload, options) {
-        var metrics = payload.metrics;
         var algorithm = options && options['algorithm'] ? options['algorithm'].toUpperCase() : "DEFLATE";
         var resultPayload = {
             "uuid" : compressed,
@@ -91,10 +90,12 @@ module.exports = function(RED) {
         // Verify that all metrics have a type (if people copy message from e.g. MQTT.FX, then the variable is not called type)
         if (payload.hasOwnProperty("metrics")) {
             if (!Array.isArray(payload.metrics)) {
+                console.log("xx", payload.metrics);
                 throw RED._("mqtt-sparkplug-plus.errors.metrics-not-array");
             } else {
                 payload.metrics.forEach(met => {
                     if (!met.hasOwnProperty("type")) {
+                        console.log("missing", met);
                         throw RED._("mqtt-sparkplug-plus.errors.unable-to-encode-message", { type : "", error :  "Unable to encode message, all metrics must have a 'type' Attribute" });
                     }
                 });
@@ -349,6 +350,10 @@ module.exports = function(RED) {
         
         this.compressAlgorithm = n.compressAlgorithm;
         this.aliasMetrics = n.aliasMetrics;
+
+        this.useTemplates = true;
+        this.templates = n.templates||[];
+
         // Config node state
         this.brokerurl = "";
         this.connected = false;
@@ -486,6 +491,83 @@ module.exports = function(RED) {
             });
         }
 
+        this.getTemplates = function() {
+            var _result = JSON.parse(this.templates);
+            return _result;
+        }
+
+        this.templateToInstance = function(instanceName, template, refLoopCounter = 0) {
+            var _result = [];
+
+            //FIXME: Make this nicer, make 100 a const and internationalization
+            if (refLoopCounter > 100) {
+                throw "Reference loop detected in template hierarchy";
+            }
+
+            // Analyse templte to make sure its valid
+            //FIXME: Hardcoded
+            var analyseResult = {
+                valid: true, // BAD BAD BAD... fixme
+                error: "All good"
+            };
+
+            if (!analyseResult.valid) {
+                node.error(RED._("mqtt-sparkplug-plus.errors.unable-to-deserialize-templates", {error: analyseResult.error}));
+                return _result;
+            }
+            // Clone template
+            var templateMetrics = JSON.parse(JSON.stringify(template.value.metrics));
+
+            // FIXME: need to Add support for inheritence
+            
+            templateMetrics.forEach(t => {
+                if (t.type == "Template") {
+
+                    // Find Template
+                    t.name = instanceName + "/" + t.name;
+                    var subTemplate = this.getTemplateByName(template.value.templateRef);
+                    _subMetrics = this.templateToInstance(t.name, subTemplate, ++refLoopCounter)
+                    _result = _result.concat(_subMetrics);
+                }
+                _result.push(t);
+            });
+            return _result;
+        };
+        
+        this.cloneTemplate = function(template) {
+
+            var _metrics = [];
+            // first verify Template is valid
+            //var result = this.verifyTemplate();
+
+            var result = {
+                valid: true // BAD... fixme
+            };
+            // Clone objec
+            var templateMetrics = JSON.parse(JSON.stringify(template.value.metrics));
+
+            if (result.valid) {
+                templateMetrics.forEach(m => {
+                    if (m.type != "Template") {
+                        m.name = template.name + "/" + m.name;
+                        _metrics.push(m);
+                    } else {
+                        // Its a embedded template
+                        var eTemplate = ""; // FIXME;
+                        //1L: Find the template
+                        console.log("Crap, not implemtend yet!!!");
+                        //2:
+                        _metrics = _metrics.concat(this.getTemplateAsMetrics(eTemplate));
+                    }
+                })
+                
+            } else {
+                // FIXME Er
+                console.log("LORT!!!")
+            }
+            return _metrics;
+            
+        }
         /**
          * 
          * @returns node death payload and topic
@@ -513,8 +595,17 @@ module.exports = function(RED) {
          */
         this.sendBirth = function() {
             this.seq = 0;
-            var birthMessageMetrics = [
-
+            var birthMessageMetrics = []
+            
+            if (node.useTemplates) {
+                try {
+                    birthMessageMetrics = this.getTemplates();
+                } catch (e) {
+                    node.error(RED._("mqtt-sparkplug-plus.errors.unable-to-deserialize-templates", {error: e.toString()}));
+                }
+            }
+            
+            birthMessageMetrics = birthMessageMetrics.concat([
                 {
                     "name" : "Node Control/Rebirth",
                     "type" : "Boolean",
@@ -524,7 +615,9 @@ module.exports = function(RED) {
                     "name" : "bdSeq",
                     "type" : "Int8",
                     "value": 0,
-                }];
+                }]);
+
+            console.log("x", birthMessageMetrics);
             var nbirth = node.createMsg("", "NBIRTH", birthMessageMetrics, x=>{});
             if (nbirth) {
                 node.publish(nbirth);
@@ -1025,7 +1118,7 @@ module.exports = function(RED) {
                         var msg = {topic:topic, payload:payload, qos:packet.qos, retain:packet.retain};
                         node.send(msg);
                     } catch (e) {
-                        node.error(RED._("mqtt-sparkplug-plus.errors.unable-to-decode-message", {type : "", error: e.toString()}));
+                    node.error(RED._("mqtt-sparkplug-plus.errors.unable-to-decode-message", {type : "Unknown", error: e.toString()}));
                     }
                     
                 }, this.id);
