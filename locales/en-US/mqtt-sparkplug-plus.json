@@ -40,7 +40,8 @@
             "maximumPacketSize": "Max Packet Size",
             "receiveMaximum": "Receive Max",
             "session": "Session",
-            "delay": "Delay"
+            "delay": "Delay",
+            "birthImmediately" : "Send Birth Immediately"
         },
         "tip": {
             "storeforward" : "all the buffered values will be kept in memory. Do not use this for high thoughput applications.",

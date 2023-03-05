@@ -98,7 +98,14 @@
                     <option value="DEFLATE">Deflate</option>
                     <option value="GZIP">Gzip</option>
                 </select>
-        </div>
+            </div>
+
+            <!-- UI for birthImmediately-->
+            <div class="form-row">
+            <label for="node-config-input-birthImmediately" style="width:70%">
+                <input type="checkbox" id="node-config-input-birthImmediately" style="display:inline-block; width:22px; vertical-align:top;"><span data-i18n="mqtt-sparkplug-plus.label.birthImmediately"></span>
+            </label>
+            </div>
 
             <!-- UI for Alias Metrics-->
             <div class="form-row">
@@ -141,6 +148,9 @@
                     return (this.cleansession===undefined || this.cleansession) || (v||"").length > 0;
                 }
             }},
+
+            birthImmediately: {value: false},
+
             usetls: {value: false},
             verifyservercert: { value: false},
             protocolVersion: { value: 4},

@@ -109,6 +109,49 @@ describe('mqtt sparkplug device node', function () {
 
 	}); // it end 
 
+	/**
+	* Verify NBirth is send when starting up Node-Red with a Device loaded.
+	*/
+	it('only sends one NBirth message', function (done) {
+		client = mqtt.connect(testBroker);
+		let n1;
+		let b1;
+		let firstMessage = true;
+
+		client.on('connect', function () {
+			client.subscribe('#', function (err) {
+			  if (!err) {
+				helper.load(sparkplugNode, simpleFlow, function () {
+					try {
+						n1 = helper.getNode("n1");
+						b1 = n1.brokerConn;
+						console.log("Hello");
+						// TIME
+						setTimeout(() => {
+							client.end();
+							done()
+						}, 500);						
+
+					}catch (e) {
+						done(e);
+					}
+				});
+			  }
+			})
+		  });
+
+		  client.on('message', function (topic, message) {
+			// Verify that we sent a DBirth Message to the broker
+			if (topic === "spBv1.0/My Devices/NBIRTH/Node-Red"){
+			
+				firstMessage.should.equal(true);
+				firstMessage = false;
+			}
+		});
+
+	}); // it end 
+
+
 	it('should send DBirth message', function (done) {
 		client = mqtt.connect(testBroker);
 		let n1;
@@ -172,6 +215,75 @@ describe('mqtt sparkplug device node', function () {
 		});
 
 	}); // it end 
+
+
+	it('should not birth when metrics missing and  birthImmediately = false', function (done) {
+		client = mqtt.connect(testBroker);
+		let n1;
+		let b1;
+		client.on('connect', function () {
+			client.subscribe('#', function (err) {
+			  if (!err) {
+				helper.load(sparkplugNode, simpleFlow, function () {
+					try {
+						n1 = helper.getNode("n1");
+						b1 = n1.brokerConn;
+						b1.birthImmediately = false;
+						setTimeout(() => done(), 500);
+					}catch (e) {
+						done(e);
+					}
+				});
+			  }
+			})
+		  });
+
+		  client.on('message', function (topic, message) {
+			// Verify that we sent a DBirth Message to the broker
+			topic.should.not.equal("spBv1.0/My Devices/DBIRTH/Node-Red/TEST2")
+			
+		});
+
+	}); // it
+
+	it('should send DBirth message when birth immediately is set', function (done) {
+		client = mqtt.connect(testBroker);
+		let n1;
+		let b1;
+
+		flow = JSON.parse(JSON.stringify(simpleFlow));
+		flow[1].birthImmediately = true;
+	
+		client.on('connect', function () {
+			client.subscribe('#', function (err) {
+			  if (!err) {
+				helper.load(sparkplugNode, flow, function () {
+					try {
+						n1 = helper.getNode("n1");
+						b1 = n1.brokerConn;
+					}catch (e) {
+						done(e);
+					}
+				});
+			  }
+			})
+		  });
+
+		  client.on('message', function (topic, message) {
+			// Verify that we sent a DBirth Message to the broker
+			if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TEST2"){
+				var buffer = Buffer.from(message);
+				var payload = spPayload.decodePayload(buffer);
+
+				payload.should.have.property("timestamp").which.is.a.Number();
+				payload.should.have.property("seq").which.is.eql(1);
+				done();
+				//client.end();
+			}
+			
+		});
+
+	}); // it
 
 	it('should send Properties in DBIRTH message', function (done) {
 		client = mqtt.connect(testBroker);
@@ -1792,4 +1904,33 @@ describe('mqtt sparkplug out node', function () {
 			done();
 		});
 	});
+
+		/**
+	 * Verify that we'll buffer if forced enabled,
+	 */
+		it('should buffer on Sparkplug B 3.0.0 style State variable', function (done) {
+
+			var n1 = null;
+			client = mqtt.connect(testBroker);
+			client.on('connect', function () {
+				client.subscribe("spBv1.0/My Devices/DDATA/Node-Red/TEST2", function (err) {
+					if (!err) {
+						helper.load(sparkplugNode, outFlow, function () {
+							n1 = helper.getNode("n1");
+							n1.shouldBuffer = true; // Force enable to buffer
+							setTimeout(() => n1.receive({ payload: validMsg}), 100);
+							setTimeout(() => client.publish("spBv1.0/STATE/MY SCADA", JSON.stringify({ online : true, timestamp : new Date() }), true), 700);						});
+					}
+				});
+			});
+	
+			client.on('message', function (topic, message) {
+				var buffer = Buffer.from(message);
+				var payload = spPayload.decodePayload(buffer);
+				n1.brokerConn.primaryScadaStatus.should.eql("ONLINE");
+				payload.should.deepEqual(validMsg);
+				done();
+			});
+		});
+
 });
