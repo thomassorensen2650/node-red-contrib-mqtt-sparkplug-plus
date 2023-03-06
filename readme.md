@@ -26,7 +26,10 @@ The following sparkplug featues can also be handled by the node:
 * Metric Alias
 
 ### Input
-One or more metrics can be written to the **mqtt sparkplug device** by passing the metrics details to the input of the **mqtt sparkplug device**. A birth message will not be send before all metrics have been received at least once. so make sure to pass all metrics as soon as possible on start up.
+One or more metrics can be written to the **mqtt sparkplug device** by passing the metrics details to the input of the **mqtt sparkplug device**. The default behaviour is to wait for a value for each of the metrics before sending birth message. so make sure to pass all metrics on start up. This functionality can be disabled by selecting **Send Birth Immediately** on the broker connection
+
+
+A birth message will not be send before all metrics have been received at least once. so make sure to pass all metrics as soon as possible on start up.
 
 The **mqtt sparkplug device** expects the metrics in the following input payload format. DataTypes can be added, but it will also be added automaticly by the node if omitted. if a metric does not have a value then a "is_null" attribute is added to the metric. Timestamps are optional per the specification. If timetamp to the metrics are not supplied, the the current time will still be added to the DBIRTH message (nothing will be added to the DDATA). 
 

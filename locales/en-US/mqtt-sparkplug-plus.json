@@ -12,7 +12,6 @@
             "messagetype": "Msg. Type",
             "eon" : "Node",
             "group" : "Group",
-            "metrics": "Metrics",
             "allgroups": "All Groups",
             "allnodes": "All Nodes",
             "allmessagetypes": "All Message Types", 
@@ -40,12 +39,14 @@
             "maximumPacketSize": "Max Packet Size",
             "receiveMaximum": "Receive Max",
             "session": "Session",
-            "delay": "Delay"
+            "delay": "Delay",
+            "birthImmediately" : "Send Birth Immediately"
         },
         "tip": {
             "storeforward" : "all the buffered values will be kept in memory. Do not use this for high thoughput applications.",
             "device": "Tip: Use '/' to group related metrics e.g. Machine1/Speed",
-            "sparkplugformat": "Topic format: namespace/group_id/message_type/edge_node_id/[device_id]"
+            "sparkplugformat": "Topic format: namespace/group_id/message_type/edge_node_id/[device_id]",
+            "birthImmediately" : "The Send Birth Immediately option will send device online (DBIRTH) with NULL values as soon as node-red starts up."
         },
         "sections-label":{
             "birth-message": "Message sent on connection (birth message)",
@@ -55,7 +56,9 @@
         "tabs-label": {
             "connection": "Connection",
             "security": "Security",
-            "sparkplug": "Sparkplug"
+            "sparkplug": "Sparkplug",
+            "advanced" : "Advanced",
+            "metrics" : " Metrics"
         },
         "placeholder": {
             "clientid": "Leave blank for auto generated",

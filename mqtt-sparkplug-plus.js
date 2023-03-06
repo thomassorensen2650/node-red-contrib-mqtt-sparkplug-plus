@@ -131,13 +131,18 @@ module.exports = function(RED) {
         this.latestMetrics = {};
         this.metrics = n.metrics || {};
         this.birthMessageSend = false;
-        
+        this.birthImmediately = n.birthImmediately || false;
+
         this.shouldBuffer = true; // hardcoded / Devices always buffers
+
+        if (typeof this.birthImmediately === 'undefined') {
+            this.birthImmediately = false;
+        }
         /**
-         * try to send Sparkplug Birth Messages
+         * try to send Sparkplug DBirth Messages
          * @param {function} done Node-Red Done Function 
          */
-        this.trySendBirth = function(done) {           
+        this.trySendBirth = function(done) {    
             let readyToSend = Object.keys(this.metrics).every(m => this.latestMetrics.hasOwnProperty(m));
             if (readyToSend) {
                 let birthMetrics = [];
@@ -305,6 +310,14 @@ module.exports = function(RED) {
                     done();
                 }
             }); // end input
+
+            //  Create "NULL" metrics if metrics should be sendt immediately
+            if (this.birthImmediately) {
+                this.latestMetrics = {};
+                Object.keys(this.metrics).forEach(m => {
+                    this.latestMetrics[m] = { value : null, name : m, type: this.metrics[m].dataType }
+                });
+            }
             node.brokerConn.register(node);
             
             // Handle DCMD Messages
@@ -349,6 +362,7 @@ module.exports = function(RED) {
         
         this.compressAlgorithm = n.compressAlgorithm;
         this.aliasMetrics = n.aliasMetrics;
+
         // Config node state
         this.brokerurl = "";
         this.connected = false;
@@ -751,10 +765,34 @@ module.exports = function(RED) {
                         // Subscribe to Primary SCADA status if store forward is enabled.
                         if (node.enableStoreForward === true) {
                             let options = { qos: 0 };
+
+                            // SPb 2.0 Support
                             let primaryScadaTopic = `STATE/${node.primaryScada}`;
                             node.subscribe(primaryScadaTopic,options,function(topic_,payload_,packet) {
                                 let status = payload_.toString();
                                 node.primaryScadaStatus = status;
+                                for (var id in node.users) {
+                                    if (node.users.hasOwnProperty(id)) {
+                                        let state = node.enableStoreForward && node.primaryScadaStatus === "OFFLINE"  && node.users[id].shouldBuffer === true ? "BUFFERING" : "CONNECTED";
+                                        node.setConnectionState(node.users[id], state);
+                                    }
+                                }
+                                node.emptyQueue();
+                            });
+
+                            // SPb 3.0 Support
+                            let primaryScadaTopicv3 = `spBv1.0/STATE/${node.primaryScada}`;
+                            node.subscribe(primaryScadaTopicv3,options,function(topic_,payload_,packet) {
+                                let payload = payload_.toString();
+
+                                try {
+                                    var pss = JSON.parse(payload);
+                                    node.primaryScadaStatus = pss.hasOwnProperty("online") ? (pss.online ? "ONLINE" : "OFFLINE") : "OFFLINE";
+                                } catch{
+                                    node.warn("Invalid Primary SCADA State:" + payload)
+                                    node.primaryScadaStatus = "OFFLINE";
+                                }
+                                
                                 for (var id in node.users) {
                                     if (node.users.hasOwnProperty(id)) {
                                         let state = node.enableStoreForward && node.primaryScadaStatus === "OFFLINE"  && node.users[id].shouldBuffer === true ? "BUFFERING" : "CONNECTED";
