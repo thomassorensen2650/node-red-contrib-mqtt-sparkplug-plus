@@ -1,3 +1,9 @@
+### 1.4.0: Maintenance Release
+
+ New:
+- Added Birth Immediately option to allow sending DBirth on start up
+- Added support for Sparkplug B V3.0.0 style Primary SCADA STATE 
+
 ### 1.3.2: Maintenance Release
 
  New:
