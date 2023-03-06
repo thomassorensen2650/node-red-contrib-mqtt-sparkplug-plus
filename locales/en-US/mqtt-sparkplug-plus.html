@@ -122,7 +122,7 @@ msg = {
         <h4>NDEATH</h4>
         <p>The node will send NDEATH when node-red runtime is stopped (it will be send on both a gracefull shutdown and a unexpected shutdown).</p>
         <h4>DBIRTH</h4>
-        <p>Node Birth will be send by the node when all metrics have been received at least once, the node-red runtime has started and the node has a connection the the MQTT Broker. This message will also be send when a "Rebirth" NCMD is received</p>
+        <p>Node Birth will be send by the node when all metrics have been received at least once or <b>Send Birth Immediately</b> is set, the node-red runtime has started and the node has a connection the the MQTT Broker. This message will also be send when a "Rebirth" NCMD is received</p>
         <h4>DCMD</h4>
         <p>NCMDs will be send to the node output port.</p>
         <h4>DDEATH</h4>

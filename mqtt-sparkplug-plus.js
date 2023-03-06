@@ -131,8 +131,13 @@ module.exports = function(RED) {
         this.latestMetrics = {};
         this.metrics = n.metrics || {};
         this.birthMessageSend = false;
-        
+        this.birthImmediately = n.birthImmediately || false;
+
         this.shouldBuffer = true; // hardcoded / Devices always buffers
+
+        if (typeof this.birthImmediately === 'undefined') {
+            this.birthImmediately = false;
+        }
         /**
          * try to send Sparkplug DBirth Messages
          * @param {function} done Node-Red Done Function 
@@ -307,7 +312,7 @@ module.exports = function(RED) {
             }); // end input
 
             //  Create "NULL" metrics if metrics should be sendt immediately
-            if (this.brokerConn.birthImmediately) {
+            if (this.birthImmediately) {
                 this.latestMetrics = {};
                 Object.keys(this.metrics).forEach(m => {
                     this.latestMetrics[m] = { value : null, name : m, type: this.metrics[m].dataType }
@@ -357,7 +362,7 @@ module.exports = function(RED) {
         
         this.compressAlgorithm = n.compressAlgorithm;
         this.aliasMetrics = n.aliasMetrics;
-        this.birthImmediately = n.birthImmediately || false;
+
         // Config node state
         this.brokerurl = "";
         this.connected = false;
@@ -559,9 +564,6 @@ module.exports = function(RED) {
         }
         if (typeof this.usews === 'undefined') {
             this.usews = false;
-        }
-        if (typeof this.birthImmediately === 'undefined') {
-            this.birthImmediately = false;
         }
         if (typeof this.verifyservercert === 'undefined') {
             this.verifyservercert = false;

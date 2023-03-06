@@ -125,7 +125,6 @@ describe('mqtt sparkplug device node', function () {
 					try {
 						n1 = helper.getNode("n1");
 						b1 = n1.brokerConn;
-						console.log("Hello");
 						// TIME
 						setTimeout(() => {
 							client.end();
@@ -252,7 +251,12 @@ describe('mqtt sparkplug device node', function () {
 		let b1;
 
 		flow = JSON.parse(JSON.stringify(simpleFlow));
-		flow[1].birthImmediately = true;
+		flow[0].birthImmediately = true;
+
+		// Add Extra node to test
+		extraDevice = JSON.parse(JSON.stringify(simpleFlow[0]));
+		extraDevice.id = "n3";
+		extraDevice.name = "TEST2"
 	
 		client.on('connect', function () {
 			client.subscribe('#', function (err) {
@@ -270,6 +274,10 @@ describe('mqtt sparkplug device node', function () {
 		  });
 
 		  client.on('message', function (topic, message) {
+
+			// Should only BIRTH device with birthImmi attribute set.
+			topic.should.not.eql("spBv1.0/My Devices/DBIRTH/Node-Red/TEST3");
+
 			// Verify that we sent a DBirth Message to the broker
 			if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TEST2"){
 				var buffer = Buffer.from(message);
