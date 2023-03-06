@@ -26,7 +26,7 @@ The following sparkplug featues can also be handled by the node:
 * Metric Alias
 
 ### Input
-One or more metrics can be written to the **mqtt sparkplug device** by passing the metrics details to the input of the **mqtt sparkplug device**. The default behaviour is to wait for a value for each of the metrics before sending birth message. so make sure to pass all metrics on start up. This functionality can be disabled by selecting **Send Birth Immediately** on the broker connection
+One or more metrics can be written to the **mqtt sparkplug device** by passing the metrics details to the input of the **mqtt sparkplug device**. The default behaviour is to wait for a value for each of the metrics before sending birth message. so make sure to pass all metrics on start up. This functionality can be disabled by selecting **Send Birth Immediately** on the advanted settings for the device.
 
 
 A birth message will not be send before all metrics have been received at least once. so make sure to pass all metrics as soon as possible on start up.
