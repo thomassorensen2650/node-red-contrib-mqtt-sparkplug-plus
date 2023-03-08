@@ -63,7 +63,8 @@
             "clientid-nonclean":"Must be set for non-clean sessions",
             "eonname":"Node-Red",
             "name": "Sparkplug Device",
-            "command": "NDATA"
+            "command": "NDATA",
+            "username" : "Leave blank for anonymous login"
         },
         "state": {
             "connected": "Connected to broker: __broker__",

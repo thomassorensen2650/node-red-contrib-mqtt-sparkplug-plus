@@ -599,12 +599,13 @@ module.exports = function(RED) {
             
             if (node.useTemplates) {
                 try {
-                    birthMessageMetrics = this.getTemplates();
+                    birthMessageMetrics = [this.getTemplates()];
                 } catch (e) {
                     node.error(RED._("mqtt-sparkplug-plus.errors.unable-to-deserialize-templates", {error: e.toString()}));
                 }
             }
             
+            console.log("Birth Metrics", birthMessageMetrics);
             birthMessageMetrics = birthMessageMetrics.concat([
                 {
                     "name" : "Node Control/Rebirth",

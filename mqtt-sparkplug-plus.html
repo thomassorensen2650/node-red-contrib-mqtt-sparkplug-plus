@@ -42,7 +42,7 @@
 
             <div class="form-row">
                 <label for="node-config-input-user"><i class="fa fa-user"></i> <span data-i18n="mqtt-sparkplug-plus.label.username"></span></label>
-                <input type="text" id="node-config-input-user">
+                <input type="text" id="node-config-input-user" data-i18n="[placeholder]mqtt-sparkplug-plus.placeholder.username">
             </div>
             <div class="form-row">
                 <label for="node-config-input-password"><i class="fa fa-lock"></i> <span data-i18n="mqtt-sparkplug-plus.label.password"></span></label>
@@ -56,6 +56,7 @@
                 <label for="node-config-input-keepalive"><i class="fa fa-heartbeat"></i> <span data-i18n="mqtt-sparkplug-plus.label.keepalive"></span></label>
                 <input type="number" min="0" id="node-config-input-keepalive" style="width: 100px">
             </div>
+            <!--
             <div class="form-row" style="margin-bottom:0">
                 <label style="vertical-align:top;"><i class="fa fa-info"></i> <span data-i18n="mqtt-sparkplug-plus.label.session"></span></label>
                 <div style="display: inline-block; width:calc(100% - 110px)">
@@ -67,7 +68,8 @@
                     </div>
                 </div>
             </div>
-            <br>
+            
+            <br>-->
         </div>
         <div id="mqtt-broker-tab-advanced" style="display:none">
             <div class="form-row node-config-input-templates-container-row" style="margin-bottom: 0px;">
@@ -76,8 +78,6 @@
             <div class="form-row node-config-input-templates-container-row" id="node-config-input-templates-container-row">
                 <ol id="node-config-input-templates-container"></ol>
             </div>
-
-
         </div>
          <div id="mqtt-broker-tab-sparkplug" style="display:none">
             <div class="form-row">
@@ -131,13 +131,10 @@
     function geTemplateList() {
         var _templates = [];
         var templates = $("#node-config-input-templates-container").editableList("items");
-        console.log("Save", templates);
         templates.each(function(i) {
             var item = $(this);
-            console.log("Searcing");
             var templateJson = item.find(".sparkplug-input-templates-json").typedInput('value');
             //var dt = item.find(".sparkplug-input-metrics-dateType option:selected").text();
-            console.log("Found", templateJson);
            _templates.push(templateJson);
         });
         return _templates;
@@ -146,12 +143,13 @@
     function validateTemplate(value) {
         try {
             var json = JSON.parse(value);
-            
-            console.log("JSON", json, typeof json);
-            if (typeof json != "object") throw "Template should be an object.";  // Verify its a object.
-            if (Array.isArray(json)) throw "Template should be a object and not an array."; // Verify not array
-            if (!json.hasOwnProperty("name")) throw "Template should have a name attribute"; // Verify has Value
-            if (typeof json.name != "string") throw "Template name should be a string";  // Verify its a object.
+            var check = (notOk, ex) => {
+                if (notOk) throw ex;
+            }
+            check(typeof json != "object", "Template should be an object.");
+            check(Array.isArray(json), "Template should be a object and not an array.");
+            check(!json.hasOwnProperty("name"), "Template should have a name attribute");
+            check(typeof(json.name) != "string", "Template name should be a string");
 
             return {
                 valid : true,
@@ -175,14 +173,7 @@
             broker: {value:"",required:true},
             port: {value:1883,required:false,validate:RED.validators.number(true)},
             tls: {type:"tls-config",required: false},
-            clientid: {value:"", validate: function(v) {
-                if ($("#node-config-input-clientid").length) {
-                    // Currently editing the node
-                    return $("#node-config-input-cleansession").is(":checked") || (v||"").length > 0;
-                } else {
-                    return (this.cleansession===undefined || this.cleansession) || (v||"").length > 0;
-                }
-            }},
+            clientid: {value:""},
             usetls: {value: false},
             verifyservercert: { value: false},
             protocolVersion: { value: 4},
@@ -224,17 +215,20 @@
             });
             tabs.addTab({
                 id: "mqtt-broker-tab-connection",
-                label: this._("mqtt-sparkplug-plus.tabs-label.connection")
+                label: this._("mqtt-sparkplug-plus.tabs-label.connection"),
+                iconClass: "fa fa-server"
             });
 
             tabs.addTab({
                 id: "mqtt-broker-tab-sparkplug",
-                label: this._("mqtt-sparkplug-plus.tabs-label.sparkplug")
+                label: this._("mqtt-sparkplug-plus.tabs-label.sparkplug"),
+                iconClass: "fa fa-plug"
             });
 
             tabs.addTab({
                 id: "mqtt-broker-tab-advanced",
-                label: this._("mqtt-sparkplug-plus.tabs-label.advanced")
+                label: this._("mqtt-sparkplug-plus.tabs-label.advanced"),
+                iconClass: "fa fa-cog"
             });
 
             // Setup Templates !!!
@@ -254,7 +248,7 @@
                         "name": "MyTemplate",
                         "type": "Template",
                         "value": {
-                            "version": "",
+                            "version": "1.0.0",
                             "isDefinition": true,
                             "metrics": [
                                 {
@@ -301,28 +295,11 @@
                     selectField.typedInput('value',useDefaultTemplate ? JSON.stringify(defaultTemplate) : JSON.stringify(opt));
                 }
             });
-            console.log("Template", this.templates);
-
             this.templates.forEach(t => {
                 templateList.editableList('addItem', JSON.parse(t));
             });
 
-
-            setTimeout(function() { tabs.resize(); },0);
-            if (typeof this.cleansession === 'undefined') {
-                this.cleansession = true;
-                $("#node-config-input-cleansession").prop("checked",true);
-            }
-            if (typeof this.usetls === 'undefined') {
-                this.usetls = false;
-                $("#node-config-input-usetls").prop("checked",false);
-            }
-            
-            $("#node-config-input-protocolVersion").on("change", function() {
-                $("#node-config-input-cleansession-label").text(RED._("node-red:mqtt.label.cleansession"))
-            });
-            $("#node-config-input-protocolVersion").val(this.protocolVersion);
-        
+            this.cleansession = true;
             $("#node-storeforward-line").hide();
             $("#node-config-input-enableStoreForward").on('change',function() {
                 if ($(this).is(":checked")) {
@@ -345,19 +322,6 @@
                 updateTLSOptions();
             });
             var node = this;
-            function updateClientId() {
-                if ($("#node-config-input-cleansession").is(":checked")) {
-                    $("#node-config-input-clientid").attr("placeholder",node._("mqtt-sparkplug-plus.placeholder.clientid"));
-                } else {
-                    $("#node-config-input-clientid").attr("placeholder",node._("mqtt-sparkplug-plus.placeholder.clientid-nonclean"));
-                }
-                $("#node-config-input-clientid").trigger("change");
-            }
-            setTimeout(updateClientId,0);
-            $("#node-config-input-cleansession").on("click",function() {
-                updateClientId();
-            });
-
             function updatePortEntry(){
                 var disabled = $("#node-config-input-port").prop("disabled");
                 if ($("#node-config-input-broker").val().indexOf("://") === -1){
@@ -381,15 +345,12 @@
             setTimeout(function() {
                 $("#node-config-input-protocolVersion").trigger("change");
             },50);
-
         },
         oneditsave: function() {
             if (!$("#node-config-input-usetls").is(':checked')) {
                 $("#node-config-input-tls").val("");
             }
             this.templates = geTemplateList();
-
-            console.log("Save", this.templates);
         }
     });
 })();
@@ -438,6 +399,8 @@
         return _metrics;
     }
 
+    let dt = ["Int8", "Int16", "Int32", "Int64", "Float", "Double", "Boolean" , "String", "Unknown"];
+
     RED.nodes.registerType('mqtt sparkplug device',{
         category: 'network',
         defaults: {
@@ -457,11 +420,13 @@
             return this.name||"Sparkplug Device";
         },
         oneditprepare: function() {
+            console.log("SET IT UP!!!");
             var that = this;
             // Setup model 
             var metricsList = $("#sparkplug-input-metric-container").editableList( {
                 header: $("<div>").append($.parseHTML("<div style='width:80%; display: inline-grid'>Name</div><div style='display: inline-grid'>Type</div>")),
                 addButton: "add",
+                sortable: true,
                 removable: true,
                 height: 300,
                 addItem: function(container,i,opt) {
@@ -481,7 +446,6 @@
                     }).appendTo(row);
                     var group0 = $('<optgroup/>', { label: "Datatypes" }).appendTo(selectField);
                     
-                    var dt = ["Int8", "Int16", "Int32", "Int64", "Float", "Double", "Boolean" , "String", "Unknown"];
                     dt.forEach(d => {
                         let option = $("<option></option>").val(d).text(d);
                         group0.append(option);
@@ -489,58 +453,36 @@
                             option.attr('selected','selected')
                         }
                     });
-
-                    
-
                     if (that.broker) {
-                        console.log("b", that.broker);
-
-                        var b = RED.nodes.node(that.broker);
-                        console.log("y", that.broker);
-
-                        if (true) { //b && b.useTemplates) {
-                            try {
-
-                                console.log("asasdasd templates");
-
-                                var group1 = $('<optgroup/>', { label: "Templates" }).appendTo(selectField);
-                                b.templates.forEach(t=> {
-                                    console.log("Templatexx");
-                                    var tv = JSON.parse(t);
-                                    tv.valid = true;
-                                    console.log("sss")
-                                    if (tv.valid) {
-                                        let option = $("<option></option>").val(tv.name).text(tv.name);
-                                        if (tv.name === opt.dataType) {
-                                            option.attr('selected','selected')
-                                        }
-
-                                        group1.append(option);
-                                    }else {
-                                        throw tv.error;
+                        try {
+                            var b = RED.nodes.node(that.broker);
+                            var group1 = $('<optgroup/>', { label: "Templates" }).appendTo(selectField);
+                            that.brokerConn.templates.forEach(t=> {
+                                var tv = JSON.parse(t);
+                                tv.valid = true; // TODO...
+                                if (tv.valid) {
+                                    let option = $("<option></option>").val(tv.name).text(tv.name);
+                                    if (tv.name === opt.dataType) {
+                                        option.attr('selected','selected')
                                     }
-                                })
+                                    group1.append(option);
+                                }else {
+                                    throw tv.error;
+                                }
+                            })
 
-                            }catch (e) {
-                                node.error(RED._("mqtt-sparkplug-plus.errors.unable-to-deserialize-templates", {error: analyseResult.error}));
-                            }
+                        }catch (e) {
+                            node.error(RED._("mqtt-sparkplug-plus.errors.unable-to-deserialize-templates", {error: analyseResult.error}));
                         }
-
                     }
-                    /*
-                    dt.forEach(d => {
-                        let option = $("<option></option>").val(d).text(d);
-                        group0.append(option);
-                        if (d === opt.dataType || (Object.keys(opt).length === 0 && d === "Int32")) {
-                            option.attr('selected','selected')
-                        }
-                    });*/
-
 
                 }
             });
+
+            if (this.broker) {
+                this.brokerConn = RED.nodes.node(this.broker);
+            }
             var metrics = this.metrics || {};
-       
             for (const [key, value] of Object.entries(metrics)) {
                 value["name"] = key;
                 metricsList.editableList('addItem', value)
