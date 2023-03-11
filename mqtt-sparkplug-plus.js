@@ -126,7 +126,6 @@ module.exports = function(RED) {
         RED.nodes.createNode(this,n);
         this.dataTypes = ["Int8", "Int16", "Int32", "Int64", "Float", "Double", "Boolean" , "String", "Unknown"],
 
-
         this.broker = n.broker;
         this.name = n.name||"Sparkplug Device";
         this.latestMetrics = {};
@@ -134,6 +133,7 @@ module.exports = function(RED) {
         this.birthMessageSend = false;
         this.birthImmediately = n.birthImmediately || false;
 
+        this.inflatedMetrics = {};
         this.shouldBuffer = true; // hardcoded / Devices always buffers
 
         if (typeof this.birthImmediately === 'undefined') {
@@ -145,9 +145,18 @@ module.exports = function(RED) {
          */
         this.trySendBirth = function(done) {    
             let readyToSend = Object.keys(this.metrics).every(m => this.latestMetrics.hasOwnProperty(m));
+
+            // Check that
+            let templates = Object.keys(this.metrics).filter(x => x.type == "Template");
+
+            templates.forEach((k) => {
+                let m = this.metrics[k];
+                // TODO CHECK...
+            });
+
             if (readyToSend) {
                 let birthMetrics = [];
-             
+                
                 for (const [key, value] of Object.entries(this.metrics)) {
                     const lv = Object.assign({}, this.latestMetrics[key]);
 
@@ -312,6 +321,7 @@ module.exports = function(RED) {
                 }
             }); // end input
 
+            
             //  Create "NULL" metrics if metrics should be sendt immediately
             if (this.birthImmediately) {
                 this.latestMetrics = {};
@@ -364,7 +374,7 @@ module.exports = function(RED) {
         this.compressAlgorithm = n.compressAlgorithm;
         this.aliasMetrics = n.aliasMetrics;
         this.useTemplates = true;
-        this.templates = n.templates||[];
+        this.templates = n.templates||"[]";
         // Config node state
         this.brokerurl = "";
         this.connected = false;
@@ -507,7 +517,7 @@ module.exports = function(RED) {
             return _result;
         }
 
-        this.templateToInstance = function(instanceName, template, refLoopCounter = 0) {
+       /* this.templateToInstance = function(instanceName, template, refLoopCounter = 0) {
             var _result = [];
 
             //FIXME: Make this nicer, make 100 a const and internationalization
@@ -543,7 +553,7 @@ module.exports = function(RED) {
                 _result.push(t);
             });
             return _result;
-        };
+        }; */
         
         this.cloneTemplate = function(template) {
 
@@ -610,13 +620,13 @@ module.exports = function(RED) {
             
             if (node.useTemplates) {
                 try {
-                    birthMessageMetrics = [this.getTemplates()];
+                    birthMessageMetrics = this.getTemplates();
                 } catch (e) {
                     node.error(RED._("mqtt-sparkplug-plus.errors.unable-to-deserialize-templates", {error: e.toString()}));
                 }
             }
             
-            console.log("Birth Metrics", birthMessageMetrics);
+            //console.log("Birth Metrics", birthMessageMetrics);
             birthMessageMetrics = birthMessageMetrics.concat([
                 {
                     "name" : "Node Control/Rebirth",
@@ -629,7 +639,7 @@ module.exports = function(RED) {
                     "value": 0,
                 }]);
 
-            console.log("x", birthMessageMetrics);
+            //console.log("x", birthMessageMetrics);
             var nbirth = node.createMsg("", "NBIRTH", birthMessageMetrics, x=>{});
             if (nbirth) {
                 node.publish(nbirth);
