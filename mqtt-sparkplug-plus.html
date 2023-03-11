@@ -98,7 +98,7 @@
                     <option value="DEFLATE">Deflate</option>
                     <option value="GZIP">Gzip</option>
                 </select>
-        </div>
+            </div>
 
             <!-- UI for Alias Metrics-->
             <div class="form-row">
@@ -358,6 +358,7 @@
 
 <!-- Sparkplug device -->
 <script type="text/html" data-template-name="mqtt sparkplug device">
+
     <div class="form-row">
         <label for="node-input-broker"><i class="fa fa-globe"></i> <span data-i18n="[placeholder]Broker">Broker</span></label>
         <input type="text" id="node-input-broker">
@@ -367,14 +368,30 @@
         <input type="text" id="node-input-name" data-i18n="[placeholder]mqtt-sparkplug-plus.placeholder.name">
     </div>
 
-    <div class="form-row sparkplug-input-metric-row" style="margin-bottom: 0px;">
-        <label><i class="fa fa-cubes"></i> <span data-i18n="mqtt-sparkplug-plus.label.metrics"></span></label>
+    <div class="form-row">
+        <ul style="min-width: 600px; margin-bottom: 20px;" id="node-mqtt-device-tabs"></ul>
     </div>
-    <div class="form-row sparkplug-input-metric-row" id="sparkplug-input-metric-container-row">
-        <ol id="sparkplug-input-metric-container"></ol>
-    </div>
+    <div id="node-mqtt-device-tabs-content" style="min-height:150px;">
+        <div id="mqtt-device-tab-metrics" style="display:none">                
+            <div class="form-row sparkplug-input-metric-row" id="sparkplug-input-metric-container-row">
+                <ol id="sparkplug-input-metric-container"></ol>
+            </div>
+        
+            <div class="form-tips"><span data-i18n="mqtt-sparkplug-plus.tip.device"></span></div>
+        </div>
 
-    <div class="form-tips"><span data-i18n="mqtt-sparkplug-plus.tip.device"></span></div>
+        <div id="mqtt-device-tab-advanced" style="display:none">
+             <!-- UI for birthImmediately-->
+            <div class="form-row">
+                <label for="node-input-birthImmediately" style="width:70%">
+                    <input type="checkbox" id="node-input-birthImmediately" style="display:inline-block; width:22px; vertical-align:top;"><span data-i18n="mqtt-sparkplug-plus.label.birthImmediately"></span>
+                </label>
+            </div>
+            <div class="form-tips"><span data-i18n="mqtt-sparkplug-plus.tip.birthImmediately"></span></div>
+            
+        </div>
+
+    </div>
 </script>
 
 <script type="text/javascript">
@@ -406,7 +423,8 @@
         defaults: {
             name: {value:"",  validate :x => /^[^/+#]*$/.test(x) },
             metrics: {value:{}, required:true, /*validate : x => Object.keys(x).length > 0*/ }, // do regex matching of invalid charaters (e.g. # or +)
-            broker: {type:"mqtt-sparkplug-broker", required:true}
+            broker: {type:"mqtt-sparkplug-broker", required:true},
+            birthImmediately: {value: false},
         },
        
         color:"#2181a6",
@@ -422,6 +440,25 @@
         oneditprepare: function() {
             console.log("SET IT UP!!!");
             var that = this;
+
+            var tabs = RED.tabs.create({
+                id: "node-mqtt-device-tabs",
+                onchange: function(tab) {
+                    $("#node-mqtt-device-tabs-content").children().hide();
+                    $("#" + tab.id).show();
+                }
+            });
+            tabs.addTab({
+                id: "mqtt-device-tab-metrics",
+                label: this._("mqtt-sparkplug-plus.tabs-label.metrics"),
+                iconClass: "fa fa-cubes",
+            });
+            tabs.addTab({
+                id: "mqtt-device-tab-advanced",
+                label: this._("mqtt-sparkplug-plus.tabs-label.advanced"),
+                iconClass: "fa fa-cog"
+            });
+
             // Setup model 
             var metricsList = $("#sparkplug-input-metric-container").editableList( {
                 header: $("<div>").append($.parseHTML("<div style='width:80%; display: inline-grid'>Name</div><div style='display: inline-grid'>Type</div>")),
