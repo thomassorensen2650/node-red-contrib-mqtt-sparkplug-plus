@@ -1065,15 +1065,19 @@ describe('mqtt sparkplug device node', function () {
 	it('should output DBIRTH and Metric when definition is passed in message', function (done) {
 
 		client = mqtt.connect(testBroker);
-
+		
 		client.on('connect', function () {
 			client.subscribe('#', function (err) {
 			  if (!err) {
 				helper.load(sparkplugNode, simpleFlow, function () {
 					try {
+						
 						n1 = helper.getNode("n1");
-						b1 = n1.brokerConn;
-
+						n1.on('call:error', call => {
+							// XXX
+							call.firstArg.should.eql("mqtt-sparkplug-plus.errors.payload-type-object")
+							done();
+						});
 						n1.receive({
 							"definition" : {
 								"TEST/TEST" : {
@@ -1086,45 +1090,38 @@ describe('mqtt sparkplug device node', function () {
 									"name" : "TEST/TEST",
 									"value" : 5
 								}]
-						}});
+						}}); 
 					}catch (e) {
 						done(e);
 					}
 				});
+				
 			  }
 			})
 		  });
 
 		client.on('message', function (topic, message) {
-		// Verify that we sent a DBirth Message to the broker
-		if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TEST2"){
-			var buffer = Buffer.from(message);
-			var payload = spPayload.decodePayload(buffer);
-			payload.should.have.property("timestamp").which.is.a.Number();
-			
-			payload.metrics.should.containDeep([
-				{ name: 'TEST/TEST', type: 'Int32', value: 5 },
+			// Verify that we sent a DBirth Message to the broker
+			if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TEST2"){
+				var buffer = Buffer.from(message);
+				var payload = spPayload.decodePayload(buffer);
+				payload.should.have.property("timestamp").which.is.a.Number();
+				
+				payload.metrics.should.containDeep([
+					{ name: 'TEST/TEST', type: 'Int32', value: 5 },
 				]);
-			done();
-			client.end();
-		}
+				
+				done();
+				//client.end();
+			}
 			/*n1.on('input', () => {
 				n1.error.should.be.calledWithExactly("Metrics should be an Array");
 				done();
 				});*/
-
-				
-
-			
-
-			n1.on('call:error', call => {
-				// XXX
-				call.firstArg.should.eql("mqtt-sparkplug-plus.errors.payload-type-object")
-				done();
-				});
+		});
 
 
-		}); // end helper
+		
 	}); // it end 
 	
 	it('should error when definition has invalid dataType', function (done) {
