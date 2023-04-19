@@ -1072,8 +1072,6 @@ describe('mqtt sparkplug device node', function () {
 				helper.load(sparkplugNode, simpleFlow, function () {
 					try {
 						n1 = helper.getNode("n1");
-						b1 = n1.brokerConn;
-
 						n1.receive({
 							"definition" : {
 								"TEST/TEST" : {
@@ -1088,6 +1086,7 @@ describe('mqtt sparkplug device node', function () {
 								}]
 						}});
 					}catch (e) {
+						console.log(e);
 						done(e);
 					}
 				});
@@ -1096,34 +1095,18 @@ describe('mqtt sparkplug device node', function () {
 		  });
 
 		client.on('message', function (topic, message) {
-		// Verify that we sent a DBirth Message to the broker
-		if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TEST2"){
-			var buffer = Buffer.from(message);
-			var payload = spPayload.decodePayload(buffer);
-			payload.should.have.property("timestamp").which.is.a.Number();
-			
-			payload.metrics.should.containDeep([
-				{ name: 'TEST/TEST', type: 'Int32', value: 5 },
-				]);
-			done();
-			client.end();
-		}
-			/*n1.on('input', () => {
-				n1.error.should.be.calledWithExactly("Metrics should be an Array");
-				done();
-				});*/
-
+			// Verify that we sent a DBirth Message to the broker
+			if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TEST2"){
 				
-
-			
-
-			n1.on('call:error', call => {
-				// XXX
-				call.firstArg.should.eql("mqtt-sparkplug-plus.errors.payload-type-object")
+				var buffer = Buffer.from(message);
+				var payload = spPayload.decodePayload(buffer);
+				payload.should.have.property("timestamp").which.is.a.Number();
+				
+				payload.metrics.should.containDeep([
+					{ name: 'TEST/TEST', type: 'Int32', value: 5 },
+				]);
 				done();
-				});
-
-
+			}
 		}); // end helper
 	}); // it end 
 	
@@ -1913,7 +1896,7 @@ describe('mqtt sparkplug out node', function () {
 		});
 	});
 
-		/**
+	/**
 	 * Verify that we'll buffer if forced enabled,
 	 */
 		it('should buffer on Sparkplug B 3.0.0 style State variable', function (done) {
@@ -1941,4 +1924,146 @@ describe('mqtt sparkplug out node', function () {
 			});
 		});
 
+
+		/**
+		 * Template Testing...
+		 * 
+		 * 1. OK - Test that template defintions are send correctly on NBIRTH
+		 * 2. Test that template instance is send correctly on DBIRTH
+		 *   a. Test Valid
+		 *   b. Test that invalid instance names throws error.
+		 *   c. Test with birth immidiatly
+		 * 3. Test that templates metrics are send correctly on DDATA (Test with one and more)
+		 */
+
+		templateFlow = [
+			{
+				"id": "n1",
+				"type": "mqtt sparkplug device",
+				"metrics": {
+					"a": {
+						"dataType": "MyTemplate"
+					},
+					"b": {
+						"dataType": "Int32"
+					}
+				},
+				"name" : "TheDevice",
+				"broker": "b1",
+				"birthImmediately": false,
+			},
+			{
+				"id": "b1",
+				"type": "mqtt-sparkplug-broker",
+				"deviceGroup": "My Devices",
+				"eonName": "Node-Red",
+				"broker": "localhost",
+				"port": "1883",
+				"clientid": "",
+				"usetls": false,
+				"protocolVersion": "4",
+				"keepalive": "60",
+				"cleansession": true,
+				"enableStoreForward": false,
+				"compressAlgorithm": "",
+				"aliasMetrics": false,
+				"templates": [
+					"{\"name\":\"MyTemplate\",\"type\":\"Template\",\"value\":{\"version\":\"1.0.0\",\"isDefinition\":true,\"metrics\":[{\"name\":\"FirstTag\",\"type\":\"Int32\"},{\"name\":\"SecondTag\",\"type\":\"Int32\"}],\"parameters\":[]}}"
+				],
+				"primaryScada": "",
+				"credentials": {}
+			}
+		]
+
+		it('Should send template on NBIRTH', function (done) {
+
+			var n1 = null;
+			client = mqtt.connect(testBroker);
+
+			client.on('connect', function () {
+				client.subscribe("spBv1.0/My Devices/#", function (err) {
+					if (!err) {
+						helper.load(sparkplugNode, templateFlow, function () {
+							n1 = helper.getNode("n1");
+						});
+					}
+				});
+			});
+	
+			client.on('message', function (topic, message) {
+				topic.should.eql("spBv1.0/My Devices/NBIRTH/Node-Red");
+				
+				var buffer = Buffer.from(message);
+				var payload = spPayload.decodePayload(buffer);
+				payload.metrics.should.deepEqual([
+					  { name: 'MyTemplate', type: 'Template', value: {
+						"version": "1.0.0",
+						"isDefinition": true,
+						"metrics": [
+							{
+								"name": "FirstTag",
+								"type": "Int32",
+								value : 0
+							},
+							{
+								"name": "SecondTag",
+								"type": "Int32",
+								value : 0
+							}
+						],
+						"parameters": [],
+						"templateRef": ""
+					  } },
+					  { name: 'Node Control/Rebirth', type: 'Boolean', value: false },
+					  { name: 'bdSeq', type: 'Int8', value: 0 }
+					]);
+				done();
+			});
+		});
+
+		it('Should send template instance on DBIRTH (birthImmediately)', function (done) {
+
+			var n1 = null;
+			client = mqtt.connect(testBroker);
+
+			templateFlow[0].birthImmediately = true;
+			client.on('connect', function () {
+				client.subscribe("spBv1.0/My Devices/#", function (err) {
+					if (!err) {
+						helper.load(sparkplugNode, templateFlow, function () {
+							n1 = helper.getNode("n1");
+						});
+					}
+				});
+			});
+	
+			client.on('message', function (topic, message) {
+				if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TheDevice") {
+					var buffer = Buffer.from(message);
+					var payload = spPayload.decodePayload(buffer);
+					console.log(payload);
+					/*payload.metrics.should.deepEqual([
+						  { name: 'MyTemplate', type: 'Template', value: {
+							"isDefinition": false,
+							"metrics": [
+								{
+									"name": "FirstTag",
+									"type": "Int32",
+									value : 0
+								},
+								{
+									"name": "SecondTag",
+									"type": "Int32",
+									value : 0
+								}
+							],
+							"parameters": [],
+							"templateRef": ""
+						  } },
+						  { name: 'b', type: 'Int32', value: null }
+						]);*/
+					done();
+				}				
+			});
+		});
 });

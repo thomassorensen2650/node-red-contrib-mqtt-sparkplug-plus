@@ -146,12 +146,13 @@ module.exports = function(RED) {
         this.trySendBirth = function(done) {    
             let readyToSend = Object.keys(this.metrics).every(m => this.latestMetrics.hasOwnProperty(m));
 
-            // Check that
-            let templates = Object.keys(this.metrics).filter(x => x.type == "Template");
-
+            // Process all templates.........
+            let templates = Object.keys(this.metrics).filter(x => this.dataTypes.indexOf(this.metrics[x].dataType) == -1);
             templates.forEach((k) => {
-                let m = this.metrics[k];
+                console.log(k);
+                let m = JSON.parse(JSON.stringify(this.metrics[k])); // Clone object..
                 // TODO CHECK...
+                console.log("Template", m);
             });
 
             if (readyToSend) {
@@ -374,7 +375,7 @@ module.exports = function(RED) {
         this.compressAlgorithm = n.compressAlgorithm;
         this.aliasMetrics = n.aliasMetrics;
         this.useTemplates = true;
-        this.templates = n.templates||"[]";
+        this.templates = n.templates||[];
         // Config node state
         this.brokerurl = "";
         this.connected = false;
@@ -513,7 +514,7 @@ module.exports = function(RED) {
         }
 
         this.getTemplates = function() {
-            var _result = JSON.parse(this.templates);
+            var _result = this.templates.map(m=>JSON.parse(m));
             return _result;
         }
 
@@ -624,9 +625,7 @@ module.exports = function(RED) {
                 } catch (e) {
                     node.error(RED._("mqtt-sparkplug-plus.errors.unable-to-deserialize-templates", {error: e.toString()}));
                 }
-            }
-            
-            //console.log("Birth Metrics", birthMessageMetrics);
+            }            
             birthMessageMetrics = birthMessageMetrics.concat([
                 {
                     "name" : "Node Control/Rebirth",
@@ -639,7 +638,6 @@ module.exports = function(RED) {
                     "value": 0,
                 }]);
 
-            //console.log("x", birthMessageMetrics);
             var nbirth = node.createMsg("", "NBIRTH", birthMessageMetrics, x=>{});
             if (nbirth) {
                 node.publish(nbirth);

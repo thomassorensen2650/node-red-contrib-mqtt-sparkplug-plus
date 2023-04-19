@@ -439,6 +439,7 @@
         },
         oneditprepare: function() {
             console.log("SET IT UP!!!");
+            console.log("Thius", this);
             var that = this;
 
             var tabs = RED.tabs.create({
@@ -498,7 +499,7 @@
                                 var tv = JSON.parse(t);
                                 tv.valid = true; // TODO...
                                 if (tv.valid) {
-                                    let option = $("<option></option>").val(tv.name).text(tv.name);
+                                    let option = $("<option></option>").val("_"+tv.name).text(tv.name);
                                     if (tv.name === opt.dataType) {
                                         option.attr('selected','selected')
                                     }
