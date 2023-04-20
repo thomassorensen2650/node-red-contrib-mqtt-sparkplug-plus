@@ -99,8 +99,11 @@ describe('mqtt sparkplug device node', function () {
 				payload.should.have.property("timestamp").which.is.a.Number();
 				payload.metrics.should.containDeep([
 					{ name: 'Node Control/Rebirth', type: 'Boolean', value: false },
-					{ name: 'bdSeq', type: 'Int8', value: 0 }
+					{ name: 'bdSeq', type: 'UInt64' } // We don't check nmber
 				 ]);
+				 payload.metrics[1].value.low.should.eql(0);
+				 payload.metrics[1].value.high.should.eql(0);
+				 payload.metrics[1].value.unsigned.should.eql(true);
 				payload.should.have.property("seq").which.is.eql(0);
 				done();
 				client.end();
@@ -389,6 +392,80 @@ describe('mqtt sparkplug device node', function () {
 		});
 
 	}); // it end 
+
+	// Should end DDEATH message
+	it('should send NDEATH messages', function (done) {
+
+		client = mqtt.connect(testBroker);
+		var initBirthDone = false;
+		var deathSend = false;
+		let n1;
+		let b1;
+		client.on('connect', function () {
+			client.subscribe('#', function (err) {
+			  if (!err) {
+				helper.load(sparkplugNode, simpleFlow, function () {
+					try {
+						n1 = helper.getNode("n1");
+						b1 = n1.brokerConn;
+
+						// Send all metrics to trigger DBIRTH
+						n1.receive({
+							"payload" : {
+								"metrics": [
+									{
+										"name": "test",
+										"value": 11,
+									},
+									{
+										"name": "test2",
+										"value": 11
+									}
+								]}
+							}
+						);
+					}catch (e) {
+						done(e);
+					}
+				});
+			  }
+			})
+		  });
+		  var expectedBd = 0;
+		  client.on('message', function (topic, message) {
+			
+			if (topic === "spBv1.0/My Devices/NBIRTH/Node-Red") {
+				var buffer = Buffer.from(message);
+				var payload = spPayload.decodePayload(buffer);
+
+				// Check that bdSeq in inceased every time we reconnect
+				// this is a Long.js object. Not sure why this is a long? but its according to specs.
+				payload.metrics[1].value.low.should.eql(expectedBd);
+				payload.metrics[1].value.high.should.eql(0);
+
+				// Force Disconnect
+				b1.deregister(n1);
+			} else if (topic === "spBv1.0/My Devices/NDEATH/Node-Red"){
+				var buffer = Buffer.from(message);
+				var payload = spPayload.decodePayload(buffer);
+
+				// Check that bdSeq in inceased every time we reconnect
+				payload.metrics[0].value.low.should.eql(expectedBd);
+				payload.metrics[0].value.high.should.eql(0);
+
+				if (expectedBd == 5) {
+					done();
+				}
+				expectedBd++;
+
+
+				// Force Reconnect
+				b1.register(n1);
+			}
+		});
+
+	}); // it end 
+
 
 	it('should send REBIRTH messages', function (done) {
 		client = mqtt.connect(testBroker);
