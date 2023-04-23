@@ -369,11 +369,8 @@ module.exports = function(RED) {
         this.connecting = false;
         this.closing = false;
         this.options = {};
-     
         this.subscriptions = {};
-
         this.bdSeq = 0;
-
         this.seq = 0;
 
         this.maxQueueSize = 100000;
