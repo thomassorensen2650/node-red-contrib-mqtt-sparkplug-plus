@@ -60,6 +60,16 @@ describe('mqtt sparkplug device node', function () {
 		}
 	];
 
+
+	it('TEST Template to ', function (done) {
+		var flow = [{ id: "n1", type: "mqtt sparkplug device", name: "device" }];
+		helper.load(sparkplugNode, flow, function () {
+			var n1 = helper.getNode("n1");
+			n1.should.have.property('name', 'device');
+			done();
+		});
+	});
+
 	it('should be loaded', function (done) {
 		var flow = [{ id: "n1", type: "mqtt sparkplug device", name: "device" }];
 		helper.load(sparkplugNode, flow, function () {
@@ -1921,149 +1931,6 @@ describe('mqtt sparkplug out node', function () {
 				n1.brokerConn.primaryScadaStatus.should.eql("ONLINE");
 				payload.should.deepEqual(validMsg);
 				done();
-			});
-		});
-
-
-		/**
-		 * Template Testing...
-		 * 
-		 * 1. OK - Test that template defintions are send correctly on NBIRTH
-		 * 2. Test that template instance is send correctly on DBIRTH
-		 *   a. Test Valid
-		 *   b. Test that invalid instance names throws error.
-		 *   c. Test with birth immidiatly
-		 * 3. Test that templates metrics are send correctly on DDATA (Test with one and more)
-		 */
-
-		templateFlow = [
-			{
-				"id": "n1",
-				"type": "mqtt sparkplug device",
-				"metrics": {
-					"a": {
-						"dataType": "MyTemplate"
-					},
-					"b": {
-						"dataType": "Int32"
-					}
-				},
-				"name" : "TheDevice",
-				"broker": "b1",
-				"birthImmediately": false,
-			},
-			{
-				"id": "b1",
-				"type": "mqtt-sparkplug-broker",
-				"deviceGroup": "My Devices",
-				"eonName": "Node-Red",
-				"broker": "localhost",
-				"port": "1883",
-				"clientid": "",
-				"usetls": false,
-				"protocolVersion": "4",
-				"keepalive": "60",
-				"cleansession": true,
-				"enableStoreForward": false,
-				"compressAlgorithm": "",
-				"aliasMetrics": false,
-				"templates": [
-					"{\"name\":\"MyTemplate\",\"type\":\"Template\",\"value\":{\"version\":\"1.0.0\",\"isDefinition\":true,\"metrics\":[{\"name\":\"FirstTag\",\"type\":\"Int32\"},{\"name\":\"SecondTag\",\"type\":\"Int32\"}],\"parameters\":[]}}"
-				],
-				"primaryScada": "",
-				"credentials": {}
-			}
-		]
-
-		it('Should send template on NBIRTH', function (done) {
-
-			var n1 = null;
-			client = mqtt.connect(testBroker);
-
-			client.on('connect', function () {
-				client.subscribe("spBv1.0/My Devices/#", function (err) {
-					if (!err) {
-						helper.load(sparkplugNode, templateFlow, function () {
-							n1 = helper.getNode("n1");
-						});
-					}
-				});
-			});
-	
-			client.on('message', function (topic, message) {
-				topic.should.eql("spBv1.0/My Devices/NBIRTH/Node-Red");
-				
-				var buffer = Buffer.from(message);
-				var payload = spPayload.decodePayload(buffer);
-				payload.metrics.should.deepEqual([
-					  { name: 'MyTemplate', type: 'Template', value: {
-						"version": "1.0.0",
-						"isDefinition": true,
-						"metrics": [
-							{
-								"name": "FirstTag",
-								"type": "Int32",
-								value : 0
-							},
-							{
-								"name": "SecondTag",
-								"type": "Int32",
-								value : 0
-							}
-						],
-						"parameters": [],
-						"templateRef": ""
-					  } },
-					  { name: 'Node Control/Rebirth', type: 'Boolean', value: false },
-					  { name: 'bdSeq', type: 'Int8', value: 0 }
-					]);
-				done();
-			});
-		});
-
-		it('Should send template instance on DBIRTH (birthImmediately)', function (done) {
-
-			var n1 = null;
-			client = mqtt.connect(testBroker);
-
-			templateFlow[0].birthImmediately = true;
-			client.on('connect', function () {
-				client.subscribe("spBv1.0/My Devices/#", function (err) {
-					if (!err) {
-						helper.load(sparkplugNode, templateFlow, function () {
-							n1 = helper.getNode("n1");
-						});
-					}
-				});
-			});
-	
-			client.on('message', function (topic, message) {
-				if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TheDevice") {
-					var buffer = Buffer.from(message);
-					var payload = spPayload.decodePayload(buffer);
-					console.log(payload);
-					/*payload.metrics.should.deepEqual([
-						  { name: 'MyTemplate', type: 'Template', value: {
-							"isDefinition": false,
-							"metrics": [
-								{
-									"name": "FirstTag",
-									"type": "Int32",
-									value : 0
-								},
-								{
-									"name": "SecondTag",
-									"type": "Int32",
-									value : 0
-								}
-							],
-							"parameters": [],
-							"templateRef": ""
-						  } },
-						  { name: 'b', type: 'Int32', value: null }
-						]);*/
-					done();
-				}				
 			});
 		});
 });

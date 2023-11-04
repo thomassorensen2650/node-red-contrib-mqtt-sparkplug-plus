@@ -139,6 +139,33 @@ module.exports = function(RED) {
         if (typeof this.birthImmediately === 'undefined') {
             this.birthImmediately = false;
         }
+        var node = this;
+
+
+        // inflatedMetrics
+
+        /** 
+        this.templateToTags = function(rootName, t) {
+           // Validate Template
+           isMetricTemplate = (x) => false;
+
+           // 2. check if template has a parent
+
+           // 3. Extract Metrics
+           m = [];
+           //
+           t.value.metrics.forEach(x=> {
+                n = rootName + "/" + x.name;
+                if (isMetricTemplate(x)) {
+                    // Add Child Tags (TODO: Recursive loops ??)
+                    m.concat(templateToTags(n , x))
+                }else {
+                    x.name = n;
+                    m.push(x);
+                }
+                return m;
+           })
+        } */
         /**
          * try to send Sparkplug DBirth Messages
          * @param {function} done Node-Red Done Function 
@@ -152,7 +179,7 @@ module.exports = function(RED) {
                 console.log(k);
                 let m = JSON.parse(JSON.stringify(this.metrics[k])); // Clone object..
                 // TODO CHECK...
-                console.log("Template", m);
+                console.log("Template not serialized", m);
             });
 
             if (readyToSend) {
@@ -187,7 +214,7 @@ module.exports = function(RED) {
         }
 
         this.brokerConn = RED.nodes.getNode(this.broker);
-        var node = this;
+     
         if (this.brokerConn) {
             this.on("input",function(msg,send,done) {
                 // Handle Command
@@ -518,78 +545,6 @@ module.exports = function(RED) {
             return _result;
         }
 
-       /* this.templateToInstance = function(instanceName, template, refLoopCounter = 0) {
-            var _result = [];
-
-            //FIXME: Make this nicer, make 100 a const and internationalization
-            if (refLoopCounter > 100) {
-                throw "Reference loop detected in template hierarchy";
-            }
-
-            // Analyse templte to make sure its valid
-            //FIXME: Hardcoded
-            var analyseResult = {
-                valid: true, // BAD BAD BAD... fixme
-                error: "All good"
-            };
-
-            if (!analyseResult.valid) {
-                node.error(RED._("mqtt-sparkplug-plus.errors.unable-to-deserialize-templates", {error: analyseResult.error}));
-                return _result;
-            }
-            // Clone template
-            var templateMetrics = JSON.parse(JSON.stringify(template.value.metrics));
-
-            // FIXME: need to Add support for inheritence
-            
-            templateMetrics.forEach(t => {
-                if (t.type == "Template") {
-
-                    // Find Template
-                    t.name = instanceName + "/" + t.name;
-                    var subTemplate = this.getTemplateByName(template.value.templateRef);
-                    _subMetrics = this.templateToInstance(t.name, subTemplate, ++refLoopCounter)
-                    _result = _result.concat(_subMetrics);
-                }
-                _result.push(t);
-            });
-            return _result;
-        }; */
-        
-        this.cloneTemplate = function(template) {
-
-            var _metrics = [];
-            // first verify Template is valid
-            //var result = this.verifyTemplate();
-
-            var result = {
-                valid: true // BAD... fixme
-            };
-            // Clone objec
-            var templateMetrics = JSON.parse(JSON.stringify(template.value.metrics));
-
-            if (result.valid) {
-                templateMetrics.forEach(m => {
-                    if (m.type != "Template") {
-                        m.name = template.name + "/" + m.name;
-                        _metrics.push(m);
-                    } else {
-                        // Its a embedded template
-                        var eTemplate = ""; // FIXME;
-                        //1L: Find the template
-                        console.log("Crap, not implemtend yet!!!");
-                        //2:
-                        _metrics = _metrics.concat(this.getTemplateAsMetrics(eTemplate));
-                    }
-                })
-                
-            } else {
-                // FIXME Er
-                console.log("LORT!!!")
-            }
-            return _metrics;
-            
-        }
         /**
          * 
          * @returns node death payload and topic
@@ -655,6 +610,7 @@ module.exports = function(RED) {
             this.username = this.credentials.user;
             this.password = this.credentials.password;
         }
+
 
         // If the config node is missing certain options (it was probably deployed prior to an update to the node code),
         // select/generate sensible options for the new fields
