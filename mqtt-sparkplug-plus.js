@@ -144,7 +144,10 @@ module.exports = function(RED) {
          */
         this.trySendBirth = function(done) {    
             let readyToSend = Object.keys(this.metrics).every(m => this.latestMetrics.hasOwnProperty(m));
-            if (readyToSend) {
+
+            // Don't send birth if no metrics. we can assume that a dynamic defintion will be send if on metrics are defined.
+            let hasMetrics = Object.keys(this.metrics).length > 0;
+            if (readyToSend && hasMetrics) {
                 let birthMetrics = [];
              
                 for (const [key, value] of Object.entries(this.metrics)) {

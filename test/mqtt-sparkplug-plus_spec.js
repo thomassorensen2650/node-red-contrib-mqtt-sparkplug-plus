@@ -219,6 +219,59 @@ describe('mqtt sparkplug device node', function () {
 	}); // it end 
 
 
+	it('should not send DBirth if no metrics', function (done) {
+
+		flow = JSON.parse(JSON.stringify(simpleFlow)); 
+		flow[0].metrics = {}; // N
+
+		Object.keys(flow[0].metrics).length.should.eql(0);
+
+		client = mqtt.connect(testBroker);
+		let n1;
+		let b1;
+		client.on('connect', function () {
+			client.subscribe('#', function (err) {
+			  if (!err) {
+				helper.load(sparkplugNode, flow, function () {
+					try {
+						n1 = helper.getNode("n1");
+						b1 = n1.brokerConn;
+
+						n1.receive({
+							"payload" : {
+								"metrics": [
+									{
+										"name": "test",
+										"value": 11
+									},
+									{
+										"name": "test2",
+										"value": 11
+									}
+								]}
+							}
+						);
+					}catch (e) {
+						console.log("Whats going on");
+						done(e);
+					}
+				});
+			  }
+			})
+		  });
+
+		client.on('message', function (topic, message) {
+			topic.should.not.eql("spBv1.0/My Devices/DBIRTH/Node-Red/TEST2")
+			
+			setTimeout(function() {
+				done();
+			  }, 500);
+		});
+
+	}); // it end 
+
+
+
 	it('should not birth when metrics missing and  birthImmediately = false', function (done) {
 		client = mqtt.connect(testBroker);
 		let n1;
