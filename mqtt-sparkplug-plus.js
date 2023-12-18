@@ -35,6 +35,14 @@ module.exports = function(RED) {
         return payload.uuid === compressed ? sparkplugDecode(decompressPayload(payload)) : payload;
     };
 
+    function returnAliasName(payload) {
+        let metricsAliasName = this.context().get("metricsAliasName");
+        payload.metrics.forEach(metric => {
+            metric.name = metricsAliasName[metric.alias.low.toString()];
+        })
+        return payload;
+    };
+
     /**
      * Function will compress the payload and return the compressed payload as a new object.
      * @param {object} payload The payload that should be compressed
@@ -496,6 +504,7 @@ module.exports = function(RED) {
 
         this.nextMetricAlias = 0;
         this.metricsAliasMap = {};
+        this.metricsAliasName = {};
         /**
          * Convert metric names to metric aliases. 
          * This method expect that the metrics attribute name exists
@@ -507,10 +516,12 @@ module.exports = function(RED) {
                 }
                 var alias = node.metricsAliasMap[metric.name];
                 if (msgType != "NBIRTH" && msgType != "DBIRTH") {
+                    node.metricsAliasName[metric.alias] = metric.name;
                     delete metric.name;
                 }
                 metric.alias = alias;
             });
+            this.context().set("metricsAliasName", node.metricsAliasName);
         }
 
         /**
