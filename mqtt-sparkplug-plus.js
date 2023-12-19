@@ -15,6 +15,7 @@
  **/
 
 const { encodePayload } = require("sparkplug-payload/lib/sparkplugbpayload");
+import { Buffer } from "buffer";
 
 module.exports = function(RED) {
     "use strict";
@@ -394,6 +395,10 @@ module.exports = function(RED) {
                 var item = this.queue.shift();
                 let count = 0;
                 while (item && node.primaryScadaStatus === "ONLINE" && node.connected) {
+
+                    if(!Buffer.isBuffer(item.payload))   {
+                        item.payload = Buffer.from(item.payload.data)
+                    }
 
                     node.publish(item, true);
                     item = this.queue.shift();
