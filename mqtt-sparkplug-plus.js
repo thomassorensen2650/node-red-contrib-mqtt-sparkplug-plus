@@ -15,7 +15,6 @@
  **/
 
 const { encodePayload } = require("sparkplug-payload/lib/sparkplugbpayload");
-import { Buffer } from "buffer";
 
 module.exports = function(RED) {
     "use strict";
