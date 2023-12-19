@@ -28,7 +28,7 @@ module.exports = function(RED) {
 
     /**
      * Try to decompress the payload if if compressed uuid is set on the payload
-     * @param {object} payload 
+     * @param {object} payload
      * @returns {object} payload
      */
     function maybeDecompressPayload(payload) {
@@ -49,12 +49,12 @@ module.exports = function(RED) {
             "uuid" : compressed,
             body : null,
             metrics : [ {
-                "name" : "algorithm", 
-                "value" : algorithm.toUpperCase(), 
+                "name" : "algorithm",
+                "value" : algorithm.toUpperCase(),
                 "type" : "string"
             } ]
         };
-     
+
         switch(algorithm) {
             case "DEFLATE":
                 resultPayload.body = pako.deflate(encodePayload(payload));
@@ -69,11 +69,11 @@ module.exports = function(RED) {
     };
 
     /**
-     * 
+     *
      * @param {object} payload the compressed payload (payload should NOT be protobuf encoded)
      * @throws Will throw an error unable to decompress
      * @returns {object} the decoded payload
-     * 
+     *
      */
     function decompressPayload(payload) {
          // Inflate will auto detect compression algorithm via the header.
@@ -82,7 +82,7 @@ module.exports = function(RED) {
 
     /**
      * Sparkplug Encode Payload
-     * @param {object} payload object to encode 
+     * @param {object} payload object to encode
      * @returns a sparkplug B encoded Buffer
      */
     function sparkplugEncode(payload) {
@@ -102,9 +102,9 @@ module.exports = function(RED) {
         }
         return spPayload.encodePayload(payload);
     }
-        
+
     /**
-     * 
+     *
      * @param {Number[]} payload Sparkplug B encoded Payload
      * @returns {Object} decoded JSON object
      */
@@ -140,16 +140,16 @@ module.exports = function(RED) {
         }
         /**
          * try to send Sparkplug DBirth Messages
-         * @param {function} done Node-Red Done Function 
+         * @param {function} done Node-Red Done Function
          */
-        this.trySendBirth = function(done) {    
+        this.trySendBirth = function(done) {
             let readyToSend = Object.keys(this.metrics).every(m => this.latestMetrics.hasOwnProperty(m));
 
             // Don't send birth if no metrics. we can assume that a dynamic defintion will be send if on metrics are defined.
             let hasMetrics = Object.keys(this.metrics).length > 0;
             if (readyToSend && hasMetrics) {
                 let birthMetrics = [];
-             
+
                 for (const [key, value] of Object.entries(this.metrics)) {
                     const lv = Object.assign({}, this.latestMetrics[key]);
 
@@ -160,7 +160,7 @@ module.exports = function(RED) {
                 }
                 let bMsg = node.brokerConn.createMsg(this.name, "DBIRTH", birthMetrics, f => {});
                 if(bMsg) {
-                    this.brokerConn.publish(bMsg, !this.shouldBuffer, done);  // send the message 
+                    this.brokerConn.publish(bMsg, !this.shouldBuffer, done);  // send the message
                     this.birthMessageSend = true;
                 }
             }
@@ -168,12 +168,12 @@ module.exports = function(RED) {
 
         /**
          * Send DDeath message
-         * @param {function} done Node-Red Done Function 
+         * @param {function} done Node-Red Done Function
          */
         this.sendDDeath = function(done) {
             let dMsg = node.brokerConn.createMsg(this.name, "DDEATH", [], x=>{});
             if(dMsg) {
-                this.brokerConn.publish(dMsg, !this.shouldBuffer, done);  // send the message 
+                this.brokerConn.publish(dMsg, !this.shouldBuffer, done);  // send the message
                 this.birthMessageSend = false;
             }
         }
@@ -187,7 +187,7 @@ module.exports = function(RED) {
                     if (msg.command.hasOwnProperty("device")) {
                         if (msg.command.device.rebirth) {
                             if (this.birthMessageSend) {
-                                this.sendDDeath();    
+                                this.sendDDeath();
                             }
                             this.trySendBirth();
                         }
@@ -201,9 +201,9 @@ module.exports = function(RED) {
                 }
 
                 let validPayload = msg.hasOwnProperty("payload") && typeof msg.payload === 'object' && msg.payload !== null && !Array.isArray(msg.payload);
-                
+
                 if (msg.hasOwnProperty("definition")) {
-                
+
                     // Verify that all metric definitions are correct
                     let definitionValid = typeof msg.definition === 'object' && msg.definition !== null && !Array.isArray(msg.definition);
                     if (definitionValid) {
@@ -238,28 +238,28 @@ module.exports = function(RED) {
                         this.latestMetrics = newMetric;
 
                         if (this.birthMessageSend) {
-                            
+
                             this.sendDDeath();
-                            
-                            // if there are no payload, then see if we can send a new birth message with the latest 
+
+                            // if there are no payload, then see if we can send a new birth message with the latest
                             // data, otherwise we'll try to send after the values have been updated
                             if (!validPayload) {
                                 this.trySendBirth();
                             }
-                        } 
+                        }
                     }
                 }
-                    
+
                 if (validPayload) {
-                 
+
                     if (msg.payload.hasOwnProperty("metrics") && Array.isArray(msg.payload.metrics)) {
                         let _metrics = [];
                         msg.payload.metrics.forEach(m => {
-                            
+
                             if (!m.hasOwnProperty("name")){
                                 this.warn(RED._("mqtt-sparkplug-plus.errors.missing-attribute-name"));
                             } else if (this.metrics.hasOwnProperty(m.name)) {
-                               
+
                                 if (!m.hasOwnProperty("value")) {
                                     //m.is_null = true;
                                     m.value = null; // the Sparkplug-payload module will create the isNull property
@@ -273,14 +273,14 @@ module.exports = function(RED) {
                                 // Type must be send on every message per the specicications (not sure why)
                                 // We already know then type, so lets append it if it not already there
                                 if (!m.hasOwnProperty("type")) {
-                                    m.type = this.metrics[m.name].dataType; 
+                                    m.type = this.metrics[m.name].dataType;
                                 }
-                                
+
                                 // We dont know how long it will take or when REBIRTH will be send
                                 // so always include timewstamp in DBIRTH messages
                                 this.latestMetrics[m.name] = JSON.parse(JSON.stringify(m));
                                 if (!this.latestMetrics[m.name].hasOwnProperty("timestamp")) {
-                                    this.latestMetrics[m.name].timestamp = new Date().getTime(); // We dont know when DBIRTH will be send, so force a timetamp in metric 
+                                    this.latestMetrics[m.name].timestamp = new Date().getTime(); // We dont know when DBIRTH will be send, so force a timetamp in metric
                                 }
                                 _metrics.push(m);
                             }else {
@@ -288,26 +288,21 @@ module.exports = function(RED) {
                             }
                         });
 
-                        if (!this.brokerConn.connected) {
-                            // we dont want to publish anything if we are not connected
-                            // if we publish here, then the messages will be queued by the MQTT Client
-                            // and we need NBIRTH to be seq 0
-                        }
-                        else if (!this.birthMessageSend) {    // Send DBIRTH
+                        if (!this.birthMessageSend) {    // Send DBIRTH
                             this.trySendBirth(done);
                         }else if (_metrics.length > 0) { // SEND DDATA
                             let dMsg = this.brokerConn.createMsg(this.name, "DDATA", _metrics, f => {});
                             if (dMsg) {
-                                this.brokerConn.publish(dMsg, !this.shouldBuffer, done); 
+                                this.brokerConn.publish(dMsg, !this.shouldBuffer, done);
                             }
                         }
-                    }else 
+                    }else
                     {
                         node.error(RED._("mqtt-sparkplug-plus.errors.device-no-metrics"));
                         done();
                     }
                 } else {
-                    if (!msg.hasOwnProperty("definition") && !msg.hasOwnProperty("command")) { // Its ok there are no payload if we set the metric definition 
+                    if (!msg.hasOwnProperty("definition") && !msg.hasOwnProperty("command")) { // Its ok there are no payload if we set the metric definition
                         node.error(RED._("mqtt-sparkplug-plus.errors.payload-type-object"));
                     }
                     done();
@@ -322,7 +317,7 @@ module.exports = function(RED) {
                 });
             }
             node.brokerConn.register(node);
-            
+
             // Handle DCMD Messages
             let options = { qos: 0 };
             let subscribeTopic = `spBv1.0/${this.brokerConn.deviceGroup}/DCMD/${this.brokerConn.eonName}/${this.name}`;
@@ -362,7 +357,7 @@ module.exports = function(RED) {
         this.protocolVersion = n.protocolVersion;
         this.keepalive = n.keepalive;
         this.cleansession = n.cleansession;
-        
+
         this.compressAlgorithm = n.compressAlgorithm;
         this.aliasMetrics = n.aliasMetrics;
 
@@ -399,7 +394,7 @@ module.exports = function(RED) {
                 var item = this.queue.shift();
                 let count = 0;
                 while (item && node.primaryScadaStatus === "ONLINE" && node.connected) {
-                    
+
                     node.publish(item, true);
                     item = this.queue.shift();
 
@@ -408,11 +403,11 @@ module.exports = function(RED) {
                         await new Promise(resolve => setTimeout(resolve, 250));
                     }
                 }
-            } 
+            }
         };
 
         this.setConnectionState = function(node, state) {
-        
+
             switch(state) {
                 case "CONNECTED":
                     node.status({fill:"green",shape:"dot",text:"node-red:common.status.connected"});
@@ -455,7 +450,7 @@ module.exports = function(RED) {
         /**
          * Create a sparkplug b complient message
          * @param {string} deviceName the name of the device (leave blank for EoN messages)
-         * @param {string} msgType the message type (DBIRTH, DDATA) 
+         * @param {string} msgType the message type (DBIRTH, DDATA)
          * @param {*} metrics The metrics to include in the payload
          * @returns a encoded sparkplug B message
          */
@@ -467,7 +462,7 @@ module.exports = function(RED) {
                 topic : topic,
                 payload : {
                     timestamp : new Date().getTime(),
-                    seq : that.nextSeq(), 
+                    seq : that.nextSeq(),
                     metrics : metrics
                 }
             };
@@ -485,25 +480,25 @@ module.exports = function(RED) {
             }
 
             try {
-                msg.payload = sparkplugEncode(msg.payload); 
+                msg.payload = sparkplugEncode(msg.payload);
             }catch (e) {
                 that.error(RED._("mqtt-sparkplug-plus.errors.unable-to-encode-message", {type : msgType, error: e.toString()}));
                 done(e);
                 return null;
             }
-            return msg;   
+            return msg;
         };
 
         this.nextMetricAlias = 0;
         this.metricsAliasMap = {};
         /**
-         * Convert metric names to metric aliases. 
+         * Convert metric names to metric aliases.
          * This method expect that the metrics attribute name exists
          */
         this.addAliasMetrics = function(msgType, metrics) {
             metrics.forEach(metric => {
                 if (!node.metricsAliasMap.hasOwnProperty(metric.name)) {
-                    node.metricsAliasMap[metric.name] = ++node.nextMetricAlias;  
+                    node.metricsAliasMap[metric.name] = ++node.nextMetricAlias;
                 }
                 var alias = node.metricsAliasMap[metric.name];
                 if (msgType != "NBIRTH" && msgType != "DBIRTH") {
@@ -514,13 +509,13 @@ module.exports = function(RED) {
         }
 
         /**
-         * 
+         *
          * @returns node death payload and topic
          */
         this.getDeathPayload = function() {
             let metric = [ {
-                    name : "bdSeq", 
-                    value : this.bdSeq, 
+                    name : "bdSeq",
+                    value : this.bdSeq,
                     type : "uint64"
                 }];
             return node.createMsg("", "NDEATH", metric,  x=>{});
@@ -553,7 +548,7 @@ module.exports = function(RED) {
                     }
                 }
             }
-           
+
         }
 
         if (this.credentials) {
@@ -651,7 +646,7 @@ module.exports = function(RED) {
         this.options.keepalive = this.keepalive;
         this.options.clean = this.cleansession;
         this.options.reconnectPeriod = RED.settings.mqttReconnectTime||5000;
-     
+
         if (this.usetls && n.tls) {
             var tlsNode = RED.nodes.getNode(n.tls);
             if (tlsNode) {
@@ -665,8 +660,8 @@ module.exports = function(RED) {
         if (typeof this.options.rejectUnauthorized === 'undefined') {
             this.options.rejectUnauthorized = (this.verifyservercert == "true" || this.verifyservercert === true);
         }
-        
-        
+
+
         // Define functions called by MQTT Devices
         var node = this;
         this.users = {};
@@ -674,10 +669,10 @@ module.exports = function(RED) {
         /**
          * Register a mqttNode to. This will ensure that this object can communcate with
          * clients (e.g for REBIRTH commands)
-         * @param {object} mqttNode 
+         * @param {object} mqttNode
          */
         this.register = function(mqttNode) {
-            
+
             node.users[mqttNode.id] = mqttNode;
             let state = node.connected ? "CONNECTED" : "DISCONNECTED";
             node.setConnectionState(mqttNode, state);
@@ -688,8 +683,8 @@ module.exports = function(RED) {
 
         /**
          * Deregister a client
-         * @param {object} mqttNode 
-         * @param {function} done 
+         * @param {object} mqttNode
+         * @param {function} done
          * @returns void
          */
         this.deregister = function(mqttNode,done) {
@@ -766,7 +761,7 @@ module.exports = function(RED) {
                         node.subscribe(subscribeTopic,options,function(topic_,payload_,packet) {
                             node.handleNCMD(payload_);
                         });
- 
+
                         // Subscribe to Primary SCADA status if store forward is enabled.
                         if (node.enableStoreForward === true) {
                             let options = { qos: 0 };
@@ -797,7 +792,7 @@ module.exports = function(RED) {
                                     node.warn("Invalid Primary SCADA State:" + payload)
                                     node.primaryScadaStatus = "OFFLINE";
                                 }
-                                
+
                                 for (var id in node.users) {
                                     if (node.users.hasOwnProperty(id)) {
                                         let state = node.enableStoreForward && node.primaryScadaStatus === "OFFLINE"  && node.users[id].shouldBuffer === true ? "BUFFERING" : "CONNECTED";
@@ -862,14 +857,14 @@ module.exports = function(RED) {
                     payload.metrics.forEach(m => {
                         if (typeof m === 'object' && m.hasOwnProperty("name") && m.name) {
                             if (m.name.toLowerCase() === "node control/rebirth") {
-                                
+
                                 let bMsg = this.getDeathPayload();
                                 if(bMsg) {
-                                    node.publish(bMsg, !this.shouldBuffer, f => {});  // send the message 
+                                    node.publish(bMsg, !this.shouldBuffer, f => {});  // send the message
                                 }
 
                                 node.sendBirth();
-                            }else 
+                            }else
                             {
                                 node.warn(`NCMD command ${m.name} is not supported`);
                             }
@@ -890,10 +885,10 @@ module.exports = function(RED) {
         this.subid = 1;
         /**
          * Subscribe to a MQTT Topic
-         * @param {string} topic the topic to subscribe to 
+         * @param {string} topic the topic to subscribe to
          * @param {object} options objects for the subsribtion
-         * @param {function} callback a function that will be called when new data comes in 
-         * @param {*} ref 
+         * @param {function} callback a function that will be called when new data comes in
+         * @param {*} ref
          */
         this.subscribe = function (topic,options,callback,ref) {
             ref = ref||0;
@@ -939,8 +934,8 @@ module.exports = function(RED) {
 
         /**
          * Unsubscribe from topic
-         * @param {string} topic 
-         * @param {object} ref 
+         * @param {string} topic
+         * @param {object} ref
          * @param {*} removed not used ()
          */
         this.unsubscribe = function (topic, ref, removed) {
@@ -967,14 +962,14 @@ module.exports = function(RED) {
                 // _debug += "sub not found! "; //TODO: remove
             }
             // node.debug(_debug); //TODO: remove
-            
+
         };
 
         /**
-         * 
-         * @param {object} msg 
-         * @param {function} done 
-         * @param {boolean} bypassQueue 
+         *
+         * @param {object} msg
+         * @param {function} done
+         * @param {boolean} bypassQueue
          */
         this.publish = function (msg, bypassQueue, done) {
 
@@ -992,7 +987,7 @@ module.exports = function(RED) {
                     qos: msg.qos || 0,
                     retain: msg.retain || false
                 };
-    
+
                 node.client.publish(msg.topic, msg.payload, options, function(err) {
                     done && done(err);
                     return;
@@ -1034,15 +1029,15 @@ module.exports = function(RED) {
 
     /**
      * MQTT In node subscribes to MQTT Topics and output them to Node-Red as messages
-     * @param {object} n node 
-     * @returns 
+     * @param {object} n node
+     * @returns
      */
     function MQTTInNode(n) {
         RED.nodes.createNode(this,n);
         this.topic = n.topic;
         this.qos = parseInt(n.qos);
         this.name = n.name;
-        
+
         this.shouldBuffer = false; // hardcoded as in node will never write
 
         if (isNaN(this.qos) || this.qos < 0 || this.qos > 2) {
@@ -1061,7 +1056,7 @@ module.exports = function(RED) {
                 let options = { qos: this.qos };
 
                 this.brokerConn.subscribe(this.topic,options, function(topic,payload,packet) {
-                    
+
                     // Decode Payload
                     try {
                         payload = maybeDecompressPayload(sparkplugDecode(payload));
@@ -1071,7 +1066,7 @@ module.exports = function(RED) {
                     } catch (e) {
                         node.error(RED._("mqtt-sparkplug-plus.errors.unable-to-decode-message", {type : "", error: e.toString()}));
                     }
-                    
+
                 }, this.id);
             }
             else {
@@ -1096,11 +1091,11 @@ module.exports = function(RED) {
         this.retain = n.retain;
         this.broker = n.broker;
         this.shouldBuffer = false; // hardcoded - buffering NCMD/DCMD is a bad idea... if we enable, then it shnould come with a big warning.
-        
+
         this.brokerConn = RED.nodes.getNode(this.broker);
         var node = this;
 
-        if (this.brokerConn) {            
+        if (this.brokerConn) {
             this.on("input",function(msg,send,done) {
 
                 // abort if not connected and node is not configured to buffer
@@ -1134,7 +1129,7 @@ module.exports = function(RED) {
                         }
 
                         try {
-                            msg.payload =  sparkplugEncode(msg.payload); 
+                            msg.payload =  sparkplugEncode(msg.payload);
                             this.brokerConn.publish(msg, !this.shouldBuffer, done);  // send the message
                         } catch (e) {
                             done(e);
