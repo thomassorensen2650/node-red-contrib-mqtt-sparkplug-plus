@@ -401,6 +401,7 @@ module.exports = function(RED) {
 
                     node.publish(item, true);
                     item = this.queue.shift();
+                    this.context().set("queue", this.queue);
 
                     // Slow down queue empty
                     if (++count % 500 === 0) {
@@ -999,11 +1000,13 @@ module.exports = function(RED) {
             } else {
                 if (node.queue.length === node.maxQueueSize) {
                     node.queue.shift();
+                    node.context().set("queue", node.queue);
                     //console.log("Queue Size", node.queue.length);
                 }else if (node.queue.length  === node.maxQueueSize-1) {
                     node.warn(RED._("mqtt-sparkplug-plus.errors.buffer-full"));
                 }
                 node.queue.push(msg);
+                node.context().set("queue", node.queue);
                 done && done();
             }
         };
