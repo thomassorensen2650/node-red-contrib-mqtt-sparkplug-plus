@@ -53,15 +53,13 @@ Example sending DataSet:
 ```javascript
 msg.payload = {
     "metrics": [
-       {
-    "metrics": [
         {
             "name": "a",
             "value": {
                 "numOfColumns": 2,
                 "types": [
-                    "string",
-                    "string"
+                    "String",
+                    "String"
                 ],
                 "columns": [
                     "Col1",
@@ -79,8 +77,6 @@ msg.payload = {
                 ]
             }
         }
-    ]
-}
     ]
 }
 ```
