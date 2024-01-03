@@ -101,7 +101,6 @@ describe('mqtt sparkplug out node', function () {
 		});
 
 		client.on('message', function (topic, message) {
-			console.log("Call");
 			var buffer = Buffer.from(message);
 			var payload = spPayload.decodePayload(buffer);
 			n1.brokerConn.primaryScadaStatus.should.eql("OFFLINE");
@@ -131,7 +130,6 @@ describe('mqtt sparkplug out node', function () {
 		});
 
 		client.on('message', function (topic, message) {
-			console.log("A")
 			var buffer = Buffer.from(message);
 			var payload = spPayload.decodePayload(buffer);
 			n1.brokerConn.primaryScadaStatus.should.eql("ONLINE");
