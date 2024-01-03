@@ -277,7 +277,6 @@ module.exports = function(RED) {
 
                                 // Extra validation of DataSet Types
                                 if (m.type == "DataSet" && m.value != null) {
-                                    
                                     if (false == (m.value.hasOwnProperty("types") && Array.isArray(m.value.types))) {
                                         node.warn(RED._("mqtt-sparkplug-plus.errors.invalid-metric-data", { "name" : m.name, "error" : "Value does not contain a types array"}));
                                     }
@@ -286,8 +285,12 @@ module.exports = function(RED) {
                                     }
                                     else if (m.value.columns.length !== m.value.types.length) {
                                         node.warn(RED._("mqtt-sparkplug-plus.errors.invalid-metric-data", { "name" : m.name, "error" : "size of types and columns array does not match"}));
-                                    }else if (m.value.hasOwnProperty("numOfColumns") && m.value.numOfColumns !== m.value.columns.length) {
+                                    }
+                                    else if (m.value.hasOwnProperty("numOfColumns") && m.value.numOfColumns !== m.value.columns.length) {
                                         node.warn(RED._("mqtt-sparkplug-plus.errors.invalid-metric-data", { "name" : m.name, "error" : "numOfColumns does not match the size of the columns"}));
+                                    }
+                                    if (!m.value.hasOwnProperty("numOfColumns")) {
+                                        m.value.numOfColumns = m.value.columns.length;
                                     }
                                 }
                                 
