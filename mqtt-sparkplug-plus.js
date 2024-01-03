@@ -100,10 +100,9 @@ module.exports = function(RED) {
                 });
             }
         }
-        console.log(payload);
         return spPayload.encodePayload(payload);
     }
-data        
+    
     /**
      * 
      * @param {Number[]} payload Sparkplug B encoded Payload
@@ -274,6 +273,22 @@ data
                                 // We already know then type, so lets append it if it not already there
                                 if (!m.hasOwnProperty("type")) {
                                     m.type = this.metrics[m.name].dataType; 
+                                }
+
+                                // Extra validation of DataSet Types
+                                if (m.type == "DataSet" && m.value != null) {
+                                    
+                                    if (false == (m.value.hasOwnProperty("types") && Array.isArray(m.value.types))) {
+                                        node.warn(RED._("mqtt-sparkplug-plus.errors.invalid-metric-data", { "name" : m.name, "error" : "Value does not contain a types array"}));
+                                    }
+                                    else if (false === m.value.hasOwnProperty("columns") && Array.isArray(m.value.columns)) {
+                                        node.warn(RED._("mqtt-sparkplug-plus.errors.invalid-metric-data", { "name" : m.name, "error" : "Value does not contain a columns array"}));
+                                    }
+                                    else if (m.value.columns.length !== m.value.types.length) {
+                                        node.warn(RED._("mqtt-sparkplug-plus.errors.invalid-metric-data", { "name" : m.name, "error" : "size of types and columns array does not match"}));
+                                    }else if (m.value.hasOwnProperty("numOfColumns") && m.value.numOfColumns !== m.value.columns.length) {
+                                        node.warn(RED._("mqtt-sparkplug-plus.errors.invalid-metric-data", { "name" : m.name, "error" : "numOfColumns does not match the size of the columns"}));
+                                    }
                                 }
                                 
                                 // We dont know how long it will take or when REBIRTH will be send
