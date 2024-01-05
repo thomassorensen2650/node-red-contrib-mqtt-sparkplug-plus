@@ -184,6 +184,13 @@ module.exports = function(RED) {
                 // Handle Command
                 if (msg.hasOwnProperty("command")) {
                     if (msg.command.hasOwnProperty("device")) {
+                        if (msg.command.device.rename) {
+                            if (this.birthMessageSend) {
+                                this.sendDDeath();
+                            }
+                            node.name = msg.command.device.rename;
+                            this.trySendBirth();
+                        }
                         if (msg.command.device.rebirth) {
                             if (this.birthMessageSend) {
                                 this.sendDDeath();    
