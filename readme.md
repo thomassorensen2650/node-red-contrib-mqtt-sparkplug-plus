@@ -139,6 +139,18 @@ msg = {
     }   
 ```
 
+Commands can also be used to rename a device. If a birth has already been send for the device, then a rebirth will be issued.
+
+Device Rename Example:
+```javascript    
+msg = {
+    "command" : {
+        "device" : {
+            "rename" : "NEW_NAME"
+        }
+    }   
+```
+
 ## mqtt sparkplug in
 The *mqtt sparkplug in* node makes it possible to subscribe to sparkplug b mqtt topics. The node is almost identical to the default node-red *mqtt in* node, but it will decode the sparkplug/protobuf messages and deliver them in json.
 
