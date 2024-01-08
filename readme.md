@@ -49,6 +49,38 @@ msg.payload = {
 }
 ```
 
+Example sending DataSet:
+```javascript
+msg.payload = {
+    "metrics": [
+        {
+            "name": "a",
+            "value": {
+                "numOfColumns": 2,
+                "types": [
+                    "String",
+                    "String"
+                ],
+                "columns": [
+                    "Col1",
+                    "OtherCol"
+                ],
+                "rows": [
+                    [
+                        "a",
+                        "A"
+                    ],
+                    [
+                        "v",
+                        "B"
+                    ]
+                ]
+            }
+        }
+    ]
+}
+```
+
 ### Dynamic metric definitions
 
 Metrics definitions should normally be setup via the UI, but in some cases its beneficial to configure the metrics via code. This can be done by configuring the metrics using the `msg.definition` attribute.
@@ -107,6 +139,18 @@ msg = {
     }   
 ```
 
+Commands can also be used to rename a device. If a birth has already been send for the device, then a rebirth will be issued.
+
+Device Rename Example:
+```javascript    
+msg = {
+    "command" : {
+        "device" : {
+            "rename" : "NEW_NAME"
+        }
+    }   
+```
+
 ## mqtt sparkplug in
 The *mqtt sparkplug in* node makes it possible to subscribe to sparkplug b mqtt topics. The node is almost identical to the default node-red *mqtt in* node, but it will decode the sparkplug/protobuf messages and deliver them in json.
 
@@ -134,3 +178,6 @@ The easiest way to get started is to start with the example that is provided wit
 3. Configure the name (this will be the name used in the messages) and the metrics
 4. Configure upstream node-red nodes to send metrics data to the **mqtt sparkplug device** 
 5. Configure downstream node-red nodes to handle NCMDs (write commands)
+
+# Contributions
+Contributions are welcome. Please discuss new features before creating PR, and please try to add unit test for new features if possible.

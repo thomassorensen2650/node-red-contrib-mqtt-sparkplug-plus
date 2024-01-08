@@ -1,3 +1,8 @@
+### 1.4.1: Maintenance Release
+
+ Fixed:
+- bdSeq now acts per v3 spec.
+
 ### 1.4.0: Maintenance Release
 
  New:

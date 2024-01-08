@@ -484,6 +484,9 @@
                     }).appendTo(row);
                     var group0 = $('<optgroup/>', { label: "Datatypes" }).appendTo(selectField);
                     
+
+                    var dt = ["Int8", "Int16", "Int32", "Int64", "Float", "Double", "Boolean" , "String", , "DataSet", "Unknown"];
+
                     dt.forEach(d => {
                         let option = $("<option></option>").val(d).text(d);
                         group0.append(option);

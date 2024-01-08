@@ -103,7 +103,7 @@ module.exports = function(RED) {
         }
         return spPayload.encodePayload(payload);
     }
-        
+    
     /**
      * 
      * @param {Number[]} payload Sparkplug B encoded Payload
@@ -125,6 +125,7 @@ module.exports = function(RED) {
     function MQTTSparkplugDeviceNode(n) {
         RED.nodes.createNode(this,n);
         this.dataTypes = ["Int8", "Int16", "Int32", "Int64", "Float", "Double", "Boolean" , "String", "Unknown"],
+
 
         this.broker = n.broker;
         this.name = n.name||"Sparkplug Device";
@@ -172,16 +173,6 @@ module.exports = function(RED) {
          */
         this.trySendBirth = function(done) {    
             let readyToSend = Object.keys(this.metrics).every(m => this.latestMetrics.hasOwnProperty(m));
-
-            // Process all templates.........
-            let templates = Object.keys(this.metrics).filter(x => this.dataTypes.indexOf(this.metrics[x].dataType) == -1);
-            templates.forEach((k) => {
-                console.log(k);
-                let m = JSON.parse(JSON.stringify(this.metrics[k])); // Clone object..
-                // TODO CHECK...
-                console.log("Template not serialized", m);
-            });
-
             if (readyToSend) {
                 let birthMetrics = [];
                 
@@ -220,6 +211,13 @@ module.exports = function(RED) {
                 // Handle Command
                 if (msg.hasOwnProperty("command")) {
                     if (msg.command.hasOwnProperty("device")) {
+                        if (msg.command.device.rename) {
+                            if (this.birthMessageSend) {
+                                this.sendDDeath();
+                            }
+                            node.name = msg.command.device.rename;
+                            this.trySendBirth();
+                        }
                         if (msg.command.device.rebirth) {
                             if (this.birthMessageSend) {
                                 this.sendDDeath();    
@@ -309,6 +307,25 @@ module.exports = function(RED) {
                                 // We already know then type, so lets append it if it not already there
                                 if (!m.hasOwnProperty("type")) {
                                     m.type = this.metrics[m.name].dataType; 
+                                }
+
+                                // Extra validation of DataSet Types
+                                if (m.type == "DataSet" && m.value != null) {
+                                    if (false == (m.value.hasOwnProperty("types") && Array.isArray(m.value.types))) {
+                                        node.warn(RED._("mqtt-sparkplug-plus.errors.invalid-metric-data", { "name" : m.name, "error" : "Value does not contain a types array"}));
+                                    }
+                                    else if (false === m.value.hasOwnProperty("columns") && Array.isArray(m.value.columns)) {
+                                        node.warn(RED._("mqtt-sparkplug-plus.errors.invalid-metric-data", { "name" : m.name, "error" : "Value does not contain a columns array"}));
+                                    }
+                                    else if (m.value.columns.length !== m.value.types.length) {
+                                        node.warn(RED._("mqtt-sparkplug-plus.errors.invalid-metric-data", { "name" : m.name, "error" : "size of types and columns array does not match"}));
+                                    }
+                                    else if (m.value.hasOwnProperty("numOfColumns") && m.value.numOfColumns !== m.value.columns.length) {
+                                        node.warn(RED._("mqtt-sparkplug-plus.errors.invalid-metric-data", { "name" : m.name, "error" : "numOfColumns does not match the size of the columns"}));
+                                    }
+                                    if (!m.value.hasOwnProperty("numOfColumns")) {
+                                        m.value.numOfColumns = m.value.columns.length;
+                                    }
                                 }
                                 
                                 // We dont know how long it will take or when REBIRTH will be send
@@ -409,9 +426,8 @@ module.exports = function(RED) {
         this.connecting = false;
         this.closing = false;
         this.options = {};
-     
         this.subscriptions = {};
-
+        this.bdSeq = 0;
         this.seq = 0;
 
         this.maxQueueSize = 100000;
@@ -478,6 +494,17 @@ module.exports = function(RED) {
             }
             return this.seq++;
         };
+
+        /**
+         * @returns the next birth sequence number
+         */
+        this.nextBdseq = function() {
+            if (this.bdSeq > 255) {
+                this.bdSeq = 0;
+            }
+            return this.bdSeq++;
+        };
+
 
         /**
          * Create a sparkplug b complient message
@@ -550,21 +577,12 @@ module.exports = function(RED) {
          * @returns node death payload and topic
          */
         this.getDeathPayload = function() {
-            let payload = {
-                timestamp : new Date().getTime(),
-                metric : [ {
+            let metric = [ {
                     name : "bdSeq", 
-                    value : 0, 
+                    value : this.bdSeq, 
                     type : "uint64"
-                }]
-            };
-            let msg = {
-                topic : `spBv1.0/${this.deviceGroup}/NDEATH/${this.eonName}`,
-                payload : sparkplugEncode(payload),
-                qos : 0,
-                retain : false
-            };
-            return msg;
+                }];
+            return node.createMsg("", "NDEATH", metric,  x=>{});
         };
 
         /**
@@ -589,10 +607,9 @@ module.exports = function(RED) {
                 },
                 {
                     "name" : "bdSeq",
-                    "type" : "Int8",
-                    "value": 0,
+                    "type" : "uint64",
+                    "value": this.bdSeq,
                 }]);
-
             var nbirth = node.createMsg("", "NBIRTH", birthMessageMetrics, x=>{});
             if (nbirth) {
                 node.publish(nbirth);
@@ -716,7 +733,7 @@ module.exports = function(RED) {
         if (typeof this.options.rejectUnauthorized === 'undefined') {
             this.options.rejectUnauthorized = (this.verifyservercert == "true" || this.verifyservercert === true);
         }
-        this.options.will = this.getDeathPayload();
+        
         
         // Define functions called by MQTT Devices
         var node = this;
@@ -772,6 +789,7 @@ module.exports = function(RED) {
             if (!node.connected && !node.connecting) {
                 node.connecting = true;
                 try {
+                    node.options.will = this.getDeathPayload();
                     node.serverProperties = {};
                     node.client = mqtt.connect(node.brokerurl ,node.options);
                     node.client.setMaxListeners(0);
@@ -859,12 +877,13 @@ module.exports = function(RED) {
                         }
                         // Send Node Birth
                         node.sendBirth();
+                        node.nextBdseq(); // Next connect will use next bdSeq
                     });
 
                     node.client.on("reconnect", function() {
                         for (var id in node.users) {
                             if (node.users.hasOwnProperty(id)) {
-                                node.setConnectionState(node.users[id], "RECONNECT");
+                                node.setConnectionState(node.users[id], "RECONNECTING");
                             }
                         }
                     });
@@ -912,7 +931,7 @@ module.exports = function(RED) {
                         if (typeof m === 'object' && m.hasOwnProperty("name") && m.name) {
                             if (m.name.toLowerCase() === "node control/rebirth") {
                                 
-                                let bMsg = node.createMsg("", "NDEATH", [], f => {});
+                                let bMsg = this.getDeathPayload();
                                 if(bMsg) {
                                     node.publish(bMsg, !this.shouldBuffer, f => {});  // send the message 
                                 }
