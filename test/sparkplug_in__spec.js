@@ -82,7 +82,6 @@ describe('mqtt sparkplug in node', function () {
 						client.publish(testMsg.topic, testMsg.payload);
 					}
 					} catch(err) {
-						console.log("Error");
 					  done(err);
 					}
 				  });
@@ -122,7 +121,6 @@ describe('mqtt sparkplug in node', function () {
 						client.publish(testMsg.topic, compressedPayload);
 					}
 					} catch(err) {
-						console.log("Error");
 					  done(err);
 					}
 				  });
@@ -162,7 +160,6 @@ describe('mqtt sparkplug in node', function () {
 						client.publish(testMsg.topic, compressedPayload);
 					}
 					} catch(err) {
-						console.log("Error");
 					  done(err);
 					}
 				  });
@@ -197,14 +194,12 @@ describe('mqtt sparkplug in node', function () {
 					try {
 					msg.should.have.property('payload');
 					if (msg.payload.seq === 200) {
-						console.log(payload);
 						done();
 					}else {
 						// Nasty hack, to make sure we publish after node is online. 
 						client.publish("spBv1.0/My Devices/DDATA/Node-Red/TEST2", compressedPayload);
 					}
 					} catch(err) {
-						console.log("Error");
 					  done(err);
 					}
 				  });

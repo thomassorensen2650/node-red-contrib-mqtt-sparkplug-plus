@@ -14,7 +14,9 @@
  * limitations under the License.
  **/
 
+const { connect } = require("http2");
 const { encodePayload } = require("sparkplug-payload/lib/sparkplugbpayload");
+//const { sparkplugtemplate } = require("sparkplug-template")
 
 module.exports = function(RED) {
     "use strict";
@@ -90,12 +92,10 @@ module.exports = function(RED) {
         // Verify that all metrics have a type (if people copy message from e.g. MQTT.FX, then the variable is not called type)
         if (payload.hasOwnProperty("metrics")) {
             if (!Array.isArray(payload.metrics)) {
-                console.log("xx", payload.metrics);
                 throw RED._("mqtt-sparkplug-plus.errors.metrics-not-array");
             } else {
                 payload.metrics.forEach(met => {
                     if (!met.hasOwnProperty("type")) {
-                        console.log("missing", met);
                         throw RED._("mqtt-sparkplug-plus.errors.unable-to-encode-message", { type : "", error :  "Unable to encode message, all metrics must have a 'type' Attribute" });
                     }
                 });
@@ -142,40 +142,18 @@ module.exports = function(RED) {
         }
         var node = this;
 
-
-        // inflatedMetrics
-
-        /** 
-        this.templateToTags = function(rootName, t) {
-           // Validate Template
-           isMetricTemplate = (x) => false;
-
-           // 2. check if template has a parent
-
-           // 3. Extract Metrics
-           m = [];
-           //
-           t.value.metrics.forEach(x=> {
-                n = rootName + "/" + x.name;
-                if (isMetricTemplate(x)) {
-                    // Add Child Tags (TODO: Recursive loops ??)
-                    m.concat(templateToTags(n , x))
-                }else {
-                    x.name = n;
-                    m.push(x);
-                }
-                return m;
-           })
-        } */
-        /**
+   /**
          * try to send Sparkplug DBirth Messages
          * @param {function} done Node-Red Done Function 
          */
         this.trySendBirth = function(done) {    
             let readyToSend = Object.keys(this.metrics).every(m => this.latestMetrics.hasOwnProperty(m));
-            if (readyToSend) {
+
+            // Don't send birth if no metrics. we can assume that a dynamic defintion will be send if on metrics are defined.
+            let hasMetrics = Object.keys(this.metrics).length > 0;
+            if (readyToSend && hasMetrics) {
                 let birthMetrics = [];
-                
+            
                 for (const [key, value] of Object.entries(this.metrics)) {
                     const lv = Object.assign({}, this.latestMetrics[key]);
 
@@ -231,6 +209,24 @@ module.exports = function(RED) {
                         }
 
                     };
+                    if (msg.command.hasOwnProperty("EoN")) {
+
+                        if (msg.command.EoN.rename) {
+                            if (this.brokerConn.connected) {
+                                let msg = this.brokerConn.getDeathPayload();
+                                this.brokerConn.publish(msg, false);
+                            }
+                            this.brokerConn.eonName = msg.command.EoN.rename;
+                            this.brokerConn.sendBirth();
+                        }
+
+                        if (msg.command.EoN.connect) {
+                            if (!this.brokerConn.connected) {
+                                this.brokerConn.manualEoNBirth = false;
+                                this.brokerConn.connect();
+                            }
+                        }
+                    }
                 }
 
                 let validPayload = msg.hasOwnProperty("payload") && typeof msg.payload === 'object' && msg.payload !== null && !Array.isArray(msg.payload);
@@ -404,13 +400,12 @@ module.exports = function(RED) {
 
         this.name = n.name||"Sparkplug Node";
         this.deviceGroup = n.deviceGroup||"Sparkplug Devices";
-        this.eonName = n.eonName||RED._("mqtt-sparkplug-plus.placeholder.eonname"),
+        this.eonName = n.eonName||RED._("mqtt-sparkplug-plus.placeholder.eonname");
         // Configuration options passed by Node Red
         this.broker = n.broker;
         this.port = n.port;
         this.clientid = n.clientid;
         this.usetls = n.usetls;
-        this.usews = n.usews;
         this.verifyservercert = n.verifyservercert;
         this.protocolVersion = n.protocolVersion;
         this.keepalive = n.keepalive;
@@ -429,6 +424,8 @@ module.exports = function(RED) {
         this.subscriptions = {};
         this.bdSeq = 0;
         this.seq = 0;
+
+        this.manualEoNBirth = n.manualEoNBirth||false,
 
         this.maxQueueSize = 100000;
         // Get information about store forward
@@ -479,6 +476,9 @@ module.exports = function(RED) {
                     break;
                 case "BUFFERING": // Online´
                     node.status({fill:"blue",shape:"dot",text:"destination offline"});
+                    break;
+                case "WAITING_CONNECT": // Online´
+                    node.status({fill:"gray",shape:"dot",text:"awaiting connect command"});
                     break;
                 default:
                     node.status({fill:"gray",shape:"dot",text:state}); // Unknown State
@@ -634,9 +634,6 @@ module.exports = function(RED) {
         if (typeof this.usetls === 'undefined') {
             this.usetls = false;
         }
-        if (typeof this.usews === 'undefined') {
-            this.usews = false;
-        }
         if (typeof this.verifyservercert === 'undefined') {
             this.verifyservercert = false;
         }
@@ -747,7 +744,8 @@ module.exports = function(RED) {
         this.register = function(mqttNode) {
             
             node.users[mqttNode.id] = mqttNode;
-            let state = node.connected ? "CONNECTED" : "DISCONNECTED";
+            let state = node.manualEoNBirth ? "WAITING_CONNECT" : node.connected ? "CONNECTED" : "DISCONNECTED";
+            
             node.setConnectionState(mqttNode, state);
             if (Object.keys(node.users).length === 1) {
                 node.connect();
@@ -786,6 +784,9 @@ module.exports = function(RED) {
          * Connect to the MQTT Broker
          */
         this.connect = function () {
+            if (node.manualEoNBirth === true) {
+                return;
+            }
             if (!node.connected && !node.connecting) {
                 node.connecting = true;
                 try {
@@ -1068,7 +1069,6 @@ module.exports = function(RED) {
             } else {
                 if (node.queue.length === node.maxQueueSize) {
                     node.queue.shift();
-                    //console.log("Queue Size", node.queue.length);
                 }else if (node.queue.length  === node.maxQueueSize-1) {
                     node.warn(RED._("mqtt-sparkplug-plus.errors.buffer-full"));
                 }

@@ -56,29 +56,17 @@
                 <label for="node-config-input-keepalive"><i class="fa fa-heartbeat"></i> <span data-i18n="mqtt-sparkplug-plus.label.keepalive"></span></label>
                 <input type="number" min="0" id="node-config-input-keepalive" style="width: 100px">
             </div>
-            <!--
-            <div class="form-row" style="margin-bottom:0">
-                <label style="vertical-align:top;"><i class="fa fa-info"></i> <span data-i18n="mqtt-sparkplug-plus.label.session"></span></label>
-                <div style="display: inline-block; width:calc(100% - 110px)">
-                    <div class="form-row">
-                        <label for="node-config-input-cleansession" style="width: auto;">
-                            <input type="checkbox" id="node-config-input-cleansession" style="position: relative;vertical-align: bottom; top: -2px; width: 15px;height: 15px;">
-                            <span id="node-config-input-cleansession-label" data-i18n="mqtt-sparkplug-plus.label.cleansession"></span>
-                        </label>
-                    </div>
-                </div>
-            </div>
-            
-            <br>-->
         </div>
-        <div id="mqtt-broker-tab-advanced" style="display:none">
+       <!-- <div id="mqtt-broker-tab-advanced" style="display:none">
+     
+        
             <div class="form-row node-config-input-templates-container-row" style="margin-bottom: 0px;">
                 <label><i class="fa fa-cubes"></i> <span data-i18n="mqtt-sparkplug-plus.label.templates"></span></label>
             </div>
             <div class="form-row node-config-input-templates-container-row" id="node-config-input-templates-container-row">
                 <ol id="node-config-input-templates-container"></ol>
             </div>
-        </div>
+        </div> -->
          <div id="mqtt-broker-tab-sparkplug" style="display:none">
             <div class="form-row">
                 <label for="node-config-input-eonName"><i class="fa fa-tag"></i> <span data-i18n="mqtt-sparkplug-plus.label.name"></span></label>
@@ -106,7 +94,11 @@
                 <input type="checkbox" id="node-config-input-aliasMetrics" style="display:inline-block; width:22px; vertical-align:top;"><span data-i18n="mqtt-sparkplug-plus.label.aliasMetrics"></span>
             </label>
             </div>
-
+            <div class="form-row">
+                <label for="node-config-input-manualEoNBirth" style="width:70%">
+                    <input type="checkbox" id="node-config-input-manualEoNBirth" style="display:inline-block; width:22px; vertical-align:top;"><span data-i18n="mqtt-sparkplug-plus.label.manualEoNBirth"></span>
+                </label>
+            </div>
             <!-- Add UI for Store forward -->
             <div class="form-row">
                 <label for="node-config-input-enableStoreForward" style="width:70%">
@@ -184,6 +176,8 @@
             aliasMetrics : {value: false},
             useTemplates : {value: true},
             templates : {value: ""},
+            manualEoNBirth : {value: false},
+            
 
             primaryScada: {value:"",  validate :x =>  !$("#node-config-input-enableStoreForward").is(":checked") || /^[^/+#]+$/.test(x) },
         },
@@ -225,11 +219,11 @@
                 iconClass: "fa fa-plug"
             });
 
-            tabs.addTab({
+           /* tabs.addTab({
                 id: "mqtt-broker-tab-advanced",
                 label: this._("mqtt-sparkplug-plus.tabs-label.advanced"),
                 iconClass: "fa fa-cog"
-            });
+            });*/
 
             // Setup Templates !!!
             var templateList = $("#node-config-input-templates-container").editableList( {
@@ -295,9 +289,16 @@
                     selectField.typedInput('value',useDefaultTemplate ? JSON.stringify(defaultTemplate) : JSON.stringify(opt));
                 }
             });
-            this.templates.forEach(t => {
-                templateList.editableList('addItem', JSON.parse(t));
+            if (this.templates) {
+                this.templates.forEach(t => {
+                    templateList.editableList('addItem', JSON.parse(t));
+                });
+            }
+          
+            $("#node-config-input-manualEoNBirth").on('change',function() {
+                $("#node-config-input-eonName").prop("disabled", $(this).is(":checked"));
             });
+                    
 
             this.cleansession = true;
             $("#node-storeforward-line").hide();
@@ -438,8 +439,7 @@
             return this.name||"Sparkplug Device";
         },
         oneditprepare: function() {
-            console.log("SET IT UP!!!");
-            console.log("Thius", this);
+
             var that = this;
 
             var tabs = RED.tabs.create({
@@ -468,6 +468,7 @@
                 removable: true,
                 height: 300,
                 addItem: function(container,i,opt) {
+         
                     var parent = container.parent();
                     var row = $("<div/>").addClass("sparkplug-input-metric").appendTo(container);
                     var fmoduleSpan = $("<span>").appendTo(row);
@@ -477,16 +478,14 @@
                         type: "text"
                     }).css({
                     }).appendTo(fmoduleSpan).val(opt.name);
-
+                   
                     var selectField = $('<select/>',{
                         style:"width:110px; margin-left: 5px; text-align: center;",
                         class : "sparkplug-input-metric-dateType"
                     }).appendTo(row);
                     var group0 = $('<optgroup/>', { label: "Datatypes" }).appendTo(selectField);
-                    
-
-                    var dt = ["Int8", "Int16", "Int32", "Int64", "Float", "Double", "Boolean" , "String", , "DataSet", "Unknown"];
-
+                    var dt = ["Int8", "Int16", "Int32", "Int64", "Float", "Double", "Boolean", "String", "DataSet", "Unknown"];
+                
                     dt.forEach(d => {
                         let option = $("<option></option>").val(d).text(d);
                         group0.append(option);
@@ -494,11 +493,14 @@
                             option.attr('selected','selected')
                         }
                     });
-                    if (that.broker) {
+
+                    // Load metrics if any defined
+                    if (that.brokerConn.templates) {
                         try {
-                            var b = RED.nodes.node(that.broker);
+                            //var b = RED.nodes.node(that.broker);
                             var group1 = $('<optgroup/>', { label: "Templates" }).appendTo(selectField);
-                            that.brokerConn.templates.forEach(t=> {
+                            if (that.brokerConn.templates) {
+                                that.brokerConn.templates.forEach(t=> {
                                 var tv = JSON.parse(t);
                                 tv.valid = true; // TODO...
                                 if (tv.valid) {
@@ -510,13 +512,12 @@
                                 }else {
                                     throw tv.error;
                                 }
-                            })
-
+                                }) 
+                            }
                         }catch (e) {
                             node.error(RED._("mqtt-sparkplug-plus.errors.unable-to-deserialize-templates", {error: analyseResult.error}));
                         }
                     }
-
                 }
             });
 
@@ -526,6 +527,7 @@
             var metrics = this.metrics || {};
             for (const [key, value] of Object.entries(metrics)) {
                 value["name"] = key;
+                console.log(value);
                 metricsList.editableList('addItem', value)
             }
         },

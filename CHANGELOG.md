@@ -1,3 +1,10 @@
+### 1.5: Major Release
+
+New:
+- Added support for DataSets
+- Added new Device rename command
+- Redesigned UI for Broker configuration
+
 ### 1.4.1: Maintenance Release
 
  Fixed:

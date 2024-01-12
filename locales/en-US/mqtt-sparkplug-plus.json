@@ -41,7 +41,8 @@
             "session": "Session",
             "delay": "Delay",
             "templates" : "Templates",
-            "birthImmediately" : "Send Birth Immediately"
+            "birthImmediately" : "Send Birth Immediately",
+            "manualEoNBirth" : "Do not connect automaticly"
         },
         "tip": {
             "storeforward" : "all the buffered values will be kept in memory. Do not use this for high thoughput applications.",
