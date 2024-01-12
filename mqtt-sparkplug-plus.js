@@ -14,9 +14,7 @@
  * limitations under the License.
  **/
 
-const { connect } = require("http2");
 const { encodePayload } = require("sparkplug-payload/lib/sparkplugbpayload");
-//const { sparkplugtemplate } = require("sparkplug-template")
 
 module.exports = function(RED) {
     "use strict";
