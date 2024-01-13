@@ -100,6 +100,17 @@ msg = {
     }   
 };
         </pre>
+
+        Device rename Example:
+        <pre>
+    msg = {
+        "command" : {
+            "device" : {
+                "set_name" : "New_Name"
+            }
+        }   
+    };
+            </pre>
         </dd>
     </dl>
 
@@ -109,7 +120,7 @@ msg = {
        <dt>payload
            <span class="property-type">object</span>
        </dt>
-       <dd>The NCMD payload. See <a href="https://s3.amazonaws.com/ignition-modules/Current/Sparkplug+Specification.pdf">Sparkplug specification</a> for more information</dd>
+       <dd>The DCMD payload. See <a href="https://s3.amazonaws.com/ignition-modules/Current/Sparkplug+Specification.pdf">Sparkplug specification</a> for more information</dd>
        </dl>
 
        <h3>Sparkplug Message Types</h3>

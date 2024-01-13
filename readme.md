@@ -139,9 +139,10 @@ msg = {
     }   
 ```
 
-Commands can also be used to rename a device. If a birth has already been send for the device, then a rebirth will be issued.
+Commands can also be used for dynamic configuration of the Devices and the EoN Nodes (MQTT Server Configuration).
 
-Device Rename Example:
+A device can be renamed by setting the follow command. This is especially useful if you have a device with 0 metrics and dynamic metrics.
+
 ```javascript    
 msg = {
     "command" : {
@@ -151,7 +152,8 @@ msg = {
     }   
 ```
 
-EoN (broker) Rename Example:
+A EoN Node (MQTT Server) can also be renamed using the following command. If the EoN Node is configuration to manual connection, then the rename command can be combined with a connect command to set the name and connect to the Broker with the new name:
+
 ```javascript    
 msg = {
     "command" : {
