@@ -187,11 +187,11 @@ module.exports = function(RED) {
                 // Handle Command
                 if (msg.hasOwnProperty("command")) {
                     if (msg.command.hasOwnProperty("device")) {
-                        if (msg.command.device.rename) {
+                        if (msg.command.device.set_name) {
                             if (this.birthMessageSend) {
                                 this.sendDDeath();
                             }
-                            node.name = msg.command.device.rename;
+                            node.name = msg.command.device.set_name;
                             this.trySendBirth();
                         }
                         if (msg.command.device.rebirth) {
@@ -209,12 +209,12 @@ module.exports = function(RED) {
                     };
                     if (msg.command.hasOwnProperty("EoN")) {
 
-                        if (msg.command.EoN.rename) {
+                        if (msg.command.EoN.set_name) {
                             if (this.brokerConn.connected) {
                                 let msg = this.brokerConn.getDeathPayload();
                                 this.brokerConn.publish(msg, false);
                             }
-                            this.brokerConn.eonName = msg.command.EoN.rename;
+                            this.brokerConn.eonName = msg.command.EoN.set_name;
                             this.brokerConn.sendBirth();
                         }
 

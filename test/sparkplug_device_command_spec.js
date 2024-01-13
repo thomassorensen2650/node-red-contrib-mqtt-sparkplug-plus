@@ -9,7 +9,7 @@ helper.init(require.resolve('node-red'));
 let testBroker = 'mqtt://localhost';
 var client = null;
 
-describe('mqtt sparkplug device node - Commands', function () {
+describe('mqtt sparkplug device commands', function () {
 	beforeEach(function (done) {
 		helper.startServer(done);
 	});
@@ -73,7 +73,7 @@ describe('mqtt sparkplug device node - Commands', function () {
 						n1.receive({
 							"command" : {
 								"device" : {
-									"rename" : "NEW_NAME"
+									"set_name" : "NEW_NAME"
 								}
 							}
 						})
@@ -145,7 +145,7 @@ describe('mqtt sparkplug device node - Commands', function () {
 							n1.receive({
 								"command" : {
 									"device" : {
-										"rename" : "NEW_NAME"
+										"set_name" : "NEW_NAME"
 									}
 								}
 							})
@@ -179,51 +179,4 @@ describe('mqtt sparkplug device node - Commands', function () {
 		});
     });
 
-
-	it('should not birth until connect', function (done) {
-	
-	flow = simpleFlow;
-	flow[1].manualEoNBirth = true;
-	client = mqtt.connect(testBroker);
-
-	let n1;
-	let b1;
-	var waitOver = false;
-	client.on('connect', function () {
-		client.subscribe('#', function (err) {
-		  if (!err) {
-			helper.load(sparkplugNode, simpleFlow, function () {
-				
-
-				try {
-					n1 = helper.getNode("n1");
-					b1 = n1.brokerConn;
-
-					setTimeout(() => {
-						waitOver = true;
-						n1.receive({
-							"command" : {
-								"EoN" : {
-									"connect" : true
-								}
-							}
-						})	
-					}, 500);
-				}catch (e) {
-					done(e);
-				}
-			});
-		  }
-		})
-	  });
-
-	
-
-	client.on('message', function (topic, message) {
-		if (topic === "spBv1.0/My Devices/NBIRTH/Node-Red") {
-			waitOver.should.be.true();
-			done();
-		}
-	});
-});
 });

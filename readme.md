@@ -146,7 +146,18 @@ Device Rename Example:
 msg = {
     "command" : {
         "device" : {
-            "rename" : "NEW_NAME"
+            "set_name" : "NEW_NAME"
+        }
+    }   
+```
+
+EoN (broker) Rename Example:
+```javascript    
+msg = {
+    "command" : {
+        "device" : {
+            "set_name" : "NEW_NAME",
+            "connect" : true
         }
     }   
 ```

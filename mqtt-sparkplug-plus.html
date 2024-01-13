@@ -57,16 +57,14 @@
                 <input type="number" min="0" id="node-config-input-keepalive" style="width: 100px">
             </div>
         </div>
-       <!-- <div id="mqtt-broker-tab-advanced" style="display:none">
-     
-        
+        <div id="mqtt-broker-tab-advanced" style="display:none">
             <div class="form-row node-config-input-templates-container-row" style="margin-bottom: 0px;">
                 <label><i class="fa fa-cubes"></i> <span data-i18n="mqtt-sparkplug-plus.label.templates"></span></label>
             </div>
             <div class="form-row node-config-input-templates-container-row" id="node-config-input-templates-container-row">
                 <ol id="node-config-input-templates-container"></ol>
             </div>
-        </div> -->
+        </div> 
          <div id="mqtt-broker-tab-sparkplug" style="display:none">
             <div class="form-row">
                 <label for="node-config-input-eonName"><i class="fa fa-tag"></i> <span data-i18n="mqtt-sparkplug-plus.label.name"></span></label>
@@ -219,82 +217,83 @@
                 iconClass: "fa fa-plug"
             });
 
-           /* tabs.addTab({
-                id: "mqtt-broker-tab-advanced",
-                label: this._("mqtt-sparkplug-plus.tabs-label.advanced"),
-                iconClass: "fa fa-cog"
-            });*/
-
-            // Setup Templates !!!
-            var templateList = $("#node-config-input-templates-container").editableList( {
-                header: $("<div>").append($.parseHTML("<div style='width:80%; display: inline-grid'>Template</div>")),
-                addButton: "add",
-                removable: true,
-                height: 300,
-                addItem: function(container,i,opt) {
-                    var parent = container.parent();
-                    var row = $("<div/>", {
-                        class:"sparkplug-config-input-metric",
-                        style: "display:flex;flex-direction:row;align-items: center;"
-                    }).appendTo(container);
-
-                    var defaultTemplate = {
-                        "name": "MyTemplate",
-                        "type": "Template",
-                        "value": {
-                            "version": "1.0.0",
-                            "isDefinition": true,
-                            "metrics": [
-                                {
-                                    "name": "FirstTag",
-                                    "type": "Int32"
-                                },
-                                {
-                                    "name": "SecondTag",
-                                    "type": "Int32"
-                                }
-                            ],
-                            "parameters": []
-                        }
-                    };
-
-                    // Template Name
-                    var fmoduleSpan = $("<span>", {
-                        style: "width:200px;",
-                        text: "MyTemplate",
-                    }).appendTo(row); //.val(opt.name);;
-
-                    // Template JSON EDITOR
-                    var selectField = $('<input/>',{
-                        class : "sparkplug-input-templates-json",
-                        type : "text"
-                    }).appendTo(row);
-
-                    selectField.typedInput({
-                        type:"json",
-                        types:["json"],
-                        validate : function(v) {
-                            console.log("Validate Called");
-                        }
+            if (false) { // TODO ENABLE TEMPLATES
+                tabs.addTab({
+                        id: "mqtt-broker-tab-advanced",
+                        label: this._("mqtt-sparkplug-plus.tabs-label.advanced"),
+                        iconClass: "fa fa-cog"
                     });
 
-                    var useDefaultTemplate = Object.keys(opt).length == 0;
+                // Setup Templates !!!
+                var templateList = $("#node-config-input-templates-container").editableList( {
+                    header: $("<div>").append($.parseHTML("<div style='width:80%; display: inline-grid'>Template</div>")),
+                    addButton: "add",
+                    removable: true,
+                    height: 300,
+                    addItem: function(container,i,opt) {
+                        var parent = container.parent();
+                        var row = $("<div/>", {
+                            class:"sparkplug-config-input-metric",
+                            style: "display:flex;flex-direction:row;align-items: center;"
+                        }).appendTo(container);
 
-                    selectField.typedInput('width', '100%');
-                    selectField.on('change', function(event, type, value) {
-                        var s = validateTemplate(value);
-                        var text = s.valid ? s.name : s.error;
-                        fmoduleSpan.text(text);
-                    });
-                    selectField.typedInput('value',useDefaultTemplate ? JSON.stringify(defaultTemplate) : JSON.stringify(opt));
-                }
-            });
-            if (this.templates) {
-                this.templates.forEach(t => {
-                    templateList.editableList('addItem', JSON.parse(t));
+                        var defaultTemplate = {
+                            "name": "MyTemplate",
+                            "type": "Template",
+                            "value": {
+                                "version": "1.0.0",
+                                "isDefinition": true,
+                                "metrics": [
+                                    {
+                                        "name": "FirstTag",
+                                        "type": "Int32"
+                                    },
+                                    {
+                                        "name": "SecondTag",
+                                        "type": "Int32"
+                                    }
+                                ],
+                                "parameters": []
+                            }
+                        };
+
+                        // Template Name
+                        var fmoduleSpan = $("<span>", {
+                            style: "width:200px;",
+                            text: "MyTemplate",
+                        }).appendTo(row); //.val(opt.name);;
+
+                        // Template JSON EDITOR
+                        var selectField = $('<input/>',{
+                            class : "sparkplug-input-templates-json",
+                            type : "text"
+                        }).appendTo(row);
+
+                        selectField.typedInput({
+                            type:"json",
+                            types:["json"],
+                            validate : function(v) {
+                                console.log("Validate Called");
+                            }
+                        });
+
+                        var useDefaultTemplate = Object.keys(opt).length == 0;
+
+                        selectField.typedInput('width', '100%');
+                        selectField.on('change', function(event, type, value) {
+                            var s = validateTemplate(value);
+                            var text = s.valid ? s.name : s.error;
+                            fmoduleSpan.text(text);
+                        });
+                        selectField.typedInput('value',useDefaultTemplate ? JSON.stringify(defaultTemplate) : JSON.stringify(opt));
+                    }
                 });
+                if (this.templates) {
+                    this.templates.forEach(t => {
+                        templateList.editableList('addItem', JSON.parse(t));
+                    });
+                }
             }
-          
             $("#node-config-input-manualEoNBirth").on('change',function() {
                 $("#node-config-input-eonName").prop("disabled", $(this).is(":checked"));
             });
