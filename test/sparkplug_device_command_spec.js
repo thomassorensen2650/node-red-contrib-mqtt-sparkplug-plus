@@ -9,7 +9,7 @@ helper.init(require.resolve('node-red'));
 let testBroker = 'mqtt://localhost';
 var client = null;
 
-describe('mqtt sparkplug device node - Commands', function () {
+describe('mqtt sparkplug device commands', function () {
 	beforeEach(function (done) {
 		helper.startServer(done);
 	});
@@ -73,7 +73,7 @@ describe('mqtt sparkplug device node - Commands', function () {
 						n1.receive({
 							"command" : {
 								"device" : {
-									"rename" : "NEW_NAME"
+									"set_name" : "NEW_NAME"
 								}
 							}
 						})
@@ -101,7 +101,6 @@ describe('mqtt sparkplug device node - Commands', function () {
 		  });
 
 		client.on('message', function (topic, message) {
-			console.log(topic);
 			if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/NEW_NAME") {
 				var buffer = Buffer.from(message);
 				var payload = spPayload.decodePayload(buffer);
@@ -146,7 +145,7 @@ describe('mqtt sparkplug device node - Commands', function () {
 							n1.receive({
 								"command" : {
 									"device" : {
-										"rename" : "NEW_NAME"
+										"set_name" : "NEW_NAME"
 									}
 								}
 							})
@@ -179,4 +178,5 @@ describe('mqtt sparkplug device node - Commands', function () {
 			}	
 		});
     });
+
 });

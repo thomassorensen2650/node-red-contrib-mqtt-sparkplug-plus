@@ -1,3 +1,13 @@
+### 1.5: Major Release
+
+New:
+- Added support for DataSets
+- Added new Device set_name command
+- Redesigned Broker configuration UI
+- Added support for manual connection of the EoN
+- Added connect command for EoN
+- Added set_name command for EoN node
+
 ### 1.4.1: Maintenance Release
 
  Fixed:

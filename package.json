@@ -16,7 +16,8 @@
     }
   },
   "scripts": {
-    "test": "mocha \"test/**/*_spec.js\""
+    "test": "mocha \"test/**/*_spec.js\"",
+    "t": "mocha \"test/**/*_spec.js\""
   },
   "keywords": [
     "MQTT",

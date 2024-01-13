@@ -41,12 +41,12 @@
             </div>
 
             <div class="form-row">
-                <label for="node-config-input-protocolVersion"><i class="fa fa-cog"></i> <span data-i18n="mqtt-sparkplug-plus.label.protocolVersion"></span></label>
-                <select id="node-config-input-protocolVersion" style="width:70%;">
-                    <!--<option value="3" data-i18n="mqtt-sparkplug-plus.label.protocolVersion3"></option> -->
-                    <option value="4" data-i18n="mqtt-sparkplug-plus.label.protocolVersion4"></option>
-                    <!-- <option value="5" data-i18n="mqtt-sparkplug-plus.label.protocolVersion5"></option> -->
-                </select>
+                <label for="node-config-input-user"><i class="fa fa-user"></i> <span data-i18n="mqtt-sparkplug-plus.label.username"></span></label>
+                <input type="text" id="node-config-input-user" data-i18n="[placeholder]mqtt-sparkplug-plus.placeholder.username">
+            </div>
+            <div class="form-row">
+                <label for="node-config-input-password"><i class="fa fa-lock"></i> <span data-i18n="mqtt-sparkplug-plus.label.password"></span></label>
+                <input type="password" id="node-config-input-password">
             </div>
             <div class="form-row">
                 <label for="node-config-input-clientid"><i class="fa fa-tag"></i> <span data-i18n="mqtt-sparkplug-plus.label.clientid"></span></label>
@@ -56,29 +56,15 @@
                 <label for="node-config-input-keepalive"><i class="fa fa-heartbeat"></i> <span data-i18n="mqtt-sparkplug-plus.label.keepalive"></span></label>
                 <input type="number" min="0" id="node-config-input-keepalive" style="width: 100px">
             </div>
-            <div class="form-row" style="margin-bottom:0">
-                <label style="vertical-align:top;"><i class="fa fa-info"></i> <span data-i18n="mqtt-sparkplug-plus.label.session"></span></label>
-                <div style="display: inline-block; width:calc(100% - 110px)">
-                    <div class="form-row">
-                        <label for="node-config-input-cleansession" style="width: auto;">
-                            <input type="checkbox" id="node-config-input-cleansession" style="position: relative;vertical-align: bottom; top: -2px; width: 15px;height: 15px;">
-                            <span id="node-config-input-cleansession-label" data-i18n="mqtt-sparkplug-plus.label.cleansession"></span>
-                        </label>
-                    </div>
-                </div>
-            </div>
-            <br>
         </div>
-        <div id="mqtt-broker-tab-security" style="display:none">
-            <div class="form-row">
-                <label for="node-config-input-user"><i class="fa fa-user"></i> <span data-i18n="mqtt-sparkplug-plus.label.username"></span></label>
-                <input type="text" id="node-config-input-user">
+        <div id="mqtt-broker-tab-advanced" style="display:none">
+            <div class="form-row node-config-input-templates-container-row" style="margin-bottom: 0px;">
+                <label><i class="fa fa-cubes"></i> <span data-i18n="mqtt-sparkplug-plus.label.templates"></span></label>
             </div>
-            <div class="form-row">
-                <label for="node-config-input-password"><i class="fa fa-lock"></i> <span data-i18n="mqtt-sparkplug-plus.label.password"></span></label>
-                <input type="password" id="node-config-input-password">
+            <div class="form-row node-config-input-templates-container-row" id="node-config-input-templates-container-row">
+                <ol id="node-config-input-templates-container"></ol>
             </div>
-        </div>
+        </div> 
          <div id="mqtt-broker-tab-sparkplug" style="display:none">
             <div class="form-row">
                 <label for="node-config-input-eonName"><i class="fa fa-tag"></i> <span data-i18n="mqtt-sparkplug-plus.label.name"></span></label>
@@ -106,7 +92,11 @@
                 <input type="checkbox" id="node-config-input-aliasMetrics" style="display:inline-block; width:22px; vertical-align:top;"><span data-i18n="mqtt-sparkplug-plus.label.aliasMetrics"></span>
             </label>
             </div>
-
+            <div class="form-row">
+                <label for="node-config-input-manualEoNBirth" style="width:70%">
+                    <input type="checkbox" id="node-config-input-manualEoNBirth" style="display:inline-block; width:22px; vertical-align:top;"><span data-i18n="mqtt-sparkplug-plus.label.manualEoNBirth"></span>
+                </label>
+            </div>
             <!-- Add UI for Store forward -->
             <div class="form-row">
                 <label for="node-config-input-enableStoreForward" style="width:70%">
@@ -124,6 +114,46 @@
 <script type="text/javascript">
 (function() {
 
+     /**
+    * Function that returns a list of configured Templates
+    * @return   {Object} A object with all configured templates.
+    */
+    function geTemplateList() {
+        var _templates = [];
+        var templates = $("#node-config-input-templates-container").editableList("items");
+        templates.each(function(i) {
+            var item = $(this);
+            var templateJson = item.find(".sparkplug-input-templates-json").typedInput('value');
+            //var dt = item.find(".sparkplug-input-metrics-dateType option:selected").text();
+           _templates.push(templateJson);
+        });
+        return _templates;
+    }
+
+    function validateTemplate(value) {
+        try {
+            var json = JSON.parse(value);
+            var check = (notOk, ex) => {
+                if (notOk) throw ex;
+            }
+            check(typeof json != "object", "Template should be an object.");
+            check(Array.isArray(json), "Template should be a object and not an array.");
+            check(!json.hasOwnProperty("name"), "Template should have a name attribute");
+            check(typeof(json.name) != "string", "Template name should be a string");
+
+            return {
+                valid : true,
+                name: json.name
+            }
+        } catch (e) {
+            return {
+                valid : false,
+                error: e
+            }
+            
+        };
+    };
+
     RED.nodes.registerType('mqtt-sparkplug-broker',{
         category: 'config',
         defaults: {
@@ -133,15 +163,7 @@
             broker: {value:"",required:true},
             port: {value:1883,required:false,validate:RED.validators.number(true)},
             tls: {type:"tls-config",required: false},
-            clientid: {value:"", validate: function(v) {
-                if ($("#node-config-input-clientid").length) {
-                    // Currently editing the node
-                    return $("#node-config-input-cleansession").is(":checked") || (v||"").length > 0;
-                } else {
-                    return (this.cleansession===undefined || this.cleansession) || (v||"").length > 0;
-                }
-            }},
-
+            clientid: {value:""},
             usetls: {value: false},
             verifyservercert: { value: false},
             protocolVersion: { value: 4},
@@ -150,6 +172,11 @@
             enableStoreForward: {value: false},
             compressAlgorithm : {value: false},
             aliasMetrics : {value: false},
+            useTemplates : {value: true},
+            templates : {value: ""},
+            manualEoNBirth : {value: false},
+            
+
             primaryScada: {value:"",  validate :x =>  !$("#node-config-input-enableStoreForward").is(":checked") || /^[^/+#]+$/.test(x) },
         },
         credentials: {
@@ -180,33 +207,99 @@
             });
             tabs.addTab({
                 id: "mqtt-broker-tab-connection",
-                label: this._("mqtt-sparkplug-plus.tabs-label.connection")
-            });
-            tabs.addTab({
-                id: "mqtt-broker-tab-security",
-                label: this._("mqtt-sparkplug-plus.tabs-label.security")
+                label: this._("mqtt-sparkplug-plus.tabs-label.connection"),
+                iconClass: "fa fa-server"
             });
 
             tabs.addTab({
                 id: "mqtt-broker-tab-sparkplug",
-                label: this._("mqtt-sparkplug-plus.tabs-label.sparkplug")
+                label: this._("mqtt-sparkplug-plus.tabs-label.sparkplug"),
+                iconClass: "fa fa-plug"
             });
 
-            setTimeout(function() { tabs.resize(); },0);
-            if (typeof this.cleansession === 'undefined') {
-                this.cleansession = true;
-                $("#node-config-input-cleansession").prop("checked",true);
+            if (false) { // TODO ENABLE TEMPLATES
+                tabs.addTab({
+                        id: "mqtt-broker-tab-advanced",
+                        label: this._("mqtt-sparkplug-plus.tabs-label.advanced"),
+                        iconClass: "fa fa-cog"
+                    });
+
+                // Setup Templates !!!
+                var templateList = $("#node-config-input-templates-container").editableList( {
+                    header: $("<div>").append($.parseHTML("<div style='width:80%; display: inline-grid'>Template</div>")),
+                    addButton: "add",
+                    removable: true,
+                    height: 300,
+                    addItem: function(container,i,opt) {
+                        var parent = container.parent();
+                        var row = $("<div/>", {
+                            class:"sparkplug-config-input-metric",
+                            style: "display:flex;flex-direction:row;align-items: center;"
+                        }).appendTo(container);
+
+                        var defaultTemplate = {
+                            "name": "MyTemplate",
+                            "type": "Template",
+                            "value": {
+                                "version": "1.0.0",
+                                "isDefinition": true,
+                                "metrics": [
+                                    {
+                                        "name": "FirstTag",
+                                        "type": "Int32"
+                                    },
+                                    {
+                                        "name": "SecondTag",
+                                        "type": "Int32"
+                                    }
+                                ],
+                                "parameters": []
+                            }
+                        };
+
+                        // Template Name
+                        var fmoduleSpan = $("<span>", {
+                            style: "width:200px;",
+                            text: "MyTemplate",
+                        }).appendTo(row); //.val(opt.name);;
+
+                        // Template JSON EDITOR
+                        var selectField = $('<input/>',{
+                            class : "sparkplug-input-templates-json",
+                            type : "text"
+                        }).appendTo(row);
+
+                        selectField.typedInput({
+                            type:"json",
+                            types:["json"],
+                            validate : function(v) {
+                                console.log("Validate Called");
+                            }
+                        });
+
+                        var useDefaultTemplate = Object.keys(opt).length == 0;
+
+                        selectField.typedInput('width', '100%');
+                        selectField.on('change', function(event, type, value) {
+                            var s = validateTemplate(value);
+                            var text = s.valid ? s.name : s.error;
+                            fmoduleSpan.text(text);
+                        });
+                        selectField.typedInput('value',useDefaultTemplate ? JSON.stringify(defaultTemplate) : JSON.stringify(opt));
+                    }
+                });
+                if (this.templates) {
+                    this.templates.forEach(t => {
+                        templateList.editableList('addItem', JSON.parse(t));
+                    });
+                }
             }
-            if (typeof this.usetls === 'undefined') {
-                this.usetls = false;
-                $("#node-config-input-usetls").prop("checked",false);
-            }
-            
-            $("#node-config-input-protocolVersion").on("change", function() {
-                $("#node-config-input-cleansession-label").text(RED._("node-red:mqtt.label.cleansession"))
+            $("#node-config-input-manualEoNBirth").on('change',function() {
+                $("#node-config-input-eonName").prop("disabled", $(this).is(":checked"));
             });
-            $("#node-config-input-protocolVersion").val(this.protocolVersion);
-        
+                    
+
+            this.cleansession = true;
             $("#node-storeforward-line").hide();
             $("#node-config-input-enableStoreForward").on('change',function() {
                 if ($(this).is(":checked")) {
@@ -229,19 +322,6 @@
                 updateTLSOptions();
             });
             var node = this;
-            function updateClientId() {
-                if ($("#node-config-input-cleansession").is(":checked")) {
-                    $("#node-config-input-clientid").attr("placeholder",node._("mqtt-sparkplug-plus.placeholder.clientid"));
-                } else {
-                    $("#node-config-input-clientid").attr("placeholder",node._("mqtt-sparkplug-plus.placeholder.clientid-nonclean"));
-                }
-                $("#node-config-input-clientid").trigger("change");
-            }
-            setTimeout(updateClientId,0);
-            $("#node-config-input-cleansession").on("click",function() {
-                updateClientId();
-            });
-
             function updatePortEntry(){
                 var disabled = $("#node-config-input-port").prop("disabled");
                 if ($("#node-config-input-broker").val().indexOf("://") === -1){
@@ -265,12 +345,12 @@
             setTimeout(function() {
                 $("#node-config-input-protocolVersion").trigger("change");
             },50);
-
         },
         oneditsave: function() {
             if (!$("#node-config-input-usetls").is(':checked')) {
                 $("#node-config-input-tls").val("");
             }
+            this.templates = geTemplateList();
         }
     });
 })();
@@ -336,6 +416,8 @@
         return _metrics;
     }
 
+    let dt = ["Int8", "Int16", "Int32", "Int64", "Float", "Double", "Boolean" , "String", "Unknown"];
+
     RED.nodes.registerType('mqtt sparkplug device',{
         category: 'network',
         defaults: {
@@ -356,6 +438,7 @@
             return this.name||"Sparkplug Device";
         },
         oneditprepare: function() {
+
             var that = this;
 
             var tabs = RED.tabs.create({
@@ -380,9 +463,11 @@
             var metricsList = $("#sparkplug-input-metric-container").editableList( {
                 header: $("<div>").append($.parseHTML("<div style='width:80%; display: inline-grid'>Name</div><div style='display: inline-grid'>Type</div>")),
                 addButton: "add",
+                sortable: true,
                 removable: true,
                 height: 300,
                 addItem: function(container,i,opt) {
+         
                     var parent = container.parent();
                     var row = $("<div/>").addClass("sparkplug-input-metric").appendTo(container);
                     var fmoduleSpan = $("<span>").appendTo(row);
@@ -392,14 +477,14 @@
                         type: "text"
                     }).css({
                     }).appendTo(fmoduleSpan).val(opt.name);
-
+                   
                     var selectField = $('<select/>',{
                         style:"width:110px; margin-left: 5px; text-align: center;",
                         class : "sparkplug-input-metric-dateType"
                     }).appendTo(row);
                     var group0 = $('<optgroup/>', { label: "Datatypes" }).appendTo(selectField);
-                    
-                    var dt = ["Int8", "Int16", "Int32", "Int64", "Float", "Double", "Boolean" , "String", , "DataSet", "Unknown"];
+                    var dt = ["Int8", "Int16", "Int32", "Int64", "Float", "Double", "Boolean", "String", "DataSet", "Unknown"];
+                
                     dt.forEach(d => {
                         let option = $("<option></option>").val(d).text(d);
                         group0.append(option);
@@ -407,12 +492,41 @@
                             option.attr('selected','selected')
                         }
                     });
+
+                    // Load metrics if any defined
+                    if (that.brokerConn.templates) {
+                        try {
+                            //var b = RED.nodes.node(that.broker);
+                            var group1 = $('<optgroup/>', { label: "Templates" }).appendTo(selectField);
+                            if (that.brokerConn.templates) {
+                                that.brokerConn.templates.forEach(t=> {
+                                var tv = JSON.parse(t);
+                                tv.valid = true; // TODO...
+                                if (tv.valid) {
+                                    let option = $("<option></option>").val("_"+tv.name).text(tv.name);
+                                    if (tv.name === opt.dataType) {
+                                        option.attr('selected','selected')
+                                    }
+                                    group1.append(option);
+                                }else {
+                                    throw tv.error;
+                                }
+                                }) 
+                            }
+                        }catch (e) {
+                            node.error(RED._("mqtt-sparkplug-plus.errors.unable-to-deserialize-templates", {error: analyseResult.error}));
+                        }
+                    }
                 }
             });
+
+            if (this.broker) {
+                this.brokerConn = RED.nodes.node(this.broker);
+            }
             var metrics = this.metrics || {};
-       
             for (const [key, value] of Object.entries(metrics)) {
                 value["name"] = key;
+                console.log(value);
                 metricsList.editableList('addItem', value)
             }
         },

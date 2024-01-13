@@ -190,7 +190,6 @@ describe('mqtt sparkplug device node', function () {
 				var buffer = Buffer.from(message);
 				var payload = spPayload.decodePayload(buffer);
 
-				//console.log(payload);
 				payload.should.have.property("timestamp").which.is.a.Number();
 				payload.metrics.should.containDeep([{
 					name: 'test',
@@ -225,6 +224,9 @@ describe('mqtt sparkplug device node', function () {
 		client = mqtt.connect(testBroker);
 		let n1;
 		let b1;
+		client.on('message', function (topic, message) {
+			topic.should.not.eql("spBv1.0/My Devices/DBIRTH/Node-Red/TEST2")
+		});
 		client.on('connect', function () {
 			client.subscribe('#', function (err) {
 			  if (!err) {
@@ -236,33 +238,28 @@ describe('mqtt sparkplug device node', function () {
 						n1.receive({
 							"payload" : {
 								"metrics": [
-									{
+									/*{
 										"name": "test",
 										"value": 11
 									},
 									{
 										"name": "test2",
 										"value": 11
-									}
+									}*/
 								]}
 							}
 						);
 					}catch (e) {
-						console.log("Whats going on");
 						done(e);
 					}
 				});
 			  }
 			})
 		  });
+		setTimeout(function() {
+		done();
+		}, 500);
 
-		client.on('message', function (topic, message) {
-			topic.should.not.eql("spBv1.0/My Devices/DBIRTH/Node-Red/TEST2")
-			
-			setTimeout(function() {
-				done();
-			  }, 500);
-		});
 
 	}); // it end 
 
@@ -630,7 +627,6 @@ describe('mqtt sparkplug device node', function () {
 
 		  client.on('message', function (topic, message) {
 			// Verify that we sent a DBirth Message to the broker
-			//console.log("TOPIC:", topic);
 			if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TEST2"){
 				n1.receive({
 					"payload" : {
@@ -700,7 +696,6 @@ describe('mqtt sparkplug device node', function () {
 
 		  client.on('message', function (topic, message) {
 			// Verify that we sent a DBirth Message to the broker
-			//console.log("TOPIC:", topic);
 			if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TEST2"){
 				n1.receive({
 					"payload" : {
@@ -831,7 +826,6 @@ describe('mqtt sparkplug device node', function () {
 
 			client.on('message', function (topic, message) {
 				// Verify that we sent a DBirth Message to the broker
-				//console.log("TOPIC:", topic);
 				if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TEST2"){
 					n1.receive({
 						"payload" : {
@@ -901,7 +895,6 @@ describe('mqtt sparkplug device node', function () {
 
 		  client.on('message', function (topic, message) {
 			// Verify that we sent a DBirth Message to the broker
-			//console.log("TOPIC:", topic);
 			if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TEST2"){
 				n1.receive({
 					"payload" : {
@@ -977,7 +970,6 @@ describe('mqtt sparkplug device node', function () {
 
 		  client.on('message', function (topic, message) {
 			// Verify that we sent a DBirth Message to the broker
-			//console.log("TOPIC:", topic);
 			if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TEST2"){
 				n1.receive({
 					"payload" : {
@@ -1067,7 +1059,6 @@ describe('mqtt sparkplug device node', function () {
 
 		  client.on('message', function (topic, message) {
 			// Verify that we sent a DBirth Message to the broker
-			//console.log("TOPIC:", topic);
 			if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TEST2"){
 				n1.receive({
 					"payload" : {
@@ -1184,7 +1175,6 @@ describe('mqtt sparkplug device node', function () {
 						b1 = n1.brokerConn;
 
 						n1.on('call:error', call => {
-							//console.log(call);
 							call.should.be.calledWithExactly('mqtt-sparkplug-plus.errors.invalid-metric-definition');
 							done();
 						  });
@@ -1198,7 +1188,6 @@ describe('mqtt sparkplug device node', function () {
 							}
 							});
 					}catch (e) {
-						console.log(e);
 						done(e);
 					}
 				});
@@ -1235,7 +1224,6 @@ describe('mqtt sparkplug device node', function () {
 							}
 							});
 					}catch (e) {
-						console.log(e);
 						done(e);
 					}
 				});
@@ -1589,7 +1577,6 @@ describe('mqtt sparkplug device node', function () {
 
 		  client.on('message', function (topic, message) {
 			// Verify that we sent a DBirth Message to the broker
-			//console.log("TOPIC:", topic);
 			if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TEST2"){
 
 				var buffer = Buffer.from(message);

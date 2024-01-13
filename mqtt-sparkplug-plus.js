@@ -43,7 +43,6 @@ module.exports = function(RED) {
      * @returns compressed payload (payload still needs to be protobuf encoded)
      */
     function compressPayload(payload, options) {
-        var metrics = payload.metrics;
         var algorithm = options && options['algorithm'] ? options['algorithm'].toUpperCase() : "DEFLATE";
         var resultPayload = {
             "uuid" : compressed,
@@ -123,7 +122,8 @@ module.exports = function(RED) {
 
     function MQTTSparkplugDeviceNode(n) {
         RED.nodes.createNode(this,n);
-        this.dataTypes = ["Int8", "Int16", "Int32", "Int64", "Float", "Double", "Boolean" , "String", "DataSet", "Unknown"],
+        this.dataTypes = ["Int8", "Int16", "Int32", "Int64", "Float", "Double", "Boolean" , "String", "Unknown"],
+
 
         this.broker = n.broker;
         this.name = n.name||"Sparkplug Device";
@@ -132,12 +132,15 @@ module.exports = function(RED) {
         this.birthMessageSend = false;
         this.birthImmediately = n.birthImmediately || false;
 
+        this.inflatedMetrics = {};
         this.shouldBuffer = true; // hardcoded / Devices always buffers
 
         if (typeof this.birthImmediately === 'undefined') {
             this.birthImmediately = false;
         }
-        /**
+        var node = this;
+
+   /**
          * try to send Sparkplug DBirth Messages
          * @param {function} done Node-Red Done Function 
          */
@@ -148,7 +151,7 @@ module.exports = function(RED) {
             let hasMetrics = Object.keys(this.metrics).length > 0;
             if (readyToSend && hasMetrics) {
                 let birthMetrics = [];
-             
+            
                 for (const [key, value] of Object.entries(this.metrics)) {
                     const lv = Object.assign({}, this.latestMetrics[key]);
 
@@ -178,17 +181,17 @@ module.exports = function(RED) {
         }
 
         this.brokerConn = RED.nodes.getNode(this.broker);
-        var node = this;
+     
         if (this.brokerConn) {
             this.on("input",function(msg,send,done) {
                 // Handle Command
                 if (msg.hasOwnProperty("command")) {
                     if (msg.command.hasOwnProperty("device")) {
-                        if (msg.command.device.rename) {
+                        if (msg.command.device.set_name) {
                             if (this.birthMessageSend) {
                                 this.sendDDeath();
                             }
-                            node.name = msg.command.device.rename;
+                            node.name = msg.command.device.set_name;
                             this.trySendBirth();
                         }
                         if (msg.command.device.rebirth) {
@@ -204,6 +207,24 @@ module.exports = function(RED) {
                         }
 
                     };
+                    if (msg.command.hasOwnProperty("EoN")) {
+
+                        if (msg.command.EoN.set_name) {
+                            if (this.brokerConn.connected) {
+                                let msg = this.brokerConn.getDeathPayload();
+                                this.brokerConn.publish(msg, false);
+                            }
+                            this.brokerConn.eonName = msg.command.EoN.set_name;
+                            this.brokerConn.sendBirth();
+                        }
+
+                        if (msg.command.EoN.connect) {
+                            if (!this.brokerConn.connected) {
+                                this.brokerConn.manualEoNBirth = false;
+                                this.brokerConn.connect();
+                            }
+                        }
+                    }
                 }
 
                 let validPayload = msg.hasOwnProperty("payload") && typeof msg.payload === 'object' && msg.payload !== null && !Array.isArray(msg.payload);
@@ -339,6 +360,7 @@ module.exports = function(RED) {
                 }
             }); // end input
 
+            
             //  Create "NULL" metrics if metrics should be sendt immediately
             if (this.birthImmediately) {
                 this.latestMetrics = {};
@@ -376,13 +398,12 @@ module.exports = function(RED) {
 
         this.name = n.name||"Sparkplug Node";
         this.deviceGroup = n.deviceGroup||"Sparkplug Devices";
-        this.eonName = n.eonName||RED._("mqtt-sparkplug-plus.placeholder.eonname"),
+        this.eonName = n.eonName||RED._("mqtt-sparkplug-plus.placeholder.eonname");
         // Configuration options passed by Node Red
         this.broker = n.broker;
         this.port = n.port;
         this.clientid = n.clientid;
         this.usetls = n.usetls;
-        this.usews = n.usews;
         this.verifyservercert = n.verifyservercert;
         this.protocolVersion = n.protocolVersion;
         this.keepalive = n.keepalive;
@@ -390,7 +411,8 @@ module.exports = function(RED) {
         
         this.compressAlgorithm = n.compressAlgorithm;
         this.aliasMetrics = n.aliasMetrics;
-
+        this.useTemplates = true;
+        this.templates = n.templates||[];
         // Config node state
         this.brokerurl = "";
         this.connected = false;
@@ -400,6 +422,8 @@ module.exports = function(RED) {
         this.subscriptions = {};
         this.bdSeq = 0;
         this.seq = 0;
+
+        this.manualEoNBirth = n.manualEoNBirth||false,
 
         this.maxQueueSize = 100000;
         // Get information about store forward
@@ -450,6 +474,9 @@ module.exports = function(RED) {
                     break;
                 case "BUFFERING": // Online´
                     node.status({fill:"blue",shape:"dot",text:"destination offline"});
+                    break;
+                case "WAITING_CONNECT": // Online´
+                    node.status({fill:"gray",shape:"dot",text:"awaiting connect command"});
                     break;
                 default:
                     node.status({fill:"gray",shape:"dot",text:state}); // Unknown State
@@ -538,6 +565,11 @@ module.exports = function(RED) {
             });
         }
 
+        this.getTemplates = function() {
+            var _result = this.templates.map(m=>JSON.parse(m));
+            return _result;
+        }
+
         /**
          * 
          * @returns node death payload and topic
@@ -556,8 +588,16 @@ module.exports = function(RED) {
          */
         this.sendBirth = function() {
             this.seq = 0;
-            var birthMessageMetrics = [
-
+            var birthMessageMetrics = []
+            
+            if (node.useTemplates) {
+                try {
+                    birthMessageMetrics = this.getTemplates();
+                } catch (e) {
+                    node.error(RED._("mqtt-sparkplug-plus.errors.unable-to-deserialize-templates", {error: e.toString()}));
+                }
+            }            
+            birthMessageMetrics = birthMessageMetrics.concat([
                 {
                     "name" : "Node Control/Rebirth",
                     "type" : "Boolean",
@@ -567,7 +607,7 @@ module.exports = function(RED) {
                     "name" : "bdSeq",
                     "type" : "uint64",
                     "value": this.bdSeq,
-                }];
+                }]);
             var nbirth = node.createMsg("", "NBIRTH", birthMessageMetrics, x=>{});
             if (nbirth) {
                 node.publish(nbirth);
@@ -586,13 +626,11 @@ module.exports = function(RED) {
             this.password = this.credentials.password;
         }
 
+
         // If the config node is missing certain options (it was probably deployed prior to an update to the node code),
         // select/generate sensible options for the new fields
         if (typeof this.usetls === 'undefined') {
             this.usetls = false;
-        }
-        if (typeof this.usews === 'undefined') {
-            this.usews = false;
         }
         if (typeof this.verifyservercert === 'undefined') {
             this.verifyservercert = false;
@@ -704,7 +742,8 @@ module.exports = function(RED) {
         this.register = function(mqttNode) {
             
             node.users[mqttNode.id] = mqttNode;
-            let state = node.connected ? "CONNECTED" : "DISCONNECTED";
+            let state = node.manualEoNBirth ? "WAITING_CONNECT" : node.connected ? "CONNECTED" : "DISCONNECTED";
+            
             node.setConnectionState(mqttNode, state);
             if (Object.keys(node.users).length === 1) {
                 node.connect();
@@ -743,6 +782,9 @@ module.exports = function(RED) {
          * Connect to the MQTT Broker
          */
         this.connect = function () {
+            if (node.manualEoNBirth === true) {
+                return;
+            }
             if (!node.connected && !node.connecting) {
                 node.connecting = true;
                 try {
@@ -1025,7 +1067,6 @@ module.exports = function(RED) {
             } else {
                 if (node.queue.length === node.maxQueueSize) {
                     node.queue.shift();
-                    //console.log("Queue Size", node.queue.length);
                 }else if (node.queue.length  === node.maxQueueSize-1) {
                     node.warn(RED._("mqtt-sparkplug-plus.errors.buffer-full"));
                 }
@@ -1094,7 +1135,7 @@ module.exports = function(RED) {
                         var msg = {topic:topic, payload:payload, qos:packet.qos, retain:packet.retain};
                         node.send(msg);
                     } catch (e) {
-                        node.error(RED._("mqtt-sparkplug-plus.errors.unable-to-decode-message", {type : "", error: e.toString()}));
+                    node.error(RED._("mqtt-sparkplug-plus.errors.unable-to-decode-message", {type : "Unknown", error: e.toString()}));
                     }
                     
                 }, this.id);

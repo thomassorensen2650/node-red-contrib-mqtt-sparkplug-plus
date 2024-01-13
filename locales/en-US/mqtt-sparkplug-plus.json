@@ -40,7 +40,9 @@
             "receiveMaximum": "Receive Max",
             "session": "Session",
             "delay": "Delay",
-            "birthImmediately" : "Send Birth Immediately"
+            "templates" : "Templates",
+            "birthImmediately" : "Send Birth Immediately",
+            "manualEoNBirth" : "Do not connect automaticly"
         },
         "tip": {
             "storeforward" : "all the buffered values will be kept in memory. Do not use this for high thoughput applications.",
@@ -65,7 +67,8 @@
             "clientid-nonclean":"Must be set for non-clean sessions",
             "eonname":"Node-Red",
             "name": "Sparkplug Device",
-            "command": "NDATA"
+            "command": "NDATA",
+            "username" : "Leave blank for anonymous login"
         },
         "state": {
             "connected": "Connected to broker: __broker__",
@@ -95,6 +98,7 @@
             "unable-to-encode-message": "Unable to encode __type__ message. the error is : __error__",
             "not-defined": "Topic is not defined",
             "invalid-metric-definition": "Unable to use '__name__' as a metric. the error is : __error__",
+            "unable-to-deserialize-templates" : "Unable to parse templates. The error is : __error__",
             "invalid-metric-data": "Unable to send data for metric '__name__'. the error is : __error__"
         }
     }	
