@@ -479,7 +479,7 @@ describe('mqtt sparkplug device node', function () {
 		  });
 		  var expectedBd = 0;
 		  client.on('message', function (topic, message) {
-			
+
 			if (topic === "spBv1.0/My Devices/NBIRTH/Node-Red") {
 				var buffer = Buffer.from(message);
 				var payload = spPayload.decodePayload(buffer);

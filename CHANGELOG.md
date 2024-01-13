@@ -7,6 +7,7 @@ New:
 - Added support for manual connection of the EoN
 - Added connect command for EoN
 - Added set_name command for EoN node
+- Support for parameter sorting
 
 ### 1.4.1: Maintenance Release
 

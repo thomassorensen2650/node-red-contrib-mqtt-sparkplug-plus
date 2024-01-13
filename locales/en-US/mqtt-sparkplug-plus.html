@@ -152,7 +152,7 @@ msg = {
 <script type="text/html" data-help-name="mqtt-sparkplug-broker">
     <p>Configuration for a connection to an MQTT broker.</p>
     <p>This configuration will create a single connection to the broker which can
-       then be reused by <code>MQTT Sparkplug In</code> and <code>MQTT Sparkplug Device</code> nodes.</p>
+       then be reused by <code>MQTT Sparkplug In</code>, <code>MQTT Sparkplug Out</code> and <code>MQTT Sparkplug Device</code> nodes.</p>
     <p>The node will generate a random Client ID if one is not set and the
        node is configured to use a Clean Session connection. If a Client ID is set,
        it must be unique to the broker you are connecting to.</p>
@@ -166,6 +166,8 @@ msg = {
     <p>This is the name of the EoN node. This name will be part of all topics. The name is used to identify the EoN node    </p>
     <h4>Group</h4>
     <p>This is the device group. This will be part of the Topic of all messages, and can be used to group related EoN nodes</p>
+    <h4>Do not connect automaticly</h4>
+    <p>When this option is enabled, the EoN (Broker) will not connect until a connect command has been received</p>
     <h4>Enable Store Forward </h4>
     <p>This will enable store forward if the Primary SCADA is offline</p>
     <h4>Destination</h4>

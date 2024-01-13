@@ -143,18 +143,17 @@ it('should rebirth on new name', function (done) {
 
 	
 
-      var stateId = 0;
-      client.on('message', function (topic, message) {
+    var stateId = 0;
+    client.on('message', function (topic, message) {
 
-        /*
-        spBv1.0/My Devices/NBIRTH/Node-Red
-spBv1.0/My Devices/DBIRTH/Node-Red/TEST2
-spBv1.0/My Devices/NDEATH/Node-Red
-spBv1.0/My Devices/NBIRTH/NEW_NAME
-        */
-        console.log(topic)
         if (topic === "spBv1.0/My Devices/NBIRTH/Node-Red") {
             stateId.should.eql(0);
+
+            var buffer = Buffer.from(message);
+            var payload = spPayload.decodePayload(buffer);
+   
+            let bd = payload.metrics.find(x=>x.name == "bdSeq");
+            bd.value.low.should.eql(0);
         
             stateId++
         }
@@ -164,10 +163,22 @@ spBv1.0/My Devices/NBIRTH/NEW_NAME
         }
         if (topic === "spBv1.0/My Devices/NDEATH/Node-Red") {
             stateId.should.eql(2);
+
+            var buffer = Buffer.from(message);
+            var payload = spPayload.decodePayload(buffer);
+            let bd = payload.metrics.find(x=>x.name == "bdSeq");
+            bd.value.low.should.eql(0);
+
             stateId++
         }
         if (topic === "spBv1.0/My Devices/NBIRTH/NEW_NAME") {
             stateId.should.eql(3);
+
+            var buffer = Buffer.from(message);
+            var payload = spPayload.decodePayload(buffer);
+            let bd = payload.metrics.find(x=>x.name == "bdSeq");
+            bd.value.low.should.eql(1);
+
             stateId++
         }	
 

@@ -213,6 +213,7 @@ module.exports = function(RED) {
                             if (this.brokerConn.connected) {
                                 let msg = this.brokerConn.getDeathPayload();
                                 this.brokerConn.publish(msg, false);
+                                this.brokerConn.nextBdseq();
                             }
                             this.brokerConn.eonName = msg.command.EoN.set_name;
                             this.brokerConn.sendBirth();
@@ -420,7 +421,7 @@ module.exports = function(RED) {
         this.closing = false;
         this.options = {};
         this.subscriptions = {};
-        this.bdSeq = 0;
+        this.bdSeq = -1;
         this.seq = 0;
 
         this.manualEoNBirth = n.manualEoNBirth||false,
@@ -500,7 +501,7 @@ module.exports = function(RED) {
             if (this.bdSeq > 255) {
                 this.bdSeq = 0;
             }
-            return this.bdSeq++;
+            return ++this.bdSeq;
         };
 
 
@@ -587,6 +588,7 @@ module.exports = function(RED) {
          * Send NBirth Message
          */
         this.sendBirth = function() {
+        
             this.seq = 0;
             var birthMessageMetrics = []
             
@@ -625,7 +627,6 @@ module.exports = function(RED) {
             this.username = this.credentials.user;
             this.password = this.credentials.password;
         }
-
 
         // If the config node is missing certain options (it was probably deployed prior to an update to the node code),
         // select/generate sensible options for the new fields
@@ -785,6 +786,7 @@ module.exports = function(RED) {
             if (node.manualEoNBirth === true) {
                 return;
             }
+            this.nextBdseq(); // Next connect will use next bdSeq
             if (!node.connected && !node.connecting) {
                 node.connecting = true;
                 try {
@@ -876,7 +878,7 @@ module.exports = function(RED) {
                         }
                         // Send Node Birth
                         node.sendBirth();
-                        node.nextBdseq(); // Next connect will use next bdSeq
+
                     });
 
                     node.client.on("reconnect", function() {
