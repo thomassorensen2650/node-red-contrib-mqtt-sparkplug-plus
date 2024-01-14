@@ -159,6 +159,7 @@ msg = {
     "command" : {
         "device" : {
             "set_name" : "NEW_NAME",
+            "set_group" : "NEW_GROUP",
             "connect" : true
         }
     }   
