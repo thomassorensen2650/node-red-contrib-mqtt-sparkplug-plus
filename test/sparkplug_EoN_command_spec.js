@@ -128,7 +128,8 @@ it('should rebirth on new name', function (done) {
 						n1.receive({
 							"command" : {
 								"EoN" : {
-									"set_name" : "NEW_NAME"
+									"set_name" : "NEW_NAME",
+                                    "set_group" : "NEW_GROUP"
 								}
 							}
 						})	
@@ -171,7 +172,7 @@ it('should rebirth on new name', function (done) {
 
             stateId++
         }
-        if (topic === "spBv1.0/My Devices/NBIRTH/NEW_NAME") {
+        if (topic === "spBv1.0/NEW_GROUP/NBIRTH/NEW_NAME") {
             stateId.should.eql(3);
 
             var buffer = Buffer.from(message);
@@ -182,7 +183,7 @@ it('should rebirth on new name', function (done) {
             stateId++
         }	
 
-        if (topic === "spBv1.0/My Devices/DBIRTH/NEW_NAME/TEST2") {
+        if (topic === "spBv1.0/NEW_GROUP/DBIRTH/NEW_NAME/TEST2") {
             stateId.should.eql(4);
             done();
         }	

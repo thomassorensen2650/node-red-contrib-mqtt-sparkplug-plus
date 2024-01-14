@@ -111,6 +111,31 @@ msg = {
         }   
     };
             </pre>
+
+            EoN Node (Broker) rename Example:
+            <pre>
+        msg = {
+            "command" : {
+                "EoN" : {
+                    "set_name" : "New_Name"
+                }
+            }   
+        };
+                </pre>
+
+                EoN Node (Broker) rename and connect Example:
+                <pre>
+            msg = {
+                "command" : {
+                    "EoN" : {
+                        "set_name" : "New_Name",
+                        "connect" : true
+                    }
+                }   
+            };
+                    </pre>
+    
+
         </dd>
     </dl>
 

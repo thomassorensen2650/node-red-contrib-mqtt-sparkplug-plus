@@ -208,14 +208,25 @@ module.exports = function(RED) {
 
                     };
                     if (msg.command.hasOwnProperty("EoN")) {
+                        let rebirthRequired = (msg.command.EoN.set_name || msg.command.EoN.set_group) && this.brokerConn.connected;
 
+                        if (rebirthRequired) {
+                          
+                            let msg = this.brokerConn.getDeathPayload();
+                            this.brokerConn.publish(msg, false);
+                            this.brokerConn.nextBdseq();
+                        }
                         if (msg.command.EoN.set_name) {
-                            if (this.brokerConn.connected) {
-                                let msg = this.brokerConn.getDeathPayload();
-                                this.brokerConn.publish(msg, false);
-                                this.brokerConn.nextBdseq();
-                            }
                             this.brokerConn.eonName = msg.command.EoN.set_name;
+                        }
+                        if (msg.command.EoN.set_group) {
+                            this.brokerConn.deviceGroup = msg.command.EoN.set_group;
+                        }
+                        if (msg.command.EoN.set_server) {
+                            // FIXME: Should we Disconnect here?
+                            this.brokerConn.broker = msg.command.EoN.set_server;
+                        }
+                        if (rebirthRequired) {
                             this.brokerConn.sendBirth();
                         }
 
