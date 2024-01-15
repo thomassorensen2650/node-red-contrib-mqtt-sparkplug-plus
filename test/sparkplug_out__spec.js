@@ -104,6 +104,8 @@ describe('mqtt sparkplug out node', function () {
 			var buffer = Buffer.from(message);
 			var payload = spPayload.decodePayload(buffer);
 			n1.brokerConn.primaryScadaStatus.should.eql("OFFLINE");
+			payload.timestamp = payload.timestamp.toNumber()
+			payload.seq = payload.seq.toNumber()
 			payload.should.deepEqual(validMsg);
 			client.end(true);
 			done();
@@ -133,6 +135,8 @@ describe('mqtt sparkplug out node', function () {
 			var buffer = Buffer.from(message);
 			var payload = spPayload.decodePayload(buffer);
 			n1.brokerConn.primaryScadaStatus.should.eql("ONLINE");
+			payload.timestamp = payload.timestamp.toNumber()
+			payload.seq = payload.seq.toNumber()
 			payload.should.deepEqual(validMsg);
 			done();
 		});
@@ -162,6 +166,8 @@ describe('mqtt sparkplug out node', function () {
 			var buffer = Buffer.from(message);
 			var payload = spPayload.decodePayload(buffer);
 			n1.brokerConn.primaryScadaStatus.should.eql("ONLINE");
+			payload.timestamp = payload.timestamp.toNumber()
+			payload.seq = payload.seq.toNumber()
 			payload.should.deepEqual(validMsg);
 			done();
 		});

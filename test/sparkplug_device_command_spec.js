@@ -104,7 +104,8 @@ describe('mqtt sparkplug device commands', function () {
 			if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/NEW_NAME") {
 				var buffer = Buffer.from(message);
 				var payload = spPayload.decodePayload(buffer);
-				payload.should.have.property("seq").which.is.eql(1);
+				payload.should.have.property("seq");
+                payload.seq.toInt().should.eql(1);
 				done();
 			}	
 		});

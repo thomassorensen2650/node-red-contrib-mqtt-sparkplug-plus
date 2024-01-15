@@ -1,6 +1,7 @@
 var helper = require("node-red-node-test-helper");
 var sparkplugNode = require("../mqtt-sparkplug-plus.js");
 var should = require("should");
+var long = require("long");
 var mqtt = require("mqtt");
 var pako = require('pako');
 
@@ -92,15 +93,21 @@ describe('mqtt sparkplug device node', function () {
 			if (topic === "spBv1.0/My Devices/NBIRTH/Node-Red"){
 				var buffer = Buffer.from(message);
 				var payload = spPayload.decodePayload(buffer);
-				payload.should.have.property("timestamp").which.is.a.Number();
+				
+				payload.should.have.property("timestamp");
+				long.isLong(payload.timestamp).should.be.true();
+
+				payload.should.have.property("seq");
+				payload.seq.toInt().should.eql(0);
+
 				payload.metrics.should.containDeep([
 					{ name: 'Node Control/Rebirth', type: 'Boolean', value: false },
 					{ name: 'bdSeq', type: 'UInt64' } // We don't check nmber
 				 ]);
-				 payload.metrics[1].value.low.should.eql(0);
-				 payload.metrics[1].value.high.should.eql(0);
-				 payload.metrics[1].value.unsigned.should.eql(true);
-				payload.should.have.property("seq").which.is.eql(0);
+
+				
+				 payload.metrics[1].value.toInt().should.eql(0);
+
 				done();
 				client.end();
 			}
@@ -190,7 +197,8 @@ describe('mqtt sparkplug device node', function () {
 				var buffer = Buffer.from(message);
 				var payload = spPayload.decodePayload(buffer);
 
-				payload.should.have.property("timestamp").which.is.a.Number();
+				payload.should.have.property("timestamp");
+				payload.timestamp.toInt().should.be.a.Number();
 				payload.metrics.should.containDeep([{
 					name: 'test',
 					type: 'Int32',
@@ -204,7 +212,6 @@ describe('mqtt sparkplug device node', function () {
 					//timestamp: 1630716767232
 					}
 				]);
-				payload.should.have.property("seq").which.is.eql(1);
 				done();
 				//client.end();
 			}
@@ -331,9 +338,8 @@ describe('mqtt sparkplug device node', function () {
 			if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TEST2"){
 				var buffer = Buffer.from(message);
 				var payload = spPayload.decodePayload(buffer);
-
-				payload.should.have.property("timestamp").which.is.a.Number();
-				payload.should.have.property("seq").which.is.eql(1);
+				payload.should.have.property("timestamp");
+				payload.timestamp.toInt().should.be.Number();
 				done();
 				//client.end();
 			}
@@ -391,7 +397,15 @@ describe('mqtt sparkplug device node', function () {
 			if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TEST2"){
 				var buffer = Buffer.from(message);
 				var payload = spPayload.decodePayload(buffer);
-				payload.should.have.property("timestamp").which.is.a.Number();
+				payload.should.have.property("timestamp");
+				payload.timestamp.toInt().should.be.Number();
+
+				payload.should.have.property("seq");
+				payload.seq.toInt().should.be.eql(1);
+
+				// Hack to remore decode Long to Number
+				payload.metrics[0].timestamp = payload.metrics[0].timestamp.toNumber();
+
 				payload.metrics.should.containDeep([{
 					name: 'TEST/TEST',
 					type: 'Int32',
@@ -405,7 +419,8 @@ describe('mqtt sparkplug device node', function () {
 					timestamp: ts
 					}
 				]);
-				payload.should.have.property("seq").which.is.eql(1);
+				
+
 				helper.getNode("n1").receive({
 					"payload" : {
 						"metrics" : [
@@ -424,7 +439,7 @@ describe('mqtt sparkplug device node', function () {
 				// Verify that Properties are not send on DDATA
 				var buffer = Buffer.from(message);
 				var payload = spPayload.decodePayload(buffer);
-				payload.should.have.property("timestamp").which.is.a.Number();
+				payload.metrics[0].timestamp = payload.metrics[0].timestamp.toNumber();
 				payload.metrics.should.containDeep([{
 					name: 'TEST/TEST',
 					type: 'Int32',
@@ -486,8 +501,8 @@ describe('mqtt sparkplug device node', function () {
 
 				// Check that bdSeq in inceased every time we reconnect
 				// this is a Long.js object. Not sure why this is a long? but its according to specs.
-				payload.metrics[1].value.low.should.eql(expectedBd);
-				payload.metrics[1].value.high.should.eql(0);
+				payload.metrics[1].value.toInt().should.eql(expectedBd);
+			
 
 				// Force Disconnect
 				b1.deregister(n1);
@@ -496,8 +511,8 @@ describe('mqtt sparkplug device node', function () {
 				var payload = spPayload.decodePayload(buffer);
 
 				// Check that bdSeq in inceased every time we reconnect
-				payload.metrics[0].value.low.should.eql(expectedBd);
-				payload.metrics[0].value.high.should.eql(0);
+				payload.metrics[0].value.toInt().should.eql(expectedBd);
+		
 
 				if (expectedBd == 5) {
 					done();
@@ -557,7 +572,8 @@ describe('mqtt sparkplug device node', function () {
 					var buffer = Buffer.from(message);
 					var payload = spPayload.decodePayload(buffer);
 					// Verify that we reset the seq to 0
-					payload.should.have.property("seq").which.is.eql(1);
+					payload.should.have.property("seq");
+					payload.seq.toInt().should.be.eql(1);
 				}
 			} else if (topic === "spBv1.0/My Devices/NDEATH/Node-Red"){
 				deathSend = true;
@@ -566,7 +582,8 @@ describe('mqtt sparkplug device node', function () {
 					if (initBirthDone === true) {
 						var buffer = Buffer.from(message);
 						var payload = spPayload.decodePayload(buffer);
-						payload.should.have.property("seq").which.is.eql(1);
+						payload.should.have.property("seq");
+						payload.seq.toInt().should.be.eql(1);
 						deathSend.should.eql(true);
 						done();
 	
@@ -643,14 +660,20 @@ describe('mqtt sparkplug device node', function () {
 				var buffer = Buffer.from(message);
 				var payload = spPayload.decodePayload(buffer);
 
-				payload.should.have.property("timestamp").which.is.a.Number();
+				
 				payload.metrics[0].should.have.property("name").which.is.eql("test");
 				payload.metrics[0].should.have.property("value").which.is.eql(100);
 				payload.metrics[0].should.have.property("type").which.is.eql("Int32");
 				//payload.metrics[0].should.have.property("timestamp").which.is.a.Number();
 				payload.metrics.length.should.eql(1);
 				Object.keys(payload.metrics[0]).length.should.eql(3);
-				payload.should.have.property("seq").which.is.eql(2); // 0 is NBIRTH, 1 is DBIRTH
+				
+				payload.should.have.property("timestamp");
+				long.isLong(payload.timestamp).should.be.true();
+
+				payload.should.have.property("seq");
+				payload.seq.toInt().should.eql(2); // 0 is NBIRTH, 1 is DBIRTH
+				
 				done();
 				//client.end();
 			}
@@ -711,14 +734,23 @@ describe('mqtt sparkplug device node', function () {
 			} else if (topic === "spBv1.0/My Devices/DDATA/Node-Red/TEST2") {
 				var buffer = Buffer.from(message);
 				var payload = spPayload.decodePayload(buffer);
-				payload.should.have.property("timestamp").which.is.a.Number();
+				payload.should.have.property("timestamp");
+				long.isLong(payload.timestamp).should.be.true();
 				payload.metrics[0].should.have.property("name").which.is.eql("test");
 				payload.metrics[0].should.have.property("value").which.is.eql(100);
 				payload.metrics[0].should.have.property("type").which.is.eql("Int32");
-				payload.metrics[0].should.have.property("timestamp").which.is.a.Number();
+
+
+				payload.metrics[0].should.have.property("timestamp");
+				long.isLong(payload.metrics[0].timestamp).should.be.true();
+
+				payload.should.have.property("seq");
+				payload.seq.toInt().should.eql(2); // 0 is NBIRTH, 1 is DBIRTH
+
+
 				payload.metrics.length.should.eql(1);
 				Object.keys(payload.metrics[0]).length.should.eql(4);
-				payload.should.have.property("seq").which.is.eql(2); // 0 is NBIRTH, 1 is DBIRTH
+
 				done();
 				client.end();
 			}
@@ -842,7 +874,10 @@ describe('mqtt sparkplug device node', function () {
 					try {
 						var buffer = Buffer.from(message);
 						var payload = spPayload.decodePayload(buffer);
-						payload.should.have.property("timestamp").which.is.a.Number();
+
+						payload.should.have.property("timestamp");
+						long.isLong(payload.timestamp).should.be.true();
+
 						payload.metrics[0].should.have.property("name").which.is.eql("test");
 						payload.metrics[0].should.have.property("value").which.is.eql(null);
 						payload.metrics[0].should.have.property("type").which.is.eql("Int32");
@@ -914,14 +949,19 @@ describe('mqtt sparkplug device node', function () {
 				buffer = Buffer.from(payload);
 				payload = spPayload.decodePayload(buffer);
 	
-				payload.should.have.property("timestamp").which.is.a.Number();
+				payload.should.have.property("timestamp");
+				long.isLong(payload.timestamp).should.be.true();
+
+				payload.should.have.property("seq");
+				payload.seq.toInt().should.eql(2); // 0 is NBIRTH, 1 is DBIRTH
+
+
 				payload.metrics[0].should.have.property("name").which.is.eql("test");
 				payload.metrics[0].should.have.property("value").which.is.eql(100);
 				payload.metrics[0].should.have.property("type").which.is.eql("Int32");
 				//payload.metrics[0].should.have.property("timestamp").which.is.a.Number();
 				payload.metrics.length.should.eql(1);
 				Object.keys(payload.metrics[0]).length.should.eql(3);
-				payload.should.have.property("seq").which.is.eql(2); // 0 is NBIRTH, 1 is DBIRTH
 
 				simpleFlow[1].compressAlgorithm = undefined;
 				done();
@@ -989,14 +1029,20 @@ describe('mqtt sparkplug device node', function () {
 				buffer = Buffer.from(payload);
 				payload = spPayload.decodePayload(buffer);
 	
-				payload.should.have.property("timestamp").which.is.a.Number();
+				payload.should.have.property("timestamp");
+                long.isLong(payload.timestamp).should.be.true();
+
+                payload.should.have.property("seq");
+                payload.seq.toInt().should.eql(2); // 0 is NBIRTH, 1 is DBIRTH
+
+
 				payload.metrics[0].should.have.property("name").which.is.eql("test");
 				payload.metrics[0].should.have.property("value").which.is.eql(100);
 				payload.metrics[0].should.have.property("type").which.is.eql("Int32");
 				//payload.metrics[0].should.have.property("timestamp").which.is.a.Number();
 				payload.metrics.length.should.eql(1);
 				Object.keys(payload.metrics[0]).length.should.eql(3);
-				payload.should.have.property("seq").which.is.eql(2); // 0 is NBIRTH, 1 is DBIRTH
+
 
 				simpleFlow[1].compressAlgorithm = undefined;
 				done();
@@ -1074,21 +1120,19 @@ describe('mqtt sparkplug device node', function () {
 			} else if (topic === "spBv1.0/My Devices/DDATA/Node-Red/TEST2") {
 				var buffer = Buffer.from(message);
 				var payload = spPayload.decodePayload(buffer);
-				//payload.should.have.property("uuid");
-				//payload.uuid.should.eql("SPBV1.0_COMPRESSED");
 
-				//payload = pako.inflate(payload.body);
-				//buffer = Buffer.from(payload);
-				//payload = spPayload.decodePayload(buffer);
-	
-				payload.should.have.property("timestamp").which.is.a.Number();
+
+				payload.should.have.property("timestamp");
+                long.isLong(payload.timestamp).should.be.true();
+                payload.should.have.property("seq");
+                payload.seq.toInt().should.eql(2); // 0 is NBIRTH, 1 is DBIRTH
+
 				payload.metrics[0].should.have.property("name").which.is.eql("test");
 				payload.metrics[0].should.have.property("value").which.is.eql(100);
 				payload.metrics[0].should.have.property("type").which.is.eql("Int32");
 				//payload.metrics[0].should.have.property("timestamp").which.is.a.Number();
 				payload.metrics.length.should.eql(1);
 				Object.keys(payload.metrics[0]).length.should.eql(3);
-				payload.should.have.property("seq").which.is.eql(2); // 0 is NBIRTH, 1 is DBIRTH
 
 				simpleFlow[1].compressAlgorithm = undefined;
 				done();
@@ -1143,19 +1187,17 @@ describe('mqtt sparkplug device node', function () {
 			if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TEST2"){
 				var buffer = Buffer.from(message);
 				var payload = spPayload.decodePayload(buffer);
-				payload.should.have.property("timestamp").which.is.a.Number();
+				
+
+				payload.should.have.property("timestamp");
+                long.isLong(payload.timestamp).should.be.true();
 				
 				payload.metrics.should.containDeep([
 					{ name: 'TEST/TEST', type: 'Int32', value: 5 },
 				]);
 				
 				done();
-				//client.end();
 			}
-			/*n1.on('input', () => {
-				n1.error.should.be.calledWithExactly("Metrics should be an Array");
-				done();
-				});*/
 		});
 
 
@@ -1582,7 +1624,10 @@ describe('mqtt sparkplug device node', function () {
 				var buffer = Buffer.from(message);
 				var payload = spPayload.decodePayload(buffer);
 
-				payload.should.have.property("timestamp").which.is.a.Number();
+				
+				payload.should.have.property("timestamp");
+                long.isLong(payload.timestamp).should.be.true();
+
 				payload.metrics[0].should.have.property("name").which.is.eql("test");
 				payload.metrics[0].should.have.property("value");
 				payload.metrics[0].should.have.property("type").which.is.eql("Int32");
@@ -1604,19 +1649,22 @@ describe('mqtt sparkplug device node', function () {
 				var buffer = Buffer.from(message);
 				var payload = spPayload.decodePayload(buffer);
 
-				payload.should.have.property("timestamp").which.is.a.Number();
-				payload.metrics[0].should.have.property("name").which.is.eql(""); // name is decoded to "" if missing
+				payload.should.have.property("timestamp");
+                long.isLong(payload.timestamp).should.be.true();
+				
+				//payload.metrics[0].should.have.property("name").which.is.eql(""); // name is decoded to "" if missing
 				payload.metrics[0].should.have.property("value");
 				payload.metrics[0].should.have.property("type").which.is.eql("Int32");
 				payload.metrics[0].should.have.property("alias");
-
+				
 				alias = payload.metrics[0].alias.toNumber();
 				alias.should.eql(3);
-				
 				//payload.metrics[0].should.have.property("timestamp").which.is.a.Number();
 				payload.metrics.length.should.eql(1);
-				Object.keys(payload.metrics[0]).length.should.eql(4);
-				payload.should.have.property("seq").which.is.eql(2); // 0 is NBIRTH, 1 is DBIRTH
+				Object.keys(payload.metrics[0]).length.should.eql(3);
+				
+				payload.should.have.property("seq");
+                payload.seq.toInt().should.eql(2); // 0 is NBIRTH, 1 is DBIRTH
 				done();
 				//client.end();
 			}

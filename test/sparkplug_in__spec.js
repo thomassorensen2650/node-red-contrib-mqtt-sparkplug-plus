@@ -74,6 +74,8 @@ describe('mqtt sparkplug in node', function () {
 				n2.on("input", function (msg) {
 					try {
 					msg.should.have.property('payload');
+					msg.payload.timestamp = msg.payload.timestamp.toNumber()
+					msg.payload.seq = msg.payload.seq.toNumber()
 					if (msg.payload.seq === 200) {
 						msg.payload.should.deepEqual(validMsg);
 						done();
@@ -113,6 +115,8 @@ describe('mqtt sparkplug in node', function () {
 				n2.on("input", function (msg) {
 					try {
 					msg.should.have.property('payload');
+					msg.payload.timestamp = msg.payload.timestamp.toNumber()
+					msg.payload.seq = msg.payload.seq.toNumber()
 					if (msg.payload.seq === 200) {
 						msg.payload.should.deepEqual(validMsg);
 						done();
@@ -152,6 +156,8 @@ describe('mqtt sparkplug in node', function () {
 				n2.on("input", function (msg) {
 					try {
 					msg.should.have.property('payload');
+					msg.payload.timestamp = msg.payload.timestamp.toNumber()
+					msg.payload.seq = msg.payload.seq.toNumber()
 					if (msg.payload.seq === 200) {
 						msg.payload.should.deepEqual(validMsg);
 						done();
@@ -193,6 +199,8 @@ describe('mqtt sparkplug in node', function () {
 				n2.on("input", function (msg) {
 					try {
 					msg.should.have.property('payload');
+					msg.payload.timestamp = msg.payload.timestamp.toNumber()
+					msg.payload.seq = msg.payload.seq.toNumber()
 					if (msg.payload.seq === 200) {
 						done();
 					}else {

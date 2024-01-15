@@ -119,13 +119,15 @@ describe('mqtt sparkplug device node - Store Forward', function () {
 			if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red") {
 				var buffer = Buffer.from(message);
 				var payload = spPayload.decodePayload(buffer);
-				payload.should.have.property("seq").which.is.eql(0);
+				payload.should.have.property("seq");
+                payload.seq.toInt().should.eql(0);
 				n1.brokerConn.primaryScadaStatus.should.eql("ONLINE");
 
 			} else if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TEST2"){
 				var buffer = Buffer.from(message);
 				var payload = spPayload.decodePayload(buffer);
-				payload.should.have.property("seq").which.is.eql(1);
+				payload.should.have.property("seq");
+                payload.seq.toInt().should.eql(1);
 				n1.brokerConn.primaryScadaStatus.should.eql("ONLINE");
 				simpleFlow[1].enableStoreForward = false;
 				done();
