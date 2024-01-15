@@ -345,7 +345,13 @@ module.exports = function(RED) {
         RED.nodes.createNode(this,n);
 
         this.name = n.name||"Sparkplug Node";
-        this.deviceGroup = n.deviceGroup||"Sparkplug Devices";
+
+        // specify the device group id according to the environment variable
+        this.prdDeviceGroup = n.deviceGroup||"Sparkplug Devices";
+        this.devDeviceGroup = n.devDeviceGroup||"Sparkplug Dev Devices";
+        this.prdMode = process.env.NODE_ENV === 'prd' || process.env.NODE_ENV === 'production'
+        this.deviceGroup = this.prdMode ? this.prdDeviceGroup : this.devDeviceGroup;
+
         this.eonName = n.eonName||RED._("mqtt-sparkplug-plus.placeholder.eonname"),
         // Configuration options passed by Node Red
         this.broker = n.broker;
@@ -730,6 +736,7 @@ module.exports = function(RED) {
                         node.connecting = false;
                         node.connected = true;
                         node.log(RED._("mqtt-sparkplug-plus.state.connected",{broker:(node.clientid?node.clientid+"@":"")+node.brokerurl}));
+                        node.log(node.prdMode ? "Production Mode" : "Development Mode")
                         for (var id in node.users) {
                             if (node.users.hasOwnProperty(id)) {
                                 let state = node.enableStoreForward && node.primaryScadaStatus === "OFFLINE"  && node.users[id].shouldBuffer === true ? "BUFFERING" : "CONNECTED";

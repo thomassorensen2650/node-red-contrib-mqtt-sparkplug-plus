@@ -134,3 +134,13 @@ The easiest way to get started is to start with the example that is provided wit
 3. Configure the name (this will be the name used in the messages) and the metrics
 4. Configure upstream node-red nodes to send metrics data to the **mqtt sparkplug device** 
 5. Configure downstream node-red nodes to handle NCMDs (write commands)
+
+
+## Enviorment Variables
+We've introduced a new property, Dev Group, in the Sparkplug settings tab of the broker node. By default, the Dev Group ID will be used in message topics. However, if the environment variable `NODE_ENV` is set to `prd` or `production`, the group ID will be utilized instead. This allows for flexibility in topic naming based on the environment. Please make sure to configure NODE_ENV accordingly.
+
+```shell
+# in windows
+$env:NODE_ENV="dev"
+node-red -u .
+```
