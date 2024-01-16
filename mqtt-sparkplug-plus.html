@@ -101,6 +101,7 @@
                     <option value="">No</option>
                     <option value="DEFLATE">Deflate</option>
                     <option value="GZIP">Gzip</option>
+                    <option value="GZIP">Gzip</option>
                 </select>
             </div>
 
@@ -120,6 +121,10 @@
             <div class="form-row" id="node-storeforward-line">
                 <label for="node-config-input-primaryScada"><i class="fa fa-desktop"></i> Destination</label>
                 <input id="node-config-input-primaryScada" type="text" placeholder="Primary SCADA Name">
+            </div>
+             <div class="form-row" id="node-devStoreforward-line">
+                <label for="node-config-input-devScada"><i class="fa fa-desktop"></i> Dev Destination</label>
+                <input id="node-config-input-devScada" type="text" placeholder="Dev SCADA Name">
             </div>
         </div>
     </div>
@@ -156,6 +161,7 @@
             compressAlgorithm : {value: false},
             aliasMetrics : {value: false},
             primaryScada: {value:"",  validate :x =>  !$("#node-config-input-enableStoreForward").is(":checked") || /^[^/+#]+$/.test(x) },
+            devScada: {value:"",  validate :x =>  !$("#node-config-input-enableStoreForward").is(":checked") || /^[^/+#]+$/.test(x) },
         },
         credentials: {
             user: {type:"text"},
@@ -206,12 +212,12 @@
                 this.usetls = false;
                 $("#node-config-input-usetls").prop("checked",false);
             }
-            
+
             $("#node-config-input-protocolVersion").on("change", function() {
                 $("#node-config-input-cleansession-label").text(RED._("node-red:mqtt.label.cleansession"))
             });
             $("#node-config-input-protocolVersion").val(this.protocolVersion);
-        
+
             $("#node-storeforward-line").hide();
             $("#node-config-input-enableStoreForward").on('change',function() {
                 if ($(this).is(":checked")) {
@@ -297,11 +303,11 @@
         <ul style="min-width: 600px; margin-bottom: 20px;" id="node-mqtt-device-tabs"></ul>
     </div>
     <div id="node-mqtt-device-tabs-content" style="min-height:150px;">
-        <div id="mqtt-device-tab-metrics" style="display:none">                
+        <div id="mqtt-device-tab-metrics" style="display:none">
             <div class="form-row sparkplug-input-metric-row" id="sparkplug-input-metric-container-row">
                 <ol id="sparkplug-input-metric-container"></ol>
             </div>
-        
+
             <div class="form-tips"><span data-i18n="mqtt-sparkplug-plus.tip.device"></span></div>
         </div>
 
@@ -313,7 +319,7 @@
                 </label>
             </div>
             <div class="form-tips"><span data-i18n="mqtt-sparkplug-plus.tip.birthImmediately"></span></div>
-            
+
         </div>
 
     </div>
@@ -333,7 +339,7 @@
             var item = $(this);
             var name = item.find(".sparkplug-input-metric-name").val();
             var dt = item.find(".sparkplug-input-metric-dateType option:selected").text();
-           
+
             if (name) {
                 _metrics[name] = { dataType : dt};
             }
@@ -349,7 +355,7 @@
             broker: {type:"mqtt-sparkplug-broker", required:true},
             birthImmediately: {value: false},
         },
-       
+
         color:"#2181a6",
         inputs:1,
         outputs:1,
@@ -381,7 +387,7 @@
                 iconClass: "fa fa-cog"
             });
 
-            // Setup model 
+            // Setup model
             var metricsList = $("#sparkplug-input-metric-container").editableList( {
                 header: $("<div>").append($.parseHTML("<div style='width:80%; display: inline-grid'>Name</div><div style='display: inline-grid'>Type</div>")),
                 addButton: "add",
@@ -403,7 +409,7 @@
                         class : "sparkplug-input-metric-dateType"
                     }).appendTo(row);
                     var group0 = $('<optgroup/>', { label: "Datatypes" }).appendTo(selectField);
-                    
+
                     var dt = ["Int8", "Int16", "Int32", "Int64", "Float", "Double", "Boolean" , "String", "Unknown"];
                     dt.forEach(d => {
                         let option = $("<option></option>").val(d).text(d);
@@ -415,7 +421,7 @@
                 }
             });
             var metrics = this.metrics || {};
-       
+
             for (const [key, value] of Object.entries(metrics)) {
                 value["name"] = key;
                 metricsList.editableList('addItem', value)

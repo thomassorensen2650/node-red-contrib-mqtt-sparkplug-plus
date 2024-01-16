@@ -380,7 +380,9 @@ module.exports = function(RED) {
         this.maxQueueSize = 100000;
         // Get information about store forward
         this.enableStoreForward = n.enableStoreForward || false;
-        this.primaryScada = n.primaryScada || "";
+        this.devScada = n.devScada || ""
+        this.prdScada = n.primaryScada || "";
+        this.primaryScada = this.prdMode ? this.prdScada : this.devScada;
 
         // This will be set by primary SCADA and written via MQTT (OFFLINE or ONLINE)
         this.primaryScadaStatus = "OFFLINE";
