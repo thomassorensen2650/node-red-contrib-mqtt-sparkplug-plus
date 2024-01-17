@@ -116,6 +116,13 @@ module.exports = function(RED) {
         if (long.isLong(payload.timestamp)) {
             payload.timestamp = new Date(payload.timestamp.toNumber());
         }
+        if (payload.hasOwnProperty("metrics") && Array.isArray(payload.metrics)) {
+            payload.metrics.forEach(m=> {
+                if (long.isLong(m.timestamp)) {
+                    m.timestamp = new Date(m.timestamp.toNumber());
+                }
+            })
+        }
         return payload;
     }
 
@@ -398,6 +405,19 @@ module.exports = function(RED) {
                         topic : topic_,
                         payload : maybeDecompressPayload(sparkplugDecode(payload_))
                     };
+
+                    if (node.brokerConn.aliasMetrics && msg.payload.hasOwnProperty("metrics")) {
+                        let lookup = Object.entries(node.brokerConn.metricsAliasMap).reduce((acc, [key, value]) => (acc[value] = key, acc), {})
+                        msg.payload.metrics.forEach(m=> {
+                            if (long.isLong(m.alias)) {
+                                m.alias = m.alias;
+                            }
+                            if (lookup.hasOwnProperty(m.alias)) {
+                                m.name = lookup[m.alias]
+                                delete m.alias;
+                            }
+                        })                       
+                    }
                     node.send(msg);
                 } catch (e) {
                     node.error(RED._("mqtt-sparkplug-plus.errors.unable-to-decode-message", {type : "DCMD", error: e.toString()}));
@@ -1150,8 +1170,9 @@ module.exports = function(RED) {
                     
                     // Decode Payload
                     try {
-                        payload = maybeDecompressPayload(sparkplugDecode(payload));
-
+                        if (topic.startsWith("spBv1.0/")) {
+                            payload = maybeDecompressPayload(sparkplugDecode(payload));
+                        }
                         var msg = {topic:topic, payload:payload, qos:packet.qos, retain:packet.retain};
                         node.send(msg);
                     } catch (e) {

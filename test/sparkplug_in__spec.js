@@ -124,6 +124,36 @@ b1 = n1.brokerConn;
 		});*/
 	});
 
+	it('should only decode spB namespace', function (done) {
+
+	
+
+		helper.load(sparkplugNode, inExample, function () {
+
+			var n2 = helper.getNode("n2");
+			var out = helper.getNode("out");
+			b1 = out.brokerConn;
+
+			b1.client.on('connect',function (connack) {
+				b1.client.publish("MyTopic", "Hello there");
+			});
+			n2.on("input", function (msg) {
+				//  Output event from MQTT Sparkplug In
+				try {
+					if (msg.topic == "MyTopic") {
+						let p = msg.payload.toString();
+						p.should.eql("Hello there");
+						//msg.payload.should.deepEqual(validMsg);
+						done();
+					}
+				} catch(err) {
+				  done(err);
+				}
+			});	
+		});
+	});
+
+
 	it('should decompress a DEFLATE encoded topic', function (done) {
 
 		var testMsg = {
@@ -141,26 +171,26 @@ b1 = n1.brokerConn;
             } ]
         };
 		compressedPayload = spPayload.encodePayload(compressedPayload);
-		client = mqtt.connect(testBroker);
-		client.on('connect', function () {
-			helper.load(sparkplugNode, inExample, function () {
-				var n2 = helper.getNode("n2");
-				n2.on("input", function (msg) {
-					try {
-						msg.should.have.property('payload');
-						if (msg.payload.seq === 200) {
-							msg.payload.metrics.should.deepEqual(validMsg.metrics);
-							done();
-						}else {
-							// Nasty hack, to make sure we publish after node is online. 
-							client.publish(testMsg.topic, compressedPayload);
-						}
-					} catch(err) {
-					  done(err);
-					}
-				  });
+		helper.load(sparkplugNode, inExample, function () {
+			var n2 = helper.getNode("n2");
+			var b1 = helper.getNode("b1");
+			b1.client.on('connect',function (connack) {
+				b1.client.publish(testMsg.topic, compressedPayload);
 			});
+			n2.on("input", function (msg) {
+				try {
+					if (msg.topic == testMsg.topic) {
+						msg.should.have.property('payload');
+						msg.payload.seq.should.eql(200) 
+						msg.payload.metrics.should.deepEqual(validMsg.metrics);
+						done();
+					}
+				} catch(err) {
+					done(err);
+				}
+				});
 		});
+		
 	});
 
 	it('should decompress a GZIP encoded topic', function (done) {
@@ -180,26 +210,29 @@ b1 = n1.brokerConn;
             } ]
         };
 		compressedPayload = spPayload.encodePayload(compressedPayload);
-		client = mqtt.connect(testBroker);
-		client.on('connect', function () {
-			helper.load(sparkplugNode, inExample, function () {
-				var n2 = helper.getNode("n2");
-				n2.on("input", function (msg) {
+	
+		helper.load(sparkplugNode, inExample, function () {
+			var n2 = helper.getNode("n2");
+
+			var b1 = helper.getNode("b1");
+			b1.client.on('connect',function (connack) {
+				b1.client.publish(testMsg.topic, compressedPayload);
+			});
+
+			n2.on("input", function (msg) {
+				if (msg.topic == testMsg.topic) {
 					try {
 						msg.should.have.property('payload');
-						if (msg.payload.seq === 200) {
-							msg.payload.metrics.should.deepEqual(validMsg.metrics);
-							done();
-						}else {
-							// Nasty hack, to make sure we publish after node is online. 
-							client.publish(testMsg.topic, compressedPayload);
-						}
+						msg.payload.seq.should.eql(200)
+						msg.payload.metrics.should.deepEqual(validMsg.metrics);
+						done();
 					} catch(err) {
-					  done(err);
+					done(err);
 					}
-				  });
+				}
 			});
 		});
+
 	});
 
 	it('should error on invalid compression topic', function (done) {
@@ -215,33 +248,29 @@ b1 = n1.brokerConn;
 			seq : 200
         };
 		compressedPayload = spPayload.encodePayload(compressedPayload);
-		client = mqtt.connect(testBroker);
-		client.on('connect', function () {
-			helper.load(sparkplugNode, inExample, function () {
-				var n2 = helper.getNode("n2");
-				var n1 = helper.getNode("in");
-				n1.on('call:error', call => {
-					call.should.be.calledWithExactly('mqtt-sparkplug-plus.errors.unable-to-decode-message');
-					done();
-				  });
+	
 
-				n2.on("input", function (msg) {
-					try {
-						msg.should.have.property('payload');
-						
-						
-						if (msg.payload.seq === 200) {
-							done();
-						}else {
-							// Nasty hack, to make sure we publish after node is online. 
-							client.publish("spBv1.0/My Devices/DDATA/Node-Red/TEST2", compressedPayload);
-						}
-					} catch(err) {
-					  done(err);
-					}
-				  });
+		helper.load(sparkplugNode, inExample, function () {
+			var n2 = helper.getNode("n2");
+			var n1 = helper.getNode("in");
+			var b1 = helper.getNode("b1");
+			b1.client.on('connect',function (connack) {
+				b1.client.publish("spBv1.0/My Devices/DDATA/Node-Red/TEST2", compressedPayload);
+			});
+			n1.on('call:error', call => {
+				call.should.be.calledWithExactly('mqtt-sparkplug-plus.errors.unable-to-decode-message');
+				done();
+			});
+
+			n2.on("input", function (msg) {
+				try {
+					msg.should.have.property('payload');
+				} catch(err) {
+				done(err);
+				}
 			});
 		});
+	
 	});
 
 });
