@@ -1,4 +1,4 @@
-### 1.5: Major Release
+### 2.0: Major Release
 
 New:
 - Added support for DataSets
@@ -10,9 +10,10 @@ New:
 - Added set_name for device
 - Added set_group for EoN.
 - Support for parameter sorting
-- MQTT In now converts seq from Long to Number
-- Timestamps are now automaticly converted from Long to Date
-
+- Fixed:  MQTT In now converts seq from Long to Number
+- Fixed: Timestamps are now automaticly converted from Long to Date
+- Fixed: DCMD commands for the devices using aliases are not converted to names correctly.
+- Fixed: Mqtt In node will only parse topic in the Sparkplug namespace (MQTT in can now be used for other topics than sparkplug B)
 ### 1.4.1: Maintenance Release
 
  Fixed:
