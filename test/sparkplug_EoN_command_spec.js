@@ -77,7 +77,7 @@ describe('mqtt sparkplug EoN - Commands', function () {
 						waitOver = true;
 						n1.receive({
 							"command" : {
-								"EoN" : {
+								"node" : {
 									"connect" : true
 								}
 							}
@@ -127,7 +127,7 @@ it('should rebirth on new name', function (done) {
 						waitOver = true;
 						n1.receive({
 							"command" : {
-								"EoN" : {
+								"node" : {
 									"set_name" : "NEW_NAME",
                                     "set_group" : "NEW_GROUP"
 								}

@@ -22,7 +22,7 @@ module.exports = function(RED) {
     var spPayload = require('sparkplug-payload').get("spBv1.0");
     var HttpsProxyAgent = require('https-proxy-agent');
     var url = require('url');
-
+    var long = require("long");
     var pako = require('pako');
     var compressed = "SPBV1.0_COMPRESSED";
 
@@ -108,8 +108,15 @@ module.exports = function(RED) {
      * @returns {Object} decoded JSON object
      */
     function sparkplugDecode(payload_) {
-        var buffer = Buffer.from(payload_);
-        return spPayload.decodePayload(buffer);
+        let buffer = Buffer.from(payload_);
+        let payload = spPayload.decodePayload(buffer);
+        if (long.isLong(payload.seq)) {
+            payload.seq = payload.seq.toNumber();
+        }
+        if (long.isLong(payload.timestamp)) {
+            payload.timestamp = new Date(payload.timestamp.toNumber());
+        }
+        return payload;
     }
 
     function matchTopic(ts,t) {
@@ -207,8 +214,8 @@ module.exports = function(RED) {
                         }
 
                     };
-                    if (msg.command.hasOwnProperty("EoN")) {
-                        let rebirthRequired = (msg.command.EoN.set_name || msg.command.EoN.set_group) && this.brokerConn.connected;
+                    if (msg.command.hasOwnProperty("node")) {
+                        let rebirthRequired = (msg.command.node.set_name || msg.command.node.set_group) && this.brokerConn.connected;
 
                         if (rebirthRequired) {
                           
@@ -216,21 +223,21 @@ module.exports = function(RED) {
                             this.brokerConn.publish(msg, false);
                             this.brokerConn.nextBdseq();
                         }
-                        if (msg.command.EoN.set_name) {
-                            this.brokerConn.eonName = msg.command.EoN.set_name;
+                        if (msg.command.node.set_name) {
+                            this.brokerConn.eonName = msg.command.node.set_name;
                         }
-                        if (msg.command.EoN.set_group) {
-                            this.brokerConn.deviceGroup = msg.command.EoN.set_group;
+                        if (msg.command.node.set_group) {
+                            this.brokerConn.deviceGroup = msg.command.node.set_group;
                         }
-                        if (msg.command.EoN.set_server) {
+                        if (msg.command.node.set_server) {
                             // FIXME: Should we Disconnect here?
-                            this.brokerConn.broker = msg.command.EoN.set_server;
+                            this.brokerConn.broker = msg.command.node.set_server;
                         }
                         if (rebirthRequired) {
                             this.brokerConn.sendBirth();
                         }
 
-                        if (msg.command.EoN.connect) {
+                        if (msg.command.node.connect) {
                             if (!this.brokerConn.connected) {
                                 this.brokerConn.manualEoNBirth = false;
                                 this.brokerConn.connect();
@@ -1202,7 +1209,10 @@ module.exports = function(RED) {
                 if (msg.hasOwnProperty("payload")) {
                     let topicOK = msg.hasOwnProperty("topic") && (typeof msg.topic === "string") && (msg.topic !== "");
                     if (topicOK) { // topic must exist
-
+                            // Sparkplug dates are always send a Unix Time
+                        if (msg.payload.timestamp instanceof Date && !isNaN(msg.payload.timestamp)) {
+                            msg.payload.timestamp = msg.payload.timestamp.getTime();
+                        }
                         try{
                             if (this.brokerConn.compressAlgorithm) {
                                 msg.payload =  compressPayload(msg.payload, { algorithm : this.brokerConn.compressAlgorithm});

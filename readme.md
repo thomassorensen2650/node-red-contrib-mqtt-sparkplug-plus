@@ -157,7 +157,7 @@ A EoN Node (MQTT Server) can also be renamed using the following command. If the
 ```javascript    
 msg = {
     "command" : {
-        "device" : {
+        "node" : {
             "set_name" : "NEW_NAME",
             "set_group" : "NEW_GROUP",
             "connect" : true
