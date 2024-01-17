@@ -7,7 +7,11 @@ New:
 - Added support for manual connection of the EoN
 - Added connect command for EoN
 - Added set_name command for EoN node
+- Added set_name for device
+- Added set_group for EoN.
 - Support for parameter sorting
+- MQTT In now converts seq from Long to Number
+- Timestamps are now automaticly converted from Long to Date
 
 ### 1.4.1: Maintenance Release
 
