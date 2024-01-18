@@ -1,4 +1,10 @@
-### 2.0: Major Release
+### 2.0.1: Maintenance Release
+Fixed:
+- Moved Broker Reconnect to Connection Tab
+- Fixed incorrect information in documentation
+- Fixed unit failed unit test.
+
+### 2.0.0: Major Release
 
 New:
 - Added support for DataSets
