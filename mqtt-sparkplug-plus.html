@@ -39,7 +39,6 @@
                 <label for="node-config-input-usetls" style="width: 100px; line-height: 34px;"><span data-i18n="mqtt-sparkplug-plus.label.use-tls"></span></label>
                 <span id="node-config-row-tls" class="hide"><input style="width: 320px;" type="text" id="node-config-input-tls"></span>
             </div>
-
             <div class="form-row">
                 <label for="node-config-input-user"><i class="fa fa-user"></i> <span data-i18n="mqtt-sparkplug-plus.label.username"></span></label>
                 <input type="text" id="node-config-input-user" data-i18n="[placeholder]mqtt-sparkplug-plus.placeholder.username">
@@ -55,6 +54,11 @@
             <div class="form-row">
                 <label for="node-config-input-keepalive"><i class="fa fa-heartbeat"></i> <span data-i18n="mqtt-sparkplug-plus.label.keepalive"></span></label>
                 <input type="number" min="0" id="node-config-input-keepalive" style="width: 100px">
+            </div>
+            <div class="form-row">
+                <label for="node-config-input-manualEoNBirth" style="height: 34px; margin: 0 5px 0 104px; display: inline-block; width: auto; vertical-align: top;">
+                    <input type="checkbox" id="node-config-input-manualEoNBirth" style="display:inline-block; width:22px; vertical-align:top;"><span data-i18n="mqtt-sparkplug-plus.label.manualEoNBirth"></span>
+                </label>
             </div>
         </div>
         <div id="mqtt-broker-tab-advanced" style="display:none">

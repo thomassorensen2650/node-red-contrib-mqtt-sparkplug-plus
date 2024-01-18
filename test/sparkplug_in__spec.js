@@ -62,17 +62,14 @@ describe('mqtt sparkplug in node', function () {
 
 	it('should ouput a subscribed topic', function (done) {
 
-		var testMsg = {
-			topic : "",
-			payload : spPayload.encodePayload(validMsg)
-		}
-
 		helper.load(sparkplugNode, inExample, function () {
 
 			var n2 = helper.getNode("n2");
 			var out = helper.getNode("out");
 			b1 = out.brokerConn;
-
+			b1.client.on("connect", function (msg) {
+				out.receive({ payload: validMsg});
+			});
 			n2.on("input", function (msg) {
 				//  Output event from MQTT Sparkplug In
 				try {
