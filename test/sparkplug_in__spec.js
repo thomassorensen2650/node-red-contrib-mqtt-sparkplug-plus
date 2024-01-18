@@ -6,10 +6,6 @@ var pako = require('pako');
 
 var spPayload = require('sparkplug-payload').get("spBv1.0");
 helper.init(require.resolve('node-red'));
-let testBroker = 'mqtt://localhost';
-var client = null;
-
-
 
 /**
  * MQTT Sparkplug B in testing
@@ -23,9 +19,6 @@ describe('mqtt sparkplug in node', function () {
 	afterEach(function (done) {
 		helper.unload();
 		helper.stopServer(done);
-		if (client) {
-			client.end();
-		}
 	});
 
 	var inExample = [
@@ -80,11 +73,6 @@ describe('mqtt sparkplug in node', function () {
 			var out = helper.getNode("out");
 			b1 = out.brokerConn;
 
-			b1.client.on('connect',function (connack) {
-				out.receive({
-					"payload" : validMsg
-				})
-			});
 			n2.on("input", function (msg) {
 				//  Output event from MQTT Sparkplug In
 				try {
@@ -102,31 +90,9 @@ describe('mqtt sparkplug in node', function () {
 				}
 			});	
 		});
-
-/*
-
-b1 = n1.brokerConn;
-
-						b1.client.on('connect',function (connack) {
-							n1.receive({
-
-		client = mqtt.connect(testBroker);
-		client.on('connect', function () {
-			helper.load(sparkplugNode, inExample, function () {
-
-				// Output event from MQTT Sparkplug In
-				var n2 = helper.getNode("n2");
-				n2.on("input", function (msg) {
-					
-					
-				  });
-			});
-		});*/
 	});
 
 	it('should only decode spB namespace', function (done) {
-
-	
 
 		helper.load(sparkplugNode, inExample, function () {
 

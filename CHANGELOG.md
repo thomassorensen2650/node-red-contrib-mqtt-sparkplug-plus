@@ -2,7 +2,6 @@
 
 New:
 - Added support for DataSets
-- Added new Device set_name command
 - Redesigned Broker configuration UI
 - Added support for manual connection of the EoN
 - Added connect command for EoN
@@ -10,10 +9,15 @@ New:
 - Added set_name for device
 - Added set_group for EoN.
 - Support for parameter sorting
-- Fixed:  MQTT In now converts seq from Long to Number
-- Fixed: Timestamps are now automaticly converted from Long to Date
-- Fixed: DCMD commands for the devices using aliases are not converted to names correctly.
-- Fixed: Mqtt In node will only parse topic in the Sparkplug namespace (MQTT in can now be used for other topics than sparkplug B)
+- Updated all dependencies to newest versions. 
+
+Fixed:
+- MQTT In now converts seq from Long to Number
+- Timestamps are now automaticly converted from Long to Date
+- DCMD commands for the devices using aliases are not converted back to names correctly.
+- Mqtt In node will only parse topic in the Sparkplug namespace (MQTT in can now be used for other topics 
+than sparkplug B)
+
 ### 1.4.1: Maintenance Release
 
  Fixed:

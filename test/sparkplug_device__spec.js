@@ -156,7 +156,6 @@ describe('mqtt sparkplug device node', function () {
 
 	}); // it end 
 
-
 	it('should send DBirth message', function (done) {
 		client = mqtt.connect(testBroker);
 		let n1;
@@ -220,7 +219,6 @@ describe('mqtt sparkplug device node', function () {
 
 	}); // it end 
 
-
 	it('should not send DBirth if no metrics', function (done) {
 
 		flow = JSON.parse(JSON.stringify(simpleFlow)); 
@@ -269,8 +267,6 @@ describe('mqtt sparkplug device node', function () {
 
 
 	}); // it end 
-
-
 
 	it('should not birth when metrics missing and  birthImmediately = false', function (done) {
 		client = mqtt.connect(testBroker);
@@ -526,7 +522,6 @@ describe('mqtt sparkplug device node', function () {
 		});
 
 	}); // it end 
-
 
 	it('should send REBIRTH messages', function (done) {
 		client = mqtt.connect(testBroker);
@@ -819,7 +814,6 @@ describe('mqtt sparkplug device node', function () {
 			  });
 		}); // end helper
 	}); // it end 
-
 
 	it('should add null_value on DData without value', function (done) {
 			client = mqtt.connect(testBroker);
@@ -1579,7 +1573,6 @@ describe('mqtt sparkplug device node', function () {
 			}
 		});
 	}); // it end 
-
 
 	it('should alias metrics if enabled', function (done) {
 		client = mqtt.connect(testBroker);
