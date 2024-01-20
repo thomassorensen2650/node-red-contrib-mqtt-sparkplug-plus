@@ -1,5 +1,9 @@
 ### 2.0.1: Maintenance Release
 Fixed:
+- Dynamic DataSet fix
+
+### 2.0.1: Maintenance Release
+Fixed:
 - Moved Broker Reconnect to Connection Tab
 - Fixed incorrect information in documentation
 - Fixed unit failed unit test.
