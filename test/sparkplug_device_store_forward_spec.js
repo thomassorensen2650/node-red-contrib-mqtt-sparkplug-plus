@@ -134,4 +134,83 @@ describe('mqtt sparkplug device node - Store Forward', function () {
 			}
 		});
 	}); // it end 
+
+	it('should buffer Broker Connection is online', function (done) {
+		client = mqtt.connect(testBroker);
+		// WARN! We'll enable buffering for all tests
+		simpleFlow[1].enableStoreForward = false;
+		simpleFlow[1].manualEoNBirth = true;
+		// Intialzie
+		// Send 5 messages
+		// Connect after 5 seconds
+		// VERIFY Birth has the "newest Data"
+		// Verify that all the NDATA messages are send
+
+		var initBirthDone = false;
+		let n1;
+		let b1;
+		waitOver = false;
+		
+		client.on('connect', function () {
+			client.subscribe('#', function (err) {
+				if (!err) {
+					helper.load(sparkplugNode, simpleFlow, function () {
+						try {
+							n1 = helper.getNode("n1");
+							b1 = n1.brokerConn;
+							setTimeout(() => {
+								waitOver = true;
+								n1.receive({
+									"command" : {
+										"node" : {
+											"connect" : true
+										}
+									}
+								})	
+							}, 500);
+
+							for (let index = 0; index < 5; index++) {
+								setTimeout(() => {
+									// Send all metrics to trigger DBIRTH
+									
+									n1.receive({
+										"payload" : {
+											"metrics": [
+												{
+													"name": "test",
+													"value": 1*index,
+												},
+												{
+													"name": "test2",
+													"value": 1*index
+												}
+											]}
+									});
+								}, index*50);
+							}
+						}catch (e) {
+							done(e);
+						}
+					});
+				}
+			});
+		});
+
+		step = -1;
+		  client.on('message', function (topic, message) {
+			if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TEST2") {
+				var buffer = Buffer.from(message);
+				var payload = spPayload.decodePayload(buffer);
+				step.should.eql(step++);
+			} else if (topic === "spBv1.0/My Devices/DDATA/Node-Red/TEST2"){
+				var buffer = Buffer.from(message);
+				var payload = spPayload.decodePayload(buffer);
+				payload.metrics[0].value.should.eql(step++);
+				if (step == 5) {
+					done();
+				}
+				
+			}
+		});
+	}); // it end 
 });

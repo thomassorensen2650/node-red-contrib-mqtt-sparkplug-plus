@@ -356,28 +356,29 @@ describe('mqtt sparkplug device node', function () {
 					try {
 						n1 = helper.getNode("n1");
 						b1 = n1.brokerConn;
-
-						n1.receive({
-							"definition": {
-								"TEST/TEST": {
-									"dataType": "Int32",
-									"properties": {
-										"engUnits": {
-											"type": "string",
-											"value": "inHg"
-										}
-									} // properties end
-								} // Metrics end
-							},
-							"payload" : {
-								"metrics" : [
-									{
-										"name": "TEST/TEST",
-										"value": 5,
-										"timestamp" : ts
-									  
-									}]
-							}
+						b1.client.on('connect',function (connack) { 
+							n1.receive({
+								"definition": {
+									"TEST/TEST": {
+										"dataType": "Int32",
+										"properties": {
+											"engUnits": {
+												"type": "string",
+												"value": "inHg"
+											}
+										} // properties end
+									} // Metrics end
+								},
+								"payload" : {
+									"metrics" : [
+										{
+											"name": "TEST/TEST",
+											"value": 5,
+											"timestamp" : ts
+										  
+										}]
+								}
+							});
 						});
 					}catch (e) {
 						done(e);
@@ -613,22 +614,23 @@ describe('mqtt sparkplug device node', function () {
 					try {
 						n1 = helper.getNode("n1");
 						b1 = n1.brokerConn;
-
-						// Send all metrics to trigger DBIRTH
-						n1.receive({
-							"payload" : {
-								"metrics": [
-									{
-										"name": "test",
-										"value": 11,
-									},
-									{
-										"name": "test2",
-										"value": 11
-									}
-								]}
-							}
-						);
+						b1.client.on('connect',function (connack) {
+							// Send all metrics to trigger DBIRTH
+							n1.receive({
+								"payload" : {
+									"metrics": [
+										{
+											"name": "test",
+											"value": 11,
+										},
+										{
+											"name": "test2",
+											"value": 11
+										}
+									]}
+								}
+							);
+						});
 					}catch (e) {
 						done(e);
 					}
@@ -688,21 +690,22 @@ describe('mqtt sparkplug device node', function () {
 					try {
 						n1 = helper.getNode("n1");
 						b1 = n1.brokerConn;
-
-						// Send all metrics to trigger DBIRTH
-						n1.receive({
-							"payload" : {
-								"metrics": [
-									{
-										"name": "test",
-										"value": 11,
-									},
-									{
-										"name": "test2",
-										"value": 11
-									}
-								]}
-							}
+						b1.client.on('connect',function (connack) {
+							// Send all metrics to trigger DBIRTH
+							n1.receive({
+								"payload" : {
+									"metrics": [
+										{
+											"name": "test",
+											"value": 11,
+										},
+										{
+											"name": "test2",
+											"value": 11
+										}
+									]}
+								}
+							);}
 						);
 					}catch (e) {
 						done(e);
@@ -826,22 +829,23 @@ describe('mqtt sparkplug device node', function () {
 						try {
 							n1 = helper.getNode("n1");
 							b1 = n1.brokerConn;
-
-							// Send all metrics to trigger DBIRTH
-							n1.receive({
-								"payload" : {
-									"metrics": [
-										{
-											"name": "test",
-											"value": 11
-										},
-										{
-											"name": "test2",
-											"value": 11
-										}
-									]}
-								}
-							);
+							b1.client.on('connect',function (connack) {
+								// Send all metrics to trigger DBIRTH
+								n1.receive({
+									"payload" : {
+										"metrics": [
+											{
+												"name": "test",
+												"value": 11
+											},
+											{
+												"name": "test2",
+												"value": 11
+											}
+										]}
+									}
+								);
+							});
 						}catch (e) {
 							done(e);
 						}
@@ -898,22 +902,23 @@ describe('mqtt sparkplug device node', function () {
 					try {
 						n1 = helper.getNode("n1");
 						b1 = n1.brokerConn;
-
-						// Send all metrics to trigger DBIRTH
-						n1.receive({
-							"payload" : {
-								"metrics": [
-									{
-										"name": "test",
-										"value": 11,
-									},
-									{
-										"name": "test2",
-										"value": 11
-									}
-								]}
-							}
-						);
+						b1.client.on('connect',function (connack) {
+							// Send all metrics to trigger DBIRTH
+							n1.receive({
+								"payload" : {
+									"metrics": [
+										{
+											"name": "test",
+											"value": 11,
+										},
+										{
+											"name": "test2",
+											"value": 11
+										}
+									]}
+								}
+							);
+						});
 					}catch (e) {
 						done(e);
 					}
@@ -978,22 +983,23 @@ describe('mqtt sparkplug device node', function () {
 					try {
 						n1 = helper.getNode("n1");
 						b1 = n1.brokerConn;
-
-						// Send all metrics to trigger DBIRTH
-						n1.receive({
-							"payload" : {
-								"metrics": [
-									{
-										"name": "test",
-										"value": 11,
-									},
-									{
-										"name": "test2",
-										"value": 11
-									}
-								]}
-							}
-						);
+						b1.client.on('connect',function (connack) {
+							// Send all metrics to trigger DBIRTH
+							n1.receive({
+								"payload" : {
+									"metrics": [
+										{
+											"name": "test",
+											"value": 11,
+										},
+										{
+											"name": "test2",
+											"value": 11
+										}
+									]}
+								}
+							);
+						});
 					}catch (e) {
 						done(e);
 					}
@@ -1059,34 +1065,35 @@ describe('mqtt sparkplug device node', function () {
 					try {
 						n1 = helper.getNode("n1");
 						b1 = n1.brokerConn;
+						b1.client.on('connect',function (connack) {
+							n1.on('call:warn', call => {
+								call.should.be.calledWithExactly('mqtt-sparkplug-plus.errors.unable-to-encode-message');
+								done();
+							});
 
-						n1.on('call:warn', call => {
-							call.should.be.calledWithExactly('mqtt-sparkplug-plus.errors.unable-to-encode-message');
-							done();
-						  });
-
-						n1.on('input', () => {
-							
-							// FIXME: warn should be called, but its not! (works in node-red)
-							// need to fix test 
-							//n1.warn.should.be.calledWithExactly('mqtt-sparkplug-plus.errors.unable-to-encode-message');
-							
+							n1.on('input', () => {
+								
+								// FIXME: warn should be called, but its not! (works in node-red)
+								// need to fix test 
+								//n1.warn.should.be.calledWithExactly('mqtt-sparkplug-plus.errors.unable-to-encode-message');
+								
+							});
+							// Send all metrics to trigger DBIRTH
+							n1.receive({
+								"payload" : {
+									"metrics": [
+										{
+											"name": "test",
+											"value": 11,
+										},
+										{
+											"name": "test2",
+											"value": 11
+										}
+									]}
+								}
+							);
 						});
-						// Send all metrics to trigger DBIRTH
-						n1.receive({
-							"payload" : {
-								"metrics": [
-									{
-										"name": "test",
-										"value": 11,
-									},
-									{
-										"name": "test2",
-										"value": 11
-									}
-								]}
-							}
-						);
 					}catch (e) {
 
 
@@ -1586,22 +1593,23 @@ describe('mqtt sparkplug device node', function () {
 					try {
 						n1 = helper.getNode("n1");
 						b1 = n1.brokerConn;
-
-						// Send all metrics to trigger DBIRTH
-						n1.receive({
-							"payload" : {
-								"metrics": [
-									{
-										"name": "test",
-										"value": 11,
-									},
-									{
-										"name": "test2",
-										"value": 11
-									}
-								]}
-							}
-						);
+						b1.client.on('connect',function (connack) {
+							// Send all metrics to trigger DBIRTH
+							n1.receive({
+								"payload" : {
+									"metrics": [
+										{
+											"name": "test",
+											"value": 11,
+										},
+										{
+											"name": "test2",
+											"value": 11
+										}
+									]}
+								}
+							);
+						});
 					}catch (e) {
 						done(e);
 					}

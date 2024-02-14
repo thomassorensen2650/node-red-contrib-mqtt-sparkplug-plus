@@ -154,11 +154,29 @@ module.exports = function(RED) {
         }
         var node = this;
 
-   /**
+        this.emptyBuffer = function() {
+            let x = this.brokerConn.getItemFromQueue(this.name);
+            while(x) { 
+                let dMsg = this.brokerConn.createMsg(this.name, "DDATA", x, f => {});
+                if (dMsg) {
+                    this.brokerConn.publish(dMsg, !this.shouldBuffer, f => {}); 
+                }
+                x = this.brokerConn.getItemFromQueue(this.name);
+            }            
+        }
+
+        /**
          * try to send Sparkplug DBirth Messages
          * @param {function} done Node-Red Done Function 
          */
         this.trySendBirth = function(done) {    
+
+            var isOnline = (node.brokerConn.enableStoreForward && node.brokerConn.primaryScadaStatus === "ONLINE" && node.brokerConn.connected) ||
+            (!node.brokerConn.enableStoreForward && node.brokerConn.connected);
+            
+            if (!isOnline) {
+                return;
+            }
             let readyToSend = Object.keys(this.metrics).every(m => this.latestMetrics.hasOwnProperty(m));
 
             // Don't send birth if no metrics. we can assume that a dynamic defintion will be send if on metrics are defined.
@@ -176,8 +194,9 @@ module.exports = function(RED) {
                 }
                 let bMsg = node.brokerConn.createMsg(this.name, "DBIRTH", birthMetrics, f => {});
                 if(bMsg) {
-                    this.brokerConn.publish(bMsg, !this.shouldBuffer, done);  // send the message 
+                    this.brokerConn.publish(bMsg, true, done);  // send the message 
                     this.birthMessageSend = true;
+                    this.emptyBuffer();
                 }
             }
         }
@@ -360,10 +379,16 @@ module.exports = function(RED) {
                             }
                         });
 
-                        if (!this.brokerConn.connected) {
+                        var isOnline = (this.brokerConn.enableStoreForward && this.brokerConn.primaryScadaStatus === "ONLINE" && this.brokerConn.connected) ||
+                                                (!this.brokerConn.enableStoreForward && this.brokerConn.connected);
+
+                        if (!isOnline) {
                             // we dont want to publish anything if we are not connected
                             // if we publish here, then the messages will be queued by the MQTT Client
                             // and we need NBIRTH to be seq 0
+                            //let dMsg = this.brokerConn.createMsg(this.name, "DDATA", _metrics, f => {});
+                            //dMsg.timestamp = 123;
+                            this.brokerConn.addItemToQueue(this.name, _metrics);
                         }
                         else if (!this.birthMessageSend) {    // Send DBIRTH
                             this.trySendBirth(done);
@@ -465,6 +490,7 @@ module.exports = function(RED) {
         this.manualEoNBirth = n.manualEoNBirth||false,
 
         this.maxQueueSize = 100000;
+
         // Get information about store forward
         this.enableStoreForward = n.enableStoreForward || false;
         this.primaryScada = n.primaryScada || "";
@@ -475,29 +501,37 @@ module.exports = function(RED) {
         // Queue to store events while primary scada offline
         this.queue = this.context().get("queue");
         if (!this.queue){
-            this.queue = [];
+            this.queue = {};
             this.context().set("queue", this.queue);
         }
 
-        /**
-         * empties the current queue
-         */
-        this.emptyQueue = async function() {
-            if (node.primaryScadaStatus === "ONLINE" && node.connected) {
-                var item = this.queue.shift();
-                let count = 0;
-                while (item && node.primaryScadaStatus === "ONLINE" && node.connected) {
-                    
-                    node.publish(item, true);
-                    item = this.queue.shift();
+        this.addItemToQueue = function(queueName, item) {
+            if (!this.queue.hasOwnProperty(queueName)){
+                this.queue[queueName] = [];
+            }
+            let q = this.queue[queueName];
+            if (q.length === node.maxQueueSize) {
+                q.shift();
+            }else if (q.length  === node.maxQueueSize-1) {
+                node.warn(RED._("mqtt-sparkplug-plus.errors.buffer-full"));
+            }
+            q.push(item);
+            this.context().set("queue", this.queue);
+        }
 
-                    // Slow down queue empty
-                    if (++count % 500 === 0) {
-                        await new Promise(resolve => setTimeout(resolve, 250));
-                    }
-                }
-            } 
-        };
+        this.getItemFromQueue = function(queueName) {
+            let item = this.queue.hasOwnProperty(queueName) ? this.queue[queueName].shift() : undefined;
+            this.context().set("queue", this.queue);
+            return item;
+        }
+
+        this.emptyDDataBuffer = function() {
+            let x = this.getItemFromQueue("ddata");
+            while(x) { 
+                this.publish(x, !this.shouldBuffer, f => {}); 
+                x = this.getItemFromQueue(this.name);
+            }
+        }
 
         this.setConnectionState = function(node, state) {
         
@@ -845,7 +879,6 @@ module.exports = function(RED) {
                         }
 
                         // Not sure if connect will be called after a reconnect?? Need to check and delete if not needed
-                        node.emptyQueue();
                         // Remove any existing listeners before resubscribing to avoid duplicates in the event of a re-connection
                         node.client.removeAllListeners('message');
 
@@ -883,13 +916,19 @@ module.exports = function(RED) {
                             node.subscribe(primaryScadaTopic,options,function(topic_,payload_,packet) {
                                 let status = payload_.toString();
                                 node.primaryScadaStatus = status;
+
+                                if (node.primaryScadaStatus === "ONLINE") {
+                                   node.emptyDDataBuffer()
+                                }
                                 for (var id in node.users) {
                                     if (node.users.hasOwnProperty(id)) {
                                         let state = node.enableStoreForward && node.primaryScadaStatus === "OFFLINE"  && node.users[id].shouldBuffer === true ? "BUFFERING" : "CONNECTED";
                                         node.setConnectionState(node.users[id], state);
+                                        if (node.primaryScadaStatus == "ONLINE" && typeof node.users[id].trySendBirth === 'function') {
+                                            node.users[id].trySendBirth();
+                                        }
                                     }
                                 }
-                                node.emptyQueue();
                             });
 
                             // SPb 3.0 Support
@@ -904,19 +943,23 @@ module.exports = function(RED) {
                                     node.warn("Invalid Primary SCADA State:" + payload)
                                     node.primaryScadaStatus = "OFFLINE";
                                 }
-                                
+                                if (node.primaryScadaStatus === "ONLINE") {
+                                    node.emptyDDataBuffer()
+                                 }
                                 for (var id in node.users) {
                                     if (node.users.hasOwnProperty(id)) {
                                         let state = node.enableStoreForward && node.primaryScadaStatus === "OFFLINE"  && node.users[id].shouldBuffer === true ? "BUFFERING" : "CONNECTED";
                                         node.setConnectionState(node.users[id], state);
+                                        if (node.primaryScadaStatus == "ONLINE" && typeof node.users[id].trySendBirth === 'function') {
+                                            node.users[id].trySendBirth();
+                                        }
                                     }
                                 }
-                                node.emptyQueue();
                             });
                         }
                         // Send Node Birth
                         node.sendBirth();
-
+                        node.emptyDDataBuffer();
                     });
 
                     node.client.on("reconnect", function() {
@@ -1085,7 +1128,7 @@ module.exports = function(RED) {
          */
         this.publish = function (msg, bypassQueue, done) {
 
-            if (node.connected && (!node.enableStoreForward || (node.primaryScadaStatus === "ONLINE" && node.queue.length === 0) || bypassQueue)) {
+            if (true)  { // (node.connected && (!node.enableStoreForward || (node.primaryScadaStatus === "ONLINE") || bypassQueue)) {
                 if (msg.payload === null || msg.payload === undefined) {
                     msg.payload = "";
                 } else if (!Buffer.isBuffer(msg.payload)) {
@@ -1105,12 +1148,7 @@ module.exports = function(RED) {
                     return;
                 });
             } else {
-                if (node.queue.length === node.maxQueueSize) {
-                    node.queue.shift();
-                }else if (node.queue.length  === node.maxQueueSize-1) {
-                    node.warn(RED._("mqtt-sparkplug-plus.errors.buffer-full"));
-                }
-                node.queue.push(msg);
+               console.log("This should not happen");
                 done && done();
             }
         };
@@ -1244,8 +1282,16 @@ module.exports = function(RED) {
                         }
 
                         try {
+                            var isOnline = (node.brokerConn.enableStoreForward && node.brokerConn.primaryScadaStatus === "ONLINE" && node.brokerConn.connected) ||
+                                            (!node.brokerConn.enableStoreForward && node.brokerConn.connected);
                             msg.payload =  sparkplugEncode(msg.payload); 
-                            this.brokerConn.publish(msg, !this.shouldBuffer, done);  // send the message
+
+                            if (isOnline) {
+                                this.brokerConn.publish(msg, !this.shouldBuffer, done);  // send the message
+                            } else {
+                                 // ddata queue will be flushed as soon as the conncetion is back online.
+                                 this.brokerConn.addItemToQueue("ddata", msg);
+                            }
                         } catch (e) {
                             done(e);
                         }
