@@ -158,6 +158,7 @@ describe('mqtt sparkplug device node - Store Forward', function () {
 						try {
 							n1 = helper.getNode("n1");
 							b1 = n1.brokerConn;
+							n1.bufferDevice = true;
 							setTimeout(() => {
 								waitOver = true;
 								n1.receive({

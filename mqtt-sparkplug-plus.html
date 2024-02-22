@@ -104,7 +104,7 @@
                 </div>
             <div class="form-row" id="node-storeforward-line">
                 <label for="node-config-input-primaryScada"><i class="fa fa-desktop"></i> Destination</label>
-                <input id="node-config-input-primaryScada" type="text" placeholder="Primary SCADA Name">
+                <input id="node-config-input-primaryScada" type="text" placeholder="Primary Application Name">
             </div>
         </div>
     </div>
@@ -381,6 +381,13 @@
         </div>
 
         <div id="mqtt-device-tab-advanced" style="display:none">
+            <!-- UI for Buffer-->
+            <div class="form-row">
+                <label for="node-input-bufferDevice" style="width:70%">
+                    <input type="checkbox" id="node-input-bufferDevice" style="display:inline-block; width:22px; vertical-align:top;"><span data-i18n="mqtt-sparkplug-plus.label.bufferDevice"></span>
+                </label>
+            </div>
+
              <!-- UI for birthImmediately-->
             <div class="form-row">
                 <label for="node-input-birthImmediately" style="width:70%">
@@ -425,6 +432,7 @@
             metrics: {value:{}, required:true, /*validate : x => Object.keys(x).length > 0*/ }, // do regex matching of invalid charaters (e.g. # or +)
             broker: {type:"mqtt-sparkplug-broker", required:true},
             birthImmediately: {value: false},
+            bufferDevice: {value: false}
         },
        
         color:"#2181a6",

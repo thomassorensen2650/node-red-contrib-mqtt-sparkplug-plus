@@ -6,7 +6,7 @@
             "topic": "Topic",
             "password": "Password",
             "device": "Device",
-            "storeforward": "Enable Store Forward",
+          
             "aliasMetrics" :  "Use Alias for Metrics",
             "compressoutput" : "Compress Body",
             "messagetype": "Msg. Type",
@@ -42,6 +42,8 @@
             "delay": "Delay",
             "templates" : "Templates",
             "birthImmediately" : "Send Birth Immediately",
+            "bufferDevice" : "Store Forward when not connected",
+            "storeforward": "Store Forward when primary application is offline",
             "manualEoNBirth" : "Do not connect automaticly"
         },
         "tip": {
@@ -49,11 +51,6 @@
             "device": "Tip: Use '/' to group related metrics e.g. Machine1/Speed",
             "sparkplugformat": "Topic format: namespace/group_id/message_type/edge_node_id/[device_id]",
             "birthImmediately" : "The Send Birth Immediately option will send device online (DBIRTH) with NULL values as soon as node-red starts up."
-        },
-        "sections-label":{
-            "birth-message": "Message sent on connection (birth message)",
-            "will-message":"Message sent on an unexpected disconnection (will message)",
-            "close-message":"Message sent before disconnecting (close message)"
         },
         "tabs-label": {
             "connection": "Connection",

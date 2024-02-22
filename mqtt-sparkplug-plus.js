@@ -139,6 +139,7 @@ module.exports = function(RED) {
         this.dataTypes = ["Int8", "Int16", "Int32", "Int64", "Float", "Double", "Boolean" , "String", "DataSet", "Unknown"],
 
 
+        this.bufferDevice = n.bufferDevice
         this.broker = n.broker;
         this.name = n.name||"Sparkplug Device";
         this.latestMetrics = {};
@@ -151,6 +152,9 @@ module.exports = function(RED) {
 
         if (typeof this.birthImmediately === 'undefined') {
             this.birthImmediately = false;
+        }
+        if (typeof this.bufferDevice === 'undefined') {
+            this.bufferDevice = false;
         }
         var node = this;
 
@@ -379,15 +383,10 @@ module.exports = function(RED) {
                             }
                         });
 
-                        var isOnline = (this.brokerConn.enableStoreForward && this.brokerConn.primaryScadaStatus === "ONLINE" && this.brokerConn.connected) ||
-                                                (!this.brokerConn.enableStoreForward && this.brokerConn.connected);
+                        var shouldBuffer = (this.brokerConn.enableStoreForward && this.brokerConn.primaryScadaStatus !== "ONLINE") ||
+                                                (!this.brokerConn.connected && this.bufferDevice);
 
-                        if (!isOnline) {
-                            // we dont want to publish anything if we are not connected
-                            // if we publish here, then the messages will be queued by the MQTT Client
-                            // and we need NBIRTH to be seq 0
-                            //let dMsg = this.brokerConn.createMsg(this.name, "DDATA", _metrics, f => {});
-                            //dMsg.timestamp = 123;
+                        if (shouldBuffer) {                        
                             this.brokerConn.addItemToQueue(this.name, _metrics);
                         }
                         else if (!this.birthMessageSend) {    // Send DBIRTH
