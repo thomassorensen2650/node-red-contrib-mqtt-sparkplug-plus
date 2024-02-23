@@ -91,8 +91,8 @@ describe('mqtt sparkplug out node', function () {
 			client.subscribe("spBv1.0/My Devices/DDATA/Node-Red/TEST2", function (err) {
 				if (!err) {
 					helper.load(sparkplugNode, outFlow, function () {
-					
 						n1 = helper.getNode("n1");
+						n1.brokerConn.enableStoreForward = false; // Force enable to buffer
 						
 						setTimeout(() => n1.receive({ payload: validMsg}), 500);
 					});
@@ -107,7 +107,6 @@ describe('mqtt sparkplug out node', function () {
 			payload.timestamp = payload.timestamp.toNumber()
 			payload.seq = payload.seq.toNumber()
 			payload.should.deepEqual(validMsg);
-			client.end(true);
 			done();
 		});
 	});
@@ -120,6 +119,8 @@ describe('mqtt sparkplug out node', function () {
 		var n1 = null;
 		client = mqtt.connect(testBroker);
 		client.on('connect', function () {
+			client.publish("STATE/MY SCADA", "OFFLINE", true)
+
 			client.subscribe("spBv1.0/My Devices/DDATA/Node-Red/TEST2", function (err) {
 				if (!err) {
 					helper.load(sparkplugNode, outFlow, function () {
