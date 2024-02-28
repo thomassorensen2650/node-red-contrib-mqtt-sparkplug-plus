@@ -161,6 +161,7 @@ module.exports = function(RED) {
         this.emptyBuffer = function() {
             let x = this.brokerConn.getItemFromQueue(this.name);
             while(x) { 
+                x.forEach(s=> s.isHistorical = true);
                 let dMsg = this.brokerConn.createMsg(this.name, "DDATA", x, f => {});
                 if (dMsg) {
                     this.brokerConn.publish(dMsg, !this.shouldBuffer, f => {}); 
