@@ -293,12 +293,6 @@
                     });
                 }
             }
-          /*  $("#node-config-input-manualEoNBirth").on('change',function() {
-                $("#node-config-input-eonName").prop("disabled", $(this).is(":checked"));
-            });
-            */
-                    
-
             this.cleansession = true;
             $("#node-storeforward-line").hide();
             $("#node-config-input-enableStoreForward").on('change',function() {
@@ -423,7 +417,7 @@
         return _metrics;
     }
 
-    let dt = ["Int8", "Int16", "Int32", "Int64", "Float", "Double", "Boolean" , "String", "Unknown"];
+    let dt =  ["Int8", "Int16", "Int32", "Int64", "UInt8", "UInt16", "UInt32", "UInt64", "Float", "Double", "Boolean", "DateTime", "UUID", "DataSet", "Bytes", "Unknown"]
 
     RED.nodes.registerType('mqtt sparkplug device',{
         category: 'network',
@@ -490,9 +484,7 @@
                         style:"width:110px; margin-left: 5px; text-align: center;",
                         class : "sparkplug-input-metric-dateType"
                     }).appendTo(row);
-                    var group0 = $('<optgroup/>', { label: "Datatypes" }).appendTo(selectField);
-                    var dt = ["Int8", "Int16", "Int32", "Int64", "Float", "Double", "Boolean", "String", "DataSet", "Unknown"];
-                
+                    var group0 = $('<optgroup/>', { label: "Datatypes" }).appendTo(selectField);                
                     dt.forEach(d => {
                         let option = $("<option></option>").val(d).text(d);
                         group0.append(option);
