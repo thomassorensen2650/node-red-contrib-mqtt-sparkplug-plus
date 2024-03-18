@@ -484,7 +484,9 @@
                         style:"width:110px; margin-left: 5px; text-align: center;",
                         class : "sparkplug-input-metric-dateType"
                     }).appendTo(row);
+
                     var group0 = $('<optgroup/>', { label: "Datatypes" }).appendTo(selectField);                
+
                     dt.forEach(d => {
                         let option = $("<option></option>").val(d).text(d);
                         group0.append(option);

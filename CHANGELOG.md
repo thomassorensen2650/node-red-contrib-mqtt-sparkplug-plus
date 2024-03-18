@@ -1,3 +1,10 @@
+### 2.1.0: Maintenance Release
+Added:
+- Option to buffer when not conected
+
+Fixed:
+- Renamed primary SCADA to primary Application per. Sparkplug B. Spec.
+
 ### 2.0.1: Maintenance Release
 Fixed:
 - Dynamic DataSet fix
