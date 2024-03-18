@@ -422,8 +422,7 @@
         });
         return _metrics;
     }
-
-    let dt = ["Int8", "Int16", "Int32", "Int64", "Float", "Double", "Boolean" , "String", "Unknown"];
+    let dt =  ["Int8", "Int16", "Int32", "Int64", "UInt8", "UInt16", "UInt32", "UInt64", "Float", "Double", "Boolean", "DateTime", "UUID", "DataSet", "Bytes", "Unknown"]
 
     RED.nodes.registerType('mqtt sparkplug device',{
         category: 'network',
@@ -491,8 +490,7 @@
                         class : "sparkplug-input-metric-dateType"
                     }).appendTo(row);
                     var group0 = $('<optgroup/>', { label: "Datatypes" }).appendTo(selectField);
-                    var dt = ["Int8", "Int16", "Int32", "Int64", "Float", "Double", "Boolean", "String", "DataSet", "Unknown"];
-                
+
                     dt.forEach(d => {
                         let option = $("<option></option>").val(d).text(d);
                         group0.append(option);
