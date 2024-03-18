@@ -145,7 +145,7 @@ module.exports = function(RED) {
         this.metrics = n.metrics || {};
         this.birthMessageSend = false;
         this.birthImmediately = n.birthImmediately || false;
-
+        this.dcmdTopic = ""; // Used to store the topic for DCMD
         this.inflatedMetrics = {};
         this.shouldBuffer = true; // hardcoded / Devices always buffers
 
@@ -167,6 +167,40 @@ module.exports = function(RED) {
                 }
                 x = this.brokerConn.getItemFromQueue(this.name);
             }            
+        }
+        this.subscribe_dcmd = function() {
+             // Handle DCMD Messages
+             let options = { qos: 0 };
+             let subscribeTopic = `spBv1.0/${this.brokerConn.deviceGroup}/DCMD/${this.brokerConn.eonName}/${this.name}`;
+             node.dcmdTopic = subscribeTopic;
+             node.brokerConn.subscribe(subscribeTopic,options,function(topic_,payload_,packet) {
+                 try {
+                     var msg = {
+                         topic : topic_,
+                         payload : maybeDecompressPayload(sparkplugDecode(payload_))
+                     };
+ 
+                     if (node.brokerConn.aliasMetrics && msg.payload.hasOwnProperty("metrics")) {
+                         let lookup = Object.entries(node.brokerConn.metricsAliasMap).reduce((acc, [key, value]) => (acc[value] = key, acc), {})
+                         msg.payload.metrics.forEach(m=> {
+                             if (long.isLong(m.alias)) {
+                                 m.alias = m.alias;
+                             }
+                             if (lookup.hasOwnProperty(m.alias)) {
+                                 m.name = lookup[m.alias]
+                                 delete m.alias;
+                             }
+                         })                       
+                     }
+                     node.send(msg);
+                 } catch (e) {
+                     node.error(RED._("mqtt-sparkplug-plus.errors.unable-to-decode-message", {type : "DCMD", error: e.toString()}));
+                 }
+             }, this.id);
+        }
+
+        this.unsubscribe_dcmd = function() {
+            node.brokerConn.unsubscribe(node.dcmdTopic,node.id, {});
         }
 
         /**
@@ -223,6 +257,24 @@ module.exports = function(RED) {
             this.on("input",function(msg,send,done) {
                 // Handle Command
                 if (msg.hasOwnProperty("command")) {
+
+                    let resubscribeRequired = true;
+                    let u = [];
+                    try 
+                    {
+                        if (resubscribeRequired) {
+                            // Unsubscribe for all topic from Devices
+                            for (const [key, n] of Object.entries(this.brokerConn.users)) {
+                                if (typeof n.unsubscribe_dcmd === 'function') {
+                                    u.push(n);
+                                    n.unsubscribe_dcmd();
+                                }
+                            }
+                        }
+                    }catch (e) {
+                        console.log(e);
+                    }
+           
                     if (msg.command.hasOwnProperty("device")) {
                         if (msg.command.device.set_name) {
                             if (this.birthMessageSend) {
@@ -246,9 +298,8 @@ module.exports = function(RED) {
                     };
                     if (msg.command.hasOwnProperty("node")) {
                         let rebirthRequired = (msg.command.node.set_name || msg.command.node.set_group) && this.brokerConn.connected;
-
+   
                         if (rebirthRequired) {
-                          
                             let msg = this.brokerConn.getDeathPayload();
                             this.brokerConn.publish(msg, false);
                             this.brokerConn.nextBdseq();
@@ -274,6 +325,9 @@ module.exports = function(RED) {
                             }
                         }
                     }
+                    u.forEach(n => {
+                        n.subscribe_dcmd();
+                    });
                 }
 
                 let validPayload = msg.hasOwnProperty("payload") && typeof msg.payload === 'object' && msg.payload !== null && !Array.isArray(msg.payload);
@@ -420,33 +474,7 @@ module.exports = function(RED) {
             }
             node.brokerConn.register(node);
             
-            // Handle DCMD Messages
-            let options = { qos: 0 };
-            let subscribeTopic = `spBv1.0/${this.brokerConn.deviceGroup}/DCMD/${this.brokerConn.eonName}/${this.name}`;
-            this.brokerConn.subscribe(subscribeTopic,options,function(topic_,payload_,packet) {
-                try {
-                    var msg = {
-                        topic : topic_,
-                        payload : maybeDecompressPayload(sparkplugDecode(payload_))
-                    };
-
-                    if (node.brokerConn.aliasMetrics && msg.payload.hasOwnProperty("metrics")) {
-                        let lookup = Object.entries(node.brokerConn.metricsAliasMap).reduce((acc, [key, value]) => (acc[value] = key, acc), {})
-                        msg.payload.metrics.forEach(m=> {
-                            if (long.isLong(m.alias)) {
-                                m.alias = m.alias;
-                            }
-                            if (lookup.hasOwnProperty(m.alias)) {
-                                m.name = lookup[m.alias]
-                                delete m.alias;
-                            }
-                        })                       
-                    }
-                    node.send(msg);
-                } catch (e) {
-                    node.error(RED._("mqtt-sparkplug-plus.errors.unable-to-decode-message", {type : "DCMD", error: e.toString()}));
-                }
-            });
+           this.subscribe_dcmd();
             this.on('close', function(done) {
                 node.brokerConn.deregister(node, done);
             });
@@ -1097,20 +1125,23 @@ module.exports = function(RED) {
             var sub = node.subscriptions[topic];
             if (sub) {
                 if (sub[ref]) {
-                    node.client.removeListener('message',sub[ref].handler);
+                    if (node.client) {
+                        node.client.removeListener('message',sub[ref].handler);
+                    }
+                    
                     delete sub[ref];
                 }
                 //TODO: Review. The `if(removed)` was commented out to always delete and remove subscriptions.
                 // if we dont then property changes dont get applied and old subs still trigger
                 //if (removed) {
 
-                    if (Object.keys(sub).length === 0) {
-                        delete node.subscriptions[topic];
-                        delete node.subscriptionIds[topic];
-                        if (node.connected) {
-                            node.client.unsubscribe(topic);
-                        }
+                if (Object.keys(sub).length === 0) {
+                    delete node.subscriptions[topic];
+                    delete node.subscriptionIds[topic];
+                    if (node.connected) {
+                        node.client.unsubscribe(topic);
                     }
+                }
                 //}
             } else {
                 // _debug += "sub not found! "; //TODO: remove
