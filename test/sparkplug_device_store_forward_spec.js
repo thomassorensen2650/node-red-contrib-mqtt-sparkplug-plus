@@ -207,8 +207,6 @@ describe('mqtt sparkplug device node - Store Forward', function () {
 				var buffer = Buffer.from(message);
 				var payload = spPayload.decodePayload(buffer);
 				payload.metrics[0].value.should.eql(step++);
-
-				console.log(payload.metrics[0]);
 				payload.metrics[0].hasOwnProperty("timestamp").should.be.true();
 				if (step == 5) {
 					done();
