@@ -258,23 +258,19 @@ module.exports = function(RED) {
                 // Handle Command
                 if (msg.hasOwnProperty("command")) {
 
+                    // Lets always refresh subscriptions for now.
                     let resubscribeRequired = true;
                     let u = [];
-                    try 
-                    {
-                        if (resubscribeRequired) {
-                            // Unsubscribe for all topic from Devices
-                            for (const [key, n] of Object.entries(this.brokerConn.users)) {
-                                if (typeof n.unsubscribe_dcmd === 'function') {
-                                    u.push(n);
-                                    n.unsubscribe_dcmd();
-                                }
+                    if (resubscribeRequired) {
+                        // Unsubscribe for all topic from Devices
+                        for (const [key, n] of Object.entries(this.brokerConn.users)) {
+                            if (typeof n.unsubscribe_dcmd === 'function') {
+                                u.push(n);
+                                n.unsubscribe_dcmd();
                             }
                         }
-                    }catch (e) {
-                        console.log(e);
                     }
-           
+
                     if (msg.command.hasOwnProperty("device")) {
                         if (msg.command.device.set_name) {
                             if (this.birthMessageSend) {
@@ -325,6 +321,7 @@ module.exports = function(RED) {
                             }
                         }
                     }
+                    // Resubscribe to MQTT topics (DCMD topic might have changed)
                     u.forEach(n => {
                         n.subscribe_dcmd();
                     });

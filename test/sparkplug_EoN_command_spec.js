@@ -197,7 +197,7 @@ describe('mqtt sparkplug EoN - Commands', function () {
       });
 	});
 
-	it('should subscribe on new node topic', function (done) {
+	it('should subscribe on new node topic (Node name change)', function (done) {
 
 		simpleFlow[1].manualEoNBirth = true;
 		simpleFlow[0].birthImmediately = true;
@@ -209,8 +209,6 @@ describe('mqtt sparkplug EoN - Commands', function () {
 
 			var n2 = helper.getNode("n2");
 			n2.on("input", function (msg) {
-
-				console.log("GOT ThIS", msg);
 				msg.topic.should.eql("spBv1.0/My Devices/DCMD/NEW_NAME/TEST2")
 				done();
 	
@@ -240,56 +238,129 @@ describe('mqtt sparkplug EoN - Commands', function () {
 				var c1 = n1.brokerConn.client;
 				// Send on old topic and new topic to make sure it only subscribes to new topic
 				c1.connected.should.be.true();
-				//c1.subscribe("#")
-				//console.log("READY")
-				//c1.on('message', function (topic, message) {
-			//		// message is Buffer
-			//		console.log(message.toString())
-			//	})
+				o1.receive({
+					topic : "spBv1.0/My Devices/DCMD/Node-Red/TEST2",
+					payload : {
+						"metrics" : [
+						{
+							"name": "test",
+							"value": 500,
+							"type" : "Int32"
+						}
+					]
+					}
+						
+				});
 
+				o1.receive({
+					"topic" : "spBv1.0/My Devices/DCMD/RANDOM/TEST2",
+					payload : {
+						"metrics" : [
+						{
+							"name": "test",
+							"value": 500,
+							"type" : "Int32"
+						}
+					]
+					}
+				});
+
+				o1.receive({
+					"topic" : "spBv1.0/My Devices/DCMD/NEW_NAME/TEST2",
+					payload : {
+						"metrics" : [
+						{
+							"name": "test",
+							"value": 500,
+							"type" : "Int32"
+						}
+					]
+					}
+				});
+				}, 200);
+			});
+	});
+
+	it('should subscribe on new node topic (Device name change)', function (done) {
+
+		simpleFlow[1].manualEoNBirth = true;
+		simpleFlow[0].birthImmediately = true;
+
+		helper.load(sparkplugNode, simpleFlow, function () {
 			
-					o1.receive({
-						topic : "spBv1.0/My Devices/DCMD/Node-Red/TEST2",
-						payload : {
-							"metrics" : [
-							{
-								"name": "test",
-								"value": 500,
-								"type" : "Int32"
-							}
-						]
+			var n1 = helper.getNode("n1");
+			var o1 = helper.getNode("o1");
+
+			var n2 = helper.getNode("n2");
+			n2.on("input", function (msg) {
+				msg.topic.should.eql("spBv1.0/My Devices/DCMD/Node-Red/NEW_NAME")
+				done();
+	
+			});
+			n1.receive({
+				"command" : {
+					"node" : {
+						"connect" : true
+					},
+					"device" : {
+						"set_name" : "NEW_NAME"
+					}
+				},
+				"payload" : [
+					{
+						"name": "test",
+						"value": 11,
+					},
+					{
+						"name": "test2",
+						"value": 11
+					}
+				]	
+			})	;
+			setTimeout(() => {
+
+				var c1 = n1.brokerConn.client;
+				// Send on old topic and new topic to make sure it only subscribes to new topic
+				c1.connected.should.be.true();
+				o1.receive({
+					topic : "spBv1.0/My Devices/DCMD/Node-Red/TEST2",
+					payload : {
+						"metrics" : [
+						{
+							"name": "test",
+							"value": 500,
+							"type" : "Int32"
 						}
-							
-					});
+					]
+					}
+						
+				});
 
-					o1.receive({
-						"topic" : "spBv1.0/My Devices/DCMD/RANDOM/TEST2",
-						payload : {
-							"metrics" : [
-							{
-								"name": "test",
-								"value": 500,
-								"type" : "Int32"
-							}
-						]
+				o1.receive({
+					"topic" : "spBv1.0/My Devices/DCMD/RANDOM/TEST2",
+					payload : {
+						"metrics" : [
+						{
+							"name": "test",
+							"value": 500,
+							"type" : "Int32"
 						}
-					});
+					]
+					}
+				});
 
-					o1.receive({
-						"topic" : "spBv1.0/My Devices/DCMD/NEW_NAME/TEST2",
-						payload : {
-							"metrics" : [
-							{
-								"name": "test",
-								"value": 500,
-								"type" : "Int32"
-							}
-						]
+				o1.receive({
+					"topic" : "spBv1.0/My Devices/DCMD/Node-Red/NEW_NAME",
+					payload : {
+						"metrics" : [
+						{
+							"name": "test",
+							"value": 500,
+							"type" : "Int32"
 						}
-					});
-
-
-
+					]
+					}
+				});
 				}, 200);
 			});
 	});
