@@ -437,7 +437,14 @@ module.exports = function(RED) {
                         var shouldBuffer = (this.brokerConn.enableStoreForward && this.brokerConn.primaryScadaStatus !== "ONLINE") ||
                                                 (!this.brokerConn.connected && this.bufferDevice);
 
-                        if (shouldBuffer) {                        
+                        if (shouldBuffer) {    
+                                               
+                            // Timestamps are required on historical metrics
+                            _metrics.forEach(m=>{
+                                if (!m.timestamp) {
+                                    m.timestamp = Date.now();
+                                }
+                            })
                             this.brokerConn.addItemToQueue(this.name, _metrics);
                         }
                         else if (!this.birthMessageSend) {    // Send DBIRTH
