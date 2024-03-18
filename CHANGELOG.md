@@ -1,3 +1,11 @@
+### 2.1.1: Maintenance Release
+Added:
+- Added support for unsigned integers
+
+Fixed:
+- Issue where old MQTT topic will be used when Devices was renamed.
+- Timestamp was not added to historical metric values
+
 ### 2.1.0: Maintenance Release
 Added:
 - Option to buffer when not conected
