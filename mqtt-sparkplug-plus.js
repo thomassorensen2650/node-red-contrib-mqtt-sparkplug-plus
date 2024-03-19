@@ -168,13 +168,27 @@ module.exports = function(RED) {
                 x = this.brokerConn.getItemFromQueue(this.name);
             }            
         }
+        /**
+         * 
+         * @returns the DCMD (Device command) topic for this Devive 
+         */
+        this.getDCMDTopic = () => `spBv1.0/${this.brokerConn.deviceGroup}/DCMD/${this.brokerConn.eonName}/${this.name}`;
         this.subscribe_dcmd = function() {
              // Handle DCMD Messages
              let options = { qos: 0 };
-             let subscribeTopic = `spBv1.0/${this.brokerConn.deviceGroup}/DCMD/${this.brokerConn.eonName}/${this.name}`;
-             node.dcmdTopic = subscribeTopic;
-             node.brokerConn.subscribe(subscribeTopic,options,function(topic_,payload_,packet) {
+    
+
+             node.dcmdTopic = this.getDCMDTopic();
+             node.brokerConn.subscribe( this.dcmdTopic,options,function(topic_,payload_,packet) {
                  try {
+                    // This should never happen.
+                    // Extra check to make sure that we are not handing command from old topic name. 
+                    // This was a issue before V2.1.1.. Hopefully this has been fully resolved now, but keep this extra check...
+                    let expectedTopic = node.getDCMDTopic()
+                    if (topic_ != expectedTopic) {
+                        node.error(`Topic ${payload_} does not match expected topic ${expectedTopic}.. Pleae create a Gibhub issue with description on how to reproduce`)
+                        return;
+                    }
                      var msg = {
                          topic : topic_,
                          payload : maybeDecompressPayload(sparkplugDecode(payload_))
@@ -196,7 +210,7 @@ module.exports = function(RED) {
                  } catch (e) {
                      node.error(RED._("mqtt-sparkplug-plus.errors.unable-to-decode-message", {type : "DCMD", error: e.toString()}));
                  }
-             }, this.id);
+             }, node.id);
         }
 
         this.unsubscribe_dcmd = function() {
