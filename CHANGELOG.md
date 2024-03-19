@@ -1,3 +1,7 @@
+### 2.1.2: Maintenance Release
+Added:
+- Added check to verify DCMD topic is correct. (This should never happen, but just in case)
+- 
 ### 2.1.1: Maintenance Release
 Added:
 - Added support for unsigned integers
