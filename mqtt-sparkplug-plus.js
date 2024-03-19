@@ -136,7 +136,7 @@ module.exports = function(RED) {
 
     function MQTTSparkplugDeviceNode(n) {
         RED.nodes.createNode(this,n);
-        this.dataTypes = ["Int8", "Int16", "Int32", "Int64", "UInt8", "UInt16", "UInt32", "UInt64", "Float", "Double", "Boolean", "DateTime", "UUID", "DataSet", "Bytes", "Unknown"]  
+        this.dataTypes = ["Int8", "Int16", "Int32", "Int64", "UInt8", "UInt16", "UInt32", "UInt64", "Float", "Double", "Boolean", "DateTime", "UUID", "DataSet", "Bytes", "String", "Unknown"]
 
         this.bufferDevice = n.bufferDevice
         this.broker = n.broker;
