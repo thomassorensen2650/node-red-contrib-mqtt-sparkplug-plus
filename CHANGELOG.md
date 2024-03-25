@@ -1,3 +1,7 @@
+### 2.1.7: Maintenance Release
+Fixed:
+- Loosen the dependency requirement so that it now works with Node14 / Node-red 2.0. 
+
 ### 2.1.2: Maintenance Release
 Added:
 - Added check to verify DCMD topic is correct. (This should never happen, but just in case)
