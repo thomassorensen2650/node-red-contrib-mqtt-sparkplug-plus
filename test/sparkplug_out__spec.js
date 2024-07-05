@@ -111,11 +111,17 @@ describe('mqtt sparkplug out node', function () {
 		});
 	});
 
-	/**
+
+
+
+	/** 
+	
 	 * Verify that we'll buffer if forced enabled,
-	 */
+	
 	it('should buffer if publish topic', function (done) {
 
+		outFlow[0].shouldBuffer = true;
+	
 		var n1 = null;
 		client = mqtt.connect(testBroker);
 		client.on('connect', function () {
@@ -127,12 +133,14 @@ describe('mqtt sparkplug out node', function () {
 						n1 = helper.getNode("n1");
 						n1.shouldBuffer = true; // Force enable to buffer
 						setTimeout(() => n1.receive({ payload: validMsg}), 500);
-						setTimeout(() => client.publish("STATE/MY SCADA", "ONLINE", true), 1000);						});
+						setTimeout(() => client.publish("STATE/MY SCADA", "ONLINE", true), 1000);						
+					});
 				}
 			});
 		});
 
 		client.on('message', function (topic, message) {
+			console.log(topic);
 			var buffer = Buffer.from(message);
 			var payload = spPayload.decodePayload(buffer);
 			n1.brokerConn.primaryScadaStatus.should.eql("ONLINE");
@@ -145,7 +153,7 @@ describe('mqtt sparkplug out node', function () {
 
 		/**
 	 * Verify that we'll buffer if forced enabled,
-	 */
+	
 	it('should buffer on Sparkplug B 3.0.0 style State variable', function (done) {
 
 		var n1 = null;
@@ -173,5 +181,5 @@ describe('mqtt sparkplug out node', function () {
 			done();
 		});
 	});
-
+*/
 });

@@ -269,10 +269,12 @@ describe('mqtt sparkplug device node - Store Forward', function () {
 		  });
 
 		  client.on('message', function (topic, message) {
-			console.log(topic)
 			switch (expectedMessageId++)
 			{
 				case 0: 
+					topic.should.equal("STATE/MY SCADA")
+					break;
+				case 1:
 					topic.should.equal("spBv1.0/My Devices/NBIRTH/Node-Red")
 					var buffer = Buffer.from(message);
 					var payload = spPayload.decodePayload(buffer);
@@ -280,7 +282,7 @@ describe('mqtt sparkplug device node - Store Forward', function () {
 					payload.seq.toInt().should.eql(0);
 					n1.brokerConn.primaryScadaStatus.should.eql("ONLINE");
 					break;
-				case 1:
+				case 2:
 					topic.should.equal("spBv1.0/My Devices/DBIRTH/Node-Red/TEST2")
 					var buffer = Buffer.from(message);
 					var payload = spPayload.decodePayload(buffer);
@@ -288,7 +290,7 @@ describe('mqtt sparkplug device node - Store Forward', function () {
 					payload.seq.toInt().should.eql(1);
 					n1.brokerConn.primaryScadaStatus.should.eql("ONLINE");
 					break;
-				case 2:
+				case 3:
 					topic.should.equal("spBv1.0/My Devices/DDATA/Node-Red/TEST2")
 					var buffer = Buffer.from(message);
 					var payload = spPayload.decodePayload(buffer);
