@@ -1,3 +1,7 @@
+### 2.1.8: Maintenance Release
+Fixed:
+- Fixed NBIRTH on Primary Application state change as reported in #65 
+
 ### 2.1.7: Maintenance Release
 Fixed:
 - Loosen the dependency requirement so that it now works with Node14 / Node-red 2.0. 

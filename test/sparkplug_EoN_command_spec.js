@@ -364,4 +364,107 @@ describe('mqtt sparkplug EoN - Commands', function () {
 				}, 200);
 			});
 	});
+
+
+	it('should NBIRTH ON REBIRTH CMD', function (done) {
+
+
+		/**
+		 * 1. 
+		 */
+		client = mqtt.connect(testBroker);
+		expectedMessageId = 0;
+
+		// WARN! We'll enable buffering for all tests
+		simpleFlow[1].enableStoreForward = false;
+		simpleFlow[1].manualEoNBirth = false;
+		// SET OFFLINE
+		// Send Birth
+		// SET SCADA ONLINE
+		// VERIFY BIRTH is send when ONLINE
+
+		var initBirthDone = false;
+		let n1;
+		let b1;
+		client.on('connect', function () {
+			client.publish("STATE/MY SCADA", "OFFLINE", true);
+			// Set Online after 250ms 
+			client.subscribe('#', function (err) {
+			  if (!err) {
+				helper.load(sparkplugNode, simpleFlow, function () {
+					try {
+						n1 = helper.getNode("n1");
+						b1 = n1.brokerConn;
+
+						// Send all metrics to trigger DBIRTH
+						n1.receive({
+							"payload" : {
+								"metrics": [
+									{
+										"name": "test",
+										"value": 11,
+									},
+									{
+										"name": "test2",
+										"value": 11
+									}
+								]}
+						});
+						
+					}catch (e) {
+						done(e);
+					}
+				});
+			  }
+			})
+			
+			
+		  });
+
+		  client.on('message', function (topic, message) {
+			switch (expectedMessageId++)
+			{
+				case 0:
+					topic.should.equal("spBv1.0/My Devices/NBIRTH/Node-Red")
+					var buffer = Buffer.from(message);
+					var payload = spPayload.decodePayload(buffer);
+					payload.should.have.property("seq");
+					payload.seq.toInt().should.eql(0);
+					break;
+				case 1:
+					topic.should.equal("spBv1.0/My Devices/DBIRTH/Node-Red/TEST2")
+					var buffer = Buffer.from(message);
+					var payload = spPayload.decodePayload(buffer);
+					payload.should.have.property("seq");
+					payload.seq.toInt().should.eql(1);
+
+					// Send a Rebirth Command
+					var cmdPayload = spPayload.encodePayload({
+						metrics : [
+							{
+								name: "Node Control/Rebirth",
+								type: "Boolean",
+								value: true
+							}
+						]
+					});
+					client.publish("spBv1.0/My Devices/NCMD/Node-Red", cmdPayload);
+					break;
+				case 2: // We Issue a rebirth command
+					topic.should.equal("spBv1.0/My Devices/NCMD/Node-Red")
+					break;
+				case 3: // EON will NDEATH Before new NBIRTH
+					topic.should.equal("spBv1.0/My Devices/NDEATH/Node-Red")
+					break;
+				case 4: // EON will NBIRTH
+					topic.should.equal("spBv1.0/My Devices/NBIRTH/Node-Red")
+					break;
+				case 5: // EON will DBIRTH
+					topic.should.equal("spBv1.0/My Devices/DBIRTH/Node-Red/TEST2")
+					done();
+					break;
+			}
+		});
+	}); // it end 
 });
+

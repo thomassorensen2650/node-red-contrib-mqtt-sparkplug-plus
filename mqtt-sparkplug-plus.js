@@ -963,15 +963,15 @@ module.exports = function(RED) {
                                 node.primaryScadaStatus = status;
 
                                 if (node.primaryScadaStatus === "ONLINE") {
-                                   node.emptyDDataBuffer()
+                                   node.sendBirth();
                                 }
                                 for (var id in node.users) {
                                     if (node.users.hasOwnProperty(id)) {
                                         let state = node.enableStoreForward && node.primaryScadaStatus === "OFFLINE"  && node.users[id].shouldBuffer === true ? "BUFFERING" : "CONNECTED";
                                         node.setConnectionState(node.users[id], state);
-                                        if (node.primaryScadaStatus == "ONLINE" && typeof node.users[id].trySendBirth === 'function') {
-                                            node.users[id].trySendBirth();
-                                        }
+                                        //if (node.primaryScadaStatus == "ONLINE" && typeof node.users[id].trySendBirth === 'function') {
+                                         //   node.users[id].trySendBirth();
+                                        //}
                                     }
                                 }
                             });
@@ -989,22 +989,29 @@ module.exports = function(RED) {
                                     node.primaryScadaStatus = "OFFLINE";
                                 }
                                 if (node.primaryScadaStatus === "ONLINE") {
-                                    node.emptyDDataBuffer()
+                                    node.sendBirth();
                                  }
                                 for (var id in node.users) {
                                     if (node.users.hasOwnProperty(id)) {
                                         let state = node.enableStoreForward && node.primaryScadaStatus === "OFFLINE"  && node.users[id].shouldBuffer === true ? "BUFFERING" : "CONNECTED";
                                         node.setConnectionState(node.users[id], state);
-                                        if (node.primaryScadaStatus == "ONLINE" && typeof node.users[id].trySendBirth === 'function') {
-                                            node.users[id].trySendBirth();
-                                        }
+                                        //if (node.primaryScadaStatus == "ONLINE" && typeof node.users[id].trySendBirth === 'function') {
+                                        //    node.users[id].trySendBirth();
+                                        //}
                                     }
                                 }
                             });
+
+                            if (node.primaryScadaStatus === "ONLINE") {
+                                node.emptyDDataBuffer()
+                            }
+
+                        } else {
+                        // Send Node Birth right away if connected and destination buffering is disabled
+                            node.sendBirth();
+                            node.emptyDDataBuffer();
                         }
-                        // Send Node Birth
-                        node.sendBirth();
-                        node.emptyDDataBuffer();
+
                     });
 
                     node.client.on("reconnect", function() {
