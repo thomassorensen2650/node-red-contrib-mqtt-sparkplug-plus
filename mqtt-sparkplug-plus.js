@@ -611,13 +611,22 @@ module.exports = function(RED) {
         };
 
         /**
+         * We Store bdSeq in context, as a redeployment of the node can cause 
          * @returns the next birth sequence number
          */
         this.nextBdseq = function() {
-            if (this.bdSeq > 255) {
-                this.bdSeq = 0;
+            let bdSeq = this.context().get("bdSeq");
+            if (bdSeq === undefined) { // we can't || here because it will also filter out 0
+                bdSeq = -1;
             }
-            return ++this.bdSeq;
+            if (bdSeq > 255) {
+                bdSeq = 0;
+            } else {
+                bdSeq += 1;
+            }
+            this.context().set("bdSeq", bdSeq);
+            this.bdSeq = bdSeq;
+            return bdSeq;
         };
 
 
