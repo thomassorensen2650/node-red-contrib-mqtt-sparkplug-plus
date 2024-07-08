@@ -184,7 +184,7 @@ describe('mqtt sparkplug EoN - Commands', function () {
             var buffer = Buffer.from(message);
             var payload = spPayload.decodePayload(buffer);
             let bd = payload.metrics.find(x=>x.name == "bdSeq");
-            bd.value.low.should.eql(1);
+            bd.value.low.should.eql(0); // BDSeq should not increase on REBIRTH
 
             stateId++
         }	
