@@ -102,7 +102,7 @@ describe('mqtt sparkplug device node', function () {
 
 				payload.metrics.should.containDeep([
 					{ name: 'Node Control/Rebirth', type: 'Boolean', value: false },
-					{ name: 'bdSeq', type: 'UInt64' } // We don't check nmber
+					{ name: 'bdSeq', type: 'Int64' } // We don't check nmber
 				 ]);
 
 				

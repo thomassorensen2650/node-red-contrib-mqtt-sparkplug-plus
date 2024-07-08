@@ -312,7 +312,6 @@ module.exports = function(RED) {
                         if (rebirthRequired) {
                             let msg = this.brokerConn.getDeathPayload();
                             this.brokerConn.publish(msg, false);
-                            this.brokerConn.nextBdseq();
                         }
                         if (msg.command.node.set_name) {
                             this.brokerConn.eonName = msg.command.node.set_name;
@@ -612,13 +611,22 @@ module.exports = function(RED) {
         };
 
         /**
+         * We Store bdSeq in context, as a redeployment of the node can cause 
          * @returns the next birth sequence number
          */
         this.nextBdseq = function() {
-            if (this.bdSeq > 255) {
-                this.bdSeq = 0;
+            let bdSeq = this.context().get("bdSeq");
+            if (bdSeq === undefined) { // we can't || here because it will also filter out 0
+                bdSeq = -1;
             }
-            return ++this.bdSeq;
+            if (bdSeq > 255) {
+                bdSeq = 0;
+            } else {
+                bdSeq += 1;
+            }
+            this.context().set("bdSeq", bdSeq);
+            this.bdSeq = bdSeq;
+            return bdSeq;
         };
 
 
@@ -696,7 +704,7 @@ module.exports = function(RED) {
             let metric = [ {
                     name : "bdSeq", 
                     value : this.bdSeq, 
-                    type : "uint64"
+                    type : "int64"
                 }];
             return node.createMsg("", "NDEATH", metric,  x=>{});
         };
@@ -724,7 +732,7 @@ module.exports = function(RED) {
                 },
                 {
                     "name" : "bdSeq",
-                    "type" : "uint64",
+                    "type" : "int64",
                     "value": this.bdSeq,
                 }]);
             var nbirth = node.createMsg("", "NBIRTH", birthMessageMetrics, x=>{});
@@ -903,10 +911,10 @@ module.exports = function(RED) {
             if (node.manualEoNBirth === true) {
                 return;
             }
-            this.nextBdseq(); // Next connect will use next bdSeq
             if (!node.connected && !node.connecting) {
                 node.connecting = true;
                 try {
+                    this.nextBdseq(); // Next connect will use next bdSeq
                     node.options.will = this.getDeathPayload();
                     node.serverProperties = {};
                     node.client = mqtt.connect(node.brokerurl ,node.options);
