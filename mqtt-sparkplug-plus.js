@@ -612,6 +612,9 @@ module.exports = function(RED) {
 
         /**
          * We Store bdSeq in context, as a redeployment of the node can cause 
+         * 
+         * FIXME: context for config nodes are reset on redeploy (node-red bug) We still have the logic to store bdSeq in Context, if it get fixed on day
+         * redeploy should always be gracefull shutdown, so it should not cause any issues (I think) 
          * @returns the next birth sequence number
          */
         this.nextBdseq = function() {

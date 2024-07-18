@@ -1,3 +1,7 @@
+### 2.1.9: Maintenance Release
+Fixed:
+- Fixed #64 - bdSeq increase on rebirth
+
 ### 2.1.8: Maintenance Release
 Fixed:
 - Fixed NBIRTH on Primary Application state change as reported in #65 
