@@ -25,6 +25,7 @@ module.exports = function(RED) {
     var long = require("long");
     var pako = require('pako');
     var compressed = "SPBV1.0_COMPRESSED";
+    var certTypes = ["NBIRTH", "NDEATH", "DBIRTH", "DDEATH"];
 
     /**
      * Try to decompress the payload if if compressed uuid is set on the payload
@@ -694,7 +695,7 @@ module.exports = function(RED) {
                     alias: node.metricsAliasMap[metric.name]
                 };
                 // Remove the name property if the message type is not NBIRTH or DBIRTH
-                if (msgType != "NBIRTH" && msgType != "DBIRTH") {
+                if (!certTypes.includes(msgType)) {
                     delete metricCopy.name;
                 }
                 return metricCopy;
