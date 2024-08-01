@@ -683,7 +683,7 @@ module.exports = function(RED) {
          * This method expect that the metrics attribute name exists
          */
         this.addAliasMetrics = function(msgType, metrics) {
-            let metricsCopy = metrics.map(metric => {
+            return metrics.map(metric => {
                 // Update the alias map if necessary
                 if (!node.metricsAliasMap.hasOwnProperty(metric.name)) {
                     node.metricsAliasMap[metric.name] = ++node.nextMetricAlias;
@@ -700,8 +700,6 @@ module.exports = function(RED) {
                 }
                 return metricCopy;
             });
-        
-            return metricsCopy;
         }
 
         this.getTemplates = function() {
