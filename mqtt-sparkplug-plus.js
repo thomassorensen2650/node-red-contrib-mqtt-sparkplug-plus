@@ -654,7 +654,7 @@ module.exports = function(RED) {
             };
 
             if (node.aliasMetrics) {
-                node.addAliasMetrics(msgType, msg.payload.metrics);
+                msg.payload.metrics = node.addAliasMetrics(msgType, msg.payload.metrics);
             }
             try {
                 if (node.compressAlgorithm) {
@@ -682,15 +682,22 @@ module.exports = function(RED) {
          * This method expect that the metrics attribute name exists
          */
         this.addAliasMetrics = function(msgType, metrics) {
-            metrics.forEach(metric => {
+            return metrics.map(metric => {
+                // Update the alias map if necessary
                 if (!node.metricsAliasMap.hasOwnProperty(metric.name)) {
-                    node.metricsAliasMap[metric.name] = ++node.nextMetricAlias;  
+                    node.metricsAliasMap[metric.name] = ++node.nextMetricAlias;
                 }
-                var alias = node.metricsAliasMap[metric.name];
+
+                // Create a new object and copy the properties manually
+                let metricCopy = {
+                    ...metric,
+                    alias: node.metricsAliasMap[metric.name]
+                };
+                // Remove the name property if the message type is not NBIRTH or DBIRTH
                 if (msgType != "NBIRTH" && msgType != "DBIRTH") {
-                    delete metric.name;
+                    delete metricCopy.name;
                 }
-                metric.alias = alias;
+                return metricCopy;
             });
         }
 
