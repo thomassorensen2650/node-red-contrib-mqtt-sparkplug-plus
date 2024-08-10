@@ -1,3 +1,8 @@
+### 2.1.10: Maintenance Release
+Fixed:
+- #68 - shaddow copy
+- Rebirth should ignore alias.
+
 ### 2.1.9: Maintenance Release
 Fixed:
 - Fixed #64 - bdSeq increase on rebirth
