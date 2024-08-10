@@ -683,6 +683,10 @@ module.exports = function(RED) {
          */
         this.addAliasMetrics = function(msgType, metrics) {
             return metrics.map(metric => {
+
+                if (metric.name == "Node Control/Rebirth") {
+                    return metricp
+                }
                 // Update the alias map if necessary
                 if (!node.metricsAliasMap.hasOwnProperty(metric.name)) {
                     node.metricsAliasMap[metric.name] = ++node.nextMetricAlias;
@@ -697,7 +701,8 @@ module.exports = function(RED) {
                 if (msgType != "NBIRTH" && msgType != "DBIRTH") {
                     delete metricCopy.name;
                 }
-                return metricCopy;
+                // [tck-id-operational-behavior-data-commands-rebirth-name-aliases] When aliases are being used by an Edge Node an NBIRTH message MUST NOT include an alias for the Node Control/Rebirth metric.
+                return  (metric.name == "Node Control/Rebirth") ? metric : metricCopy;
             });
         }
 

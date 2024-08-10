@@ -147,9 +147,6 @@ describe('mqtt sparkplug EoN - Commands', function () {
 		  }
 		})
 	  });
-
-	
-
     var stateId = 0;
     client.on('message', function (topic, message) {
 
@@ -364,7 +361,6 @@ describe('mqtt sparkplug EoN - Commands', function () {
 				}, 200);
 			});
 	});
-
 
 	it('should NBIRTH ON REBIRTH CMD', function (done) {
 
