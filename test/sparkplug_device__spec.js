@@ -1620,7 +1620,17 @@ describe('mqtt sparkplug device node', function () {
 
 		  client.on('message', function (topic, message) {
 			// Verify that we sent a DBirth Message to the broker
-			if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TEST2"){
+			if (topic === "spBv1.0/My Devices/NBIRTH/Node-Red"){ 
+				var buffer = Buffer.from(message);
+				var payload = spPayload.decodePayload(buffer);
+				payload.metrics[0].should.have.property("name").which.is.eql("Node Control/Rebirth");
+				payload.metrics[0].should.not.have.property("alias");
+				payload.metrics[0].should.have.property("value").which.is.eql(false);
+
+				payload.metrics[1].should.have.property("name").which.is.eql("bdSeq");
+				payload.metrics[1].should.not.have.property("alias");
+			}
+			else if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TEST2"){
 
 				var buffer = Buffer.from(message);
 				var payload = spPayload.decodePayload(buffer);
@@ -1634,7 +1644,7 @@ describe('mqtt sparkplug device node', function () {
 				payload.metrics[0].should.have.property("type").which.is.eql("Int32");
 				//payload.metrics[0].should.have.property("alias").which.is.eql(1);
 				alias = payload.metrics[0].alias.toNumber();
-				alias.should.eql(3);
+				alias.should.eql(1);
 				n1.receive({
 					"payload" : {
 						"metrics": [
@@ -1657,9 +1667,9 @@ describe('mqtt sparkplug device node', function () {
 				payload.metrics[0].should.have.property("value");
 				payload.metrics[0].should.have.property("type").which.is.eql("Int32");
 				payload.metrics[0].should.have.property("alias");
-				
+				payload.metrics[0].should.not.have.property("name");
 				alias = payload.metrics[0].alias.toNumber();
-				alias.should.eql(3);
+				alias.should.eql(1);
 				//payload.metrics[0].should.have.property("timestamp").which.is.a.Number();
 				payload.metrics.length.should.eql(1);
 				Object.keys(payload.metrics[0]).length.should.eql(3);
