@@ -674,7 +674,6 @@ module.exports = function(RED) {
             }
             return msg;   
         };
-
         this.nextMetricAlias = 0;
         this.metricsAliasMap = {};
         /**
@@ -684,8 +683,9 @@ module.exports = function(RED) {
         this.addAliasMetrics = function(msgType, metrics) {
             return metrics.map(metric => {
 
+                // [tck-id-operational-behavior-data-commands-rebirth-name-aliases] When aliases are being used by an Edge Node an NBIRTH message MUST NOT include an alias for the Node Control/Rebirth metric.
                 if (metric.name == "Node Control/Rebirth") {
-                    return metricp
+                    return metric
                 }
                 // Update the alias map if necessary
                 if (!node.metricsAliasMap.hasOwnProperty(metric.name)) {
@@ -701,8 +701,7 @@ module.exports = function(RED) {
                 if (msgType != "NBIRTH" && msgType != "DBIRTH") {
                     delete metricCopy.name;
                 }
-                // [tck-id-operational-behavior-data-commands-rebirth-name-aliases] When aliases are being used by an Edge Node an NBIRTH message MUST NOT include an alias for the Node Control/Rebirth metric.
-                return  (metric.name == "Node Control/Rebirth") ? metric : metricCopy;
+                return metricCopy;
             });
         }
 
