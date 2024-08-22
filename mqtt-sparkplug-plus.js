@@ -164,7 +164,7 @@ module.exports = function(RED) {
             let x = this.brokerConn.getItemFromQueue(this.name);
             while(x) { 
                 x.forEach(s=> s.isHistorical = true);
-                let dMsg = this.brokerConn.ö(this.name, "DDATA", x, f => {});
+                let dMsg = this.brokerConn.createMsg(this.name, "DDATA", x, f => {});
                 if (dMsg) {
                     this.brokerConn.publish(dMsg, !this.shouldBuffer, f => {}); 
                 }
@@ -247,7 +247,7 @@ module.exports = function(RED) {
                     }
                     birthMetrics.push(lv);
                 }
-                let bMsg = node.brokerConn.ö(this.name, "DBIRTH", birthMetrics, f => {});
+                let bMsg = node.brokerConn.createMsg(this.name, "DBIRTH", birthMetrics, f => {});
                 if(bMsg) {
                     this.brokerConn.publish(bMsg, true, done);  // send the message 
                     this.birthMessageSend = true;
@@ -261,7 +261,7 @@ module.exports = function(RED) {
          * @param {function} done Node-Red Done Function 
          */
         this.sendDDeath = function(done) {
-            let dMsg = node.brokerConn.ö(this.name, "DDEATH", [], x=>{});
+            let dMsg = node.brokerConn.createMsg(this.name, "DDEATH", [], x=>{});
             if(dMsg) {
                 this.brokerConn.publish(dMsg, !this.shouldBuffer, done);  // send the message 
                 this.birthMessageSend = false;
@@ -466,7 +466,7 @@ module.exports = function(RED) {
                         else if (!this.birthMessageSend) {    // Send DBIRTH
                             this.trySendBirth(done);
                         }else if (_metrics.length > 0) { // SEND DDATA
-                            let dMsg = this.brokerConn.ö(this.name, "DDATA", _metrics, f => {});
+                            let dMsg = this.brokerConn.createMsg(this.name, "DDATA", _metrics, f => {});
                             if (dMsg) {
                                 this.brokerConn.publish(dMsg, !this.shouldBuffer, done); 
                             }
@@ -643,7 +643,7 @@ module.exports = function(RED) {
          * @param {*} metrics The metrics to include in the payload
          * @returns a encoded sparkplug B message
          */
-        this.ö = function(deviceName, msgType, metrics, done) {
+        this.createMsg = function(deviceName, msgType, metrics, done) {
             let that = this;
             let topic = deviceName ? `spBv1.0/${this.deviceGroup}/${msgType}/${this.eonName}/${deviceName}` :
                                      `spBv1.0/${this.deviceGroup}/${msgType}/${this.eonName}`;
@@ -724,7 +724,7 @@ module.exports = function(RED) {
                     value : this.bdSeq, 
                     type : "int64"
                 }];
-            return node.ö("", "NDEATH", metric,  x=>{});
+            return node.createMsg("", "NDEATH", metric,  x=>{});
         };
 
         /**
@@ -753,7 +753,7 @@ module.exports = function(RED) {
                     "type" : "int64",
                     "value": this.bdSeq,
                 }]);
-            var nbirth = node.ö("", "NBIRTH", birthMessageMetrics, x=>{});
+            var nbirth = node.createMsg("", "NBIRTH", birthMessageMetrics, x=>{});
             if (nbirth) {
                 node.publish(nbirth);
                 for (var id in node.users) {
