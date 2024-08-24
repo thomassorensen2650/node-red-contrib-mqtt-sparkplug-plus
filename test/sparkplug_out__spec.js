@@ -112,6 +112,42 @@ describe('mqtt sparkplug out node', function () {
 	});
 
 
+		/**
+	 * Verify that we outout a topic even though the primary SCADA is offline
+	 */
+		it('should allow to send metrics without type', function (done) {
+			
+			var validMsgNoType = {"timestamp":12345,"metrics":[{"name":"test","value":100}],"seq":200}
+			
+			var n1 = null;
+			client = mqtt.connect(testBroker);
+			client.on('connect', function () {
+				client.subscribe("spBv1.0/My Devices/DDATA/Node-Red/TEST2", function (err) {
+					if (!err) {
+						helper.load(sparkplugNode, outFlow, function () {
+							n1 = helper.getNode("n1");
+							n1.brokerConn.enableStoreForward = false; // Force enable to buffer
+							console.log("sending")
+							n1.receive({ payload: validMsgNoType});
+						});
+					}
+				});
+			});
+	
+			client.on('message', function (topic, message) {
+				console.log("received")
+				var buffer = Buffer.from(message);
+				var payload = spPayload.decodePayload(buffer);
+				console.log(payload);
+				n1.brokerConn.primaryScadaStatus.should.eql("OFFLINE");
+				payload.timestamp = payload.timestamp.toNumber()
+				payload.seq = payload.seq.toNumber()
+				payload.should.deepEqual(validMsg);
+				done();
+			});
+		});
+
+
 
 
 	/** 
