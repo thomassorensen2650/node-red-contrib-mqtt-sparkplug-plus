@@ -95,15 +95,12 @@ module.exports = function(RED) {
             if (!Array.isArray(payload.metrics)) {
                 throw RED._("mqtt-sparkplug-plus.errors.metrics-not-array");
             } else {
-                // Type is required in Sparkplug B V2.0.0, but it is not required in V3.0.0.0.. 
-                // We dont differentiate at the moment, so disable warning.
-                /**
                 payload.metrics.forEach(met => {
                     if (!met.hasOwnProperty("type")) {
                         throw RED._("mqtt-sparkplug-plus.errors.unable-to-encode-message", { type : "", error :  "Unable to encode message, all metrics must have a 'type' Attribute" });
                     }
                 });
-                */
+                
             }
         }
         return spPayload.encodePayload(payload);
