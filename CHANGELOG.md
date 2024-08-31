@@ -2,7 +2,6 @@
 Fixed:
 - #68 - shaddow copy
 - Rebirth should ignore alias.
-- #72 - removed warning if Metric type is missin, to support new requirement in Sparkplug B V3
 
 ### 2.1.9: Maintenance Release
 Fixed:
