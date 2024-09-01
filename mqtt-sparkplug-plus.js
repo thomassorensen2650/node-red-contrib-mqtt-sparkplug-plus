@@ -90,6 +90,19 @@ module.exports = function(RED) {
     function sparkplugEncode(payload) {
         // return JSON.stringify(payload); // for debugging
 
+        if (typeof payload.timestamp  === "string") {
+                        
+            let ts = Date.parse(payload.timestamp);
+            if (!ts) {
+                throw RED._("mqtt-sparkplug-plus.errors.unable-to-encode-message", { type : "", error :  "Unable to encode message, unable to encode metric timestamp for payload"});
+            }
+            payload.timestamp = ts;
+        }
+        // Sparkplug dates are always send a Unix Time
+        if (payload.timestamp instanceof Date && !isNaN(payload.timestamp)) {
+            payload.timestamp = payload.timestamp.getTime();
+        }
+
         // Verify that all metrics have a type (if people copy message from e.g. MQTT.FX, then the variable is not called type)
         if (payload.hasOwnProperty("metrics")) {
             if (!Array.isArray(payload.metrics)) {
@@ -99,6 +112,20 @@ module.exports = function(RED) {
                     if (!met.hasOwnProperty("type")) {
                         throw RED._("mqtt-sparkplug-plus.errors.unable-to-encode-message", { type : "", error :  "Unable to encode message, all metrics must have a 'type' Attribute" });
                     }
+                    // Sparkplug dates are always send a Unix Time
+                    if (met.timestamp instanceof Date && !isNaN(met.timestamp)) {
+                        met.timestamp = met.timestamp.getTime();
+                    }
+
+                    if (typeof met.timestamp  === "string") {
+                        
+                        let ts = Date.parse(met.timestamp);
+                        if (!ts) {
+                            throw RED._("mqtt-sparkplug-plus.errors.unable-to-encode-message", { type : "", error :  "Unable to encode message, unable to encode metric timestamp for metric " + met.name });
+                        }
+                        met.timestamp = ts;
+                    }
+
                 });
                 
             }
