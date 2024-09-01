@@ -26,7 +26,8 @@ describe('mqtt sparkplug out node', function () {
 		}
 	});
 	var validMsg = {"timestamp":12345,"metrics":[{"name":"test","type":"Int32","value":100}],"seq":200}
-	
+
+
 	outFlow = [
 		{
 			"id": "n1",
@@ -111,6 +112,44 @@ describe('mqtt sparkplug out node', function () {
 		});
 	});
 
+		/**
+	 * Verify that we outout a topic even though the primary SCADA is offline
+	 */
+		it('should ouput a publish topic with string timestamp on metric', function (done) {
+
+			var p = {"timestamp":12345,"metrics":[{"name":"test","type":"Int32","value":100, "timestamp": "2024-08-31T14:32:18.626Z"}],"seq":200}
+			var sendTS = Date.parse(p.metrics[0].timestamp);
+
+			var n1 = null;
+			client = mqtt.connect(testBroker);
+			client.on('connect', function () {
+				client.subscribe("spBv1.0/My Devices/DDATA/Node-Red/TEST2", function (err) {
+					if (!err) {
+						helper.load(sparkplugNode, outFlow, function () {
+							n1 = helper.getNode("n1");
+							n1.brokerConn.enableStoreForward = false; // Force enable to buffer
+							
+							setTimeout(() => n1.receive({ payload: p}), 500);
+						});
+					}
+				});
+			});
+	
+			client.on('message', function (topic, message) {
+				var buffer = Buffer.from(message);
+				var payload = spPayload.decodePayload(buffer);
+				n1.brokerConn.primaryScadaStatus.should.eql("OFFLINE");
+				payload.metrics[0].timestamp.toNumber().should.eql(sendTS)
+				payload.seq = payload.seq.toNumber()
+				//payload.should.deepEqual(validMsg);
+				done();
+			});
+		});
+
+
+
+	
+	
 
 	/** 
 	
