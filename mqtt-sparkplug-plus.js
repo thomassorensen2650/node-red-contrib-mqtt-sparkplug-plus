@@ -191,8 +191,12 @@ module.exports = function(RED) {
         this.emptyBuffer = function() {
             let x = this.brokerConn.getItemFromQueue(this.name);
             while(x) { 
-                x.forEach(s=> s.isHistorical = true);
-                let dMsg = this.brokerConn.createMsg(this.name, "DDATA", x, f => {});
+                // Create historical object from original
+                let historicalItem = x.map(s => ({ 
+                    ...s, // Copy of original object
+                    isHistorical: true
+                }));
+                let dMsg = this.brokerConn.createMsg(this.name, "DDATA", historicalItem, f => {});
                 if (dMsg) {
                     this.brokerConn.publish(dMsg, !this.shouldBuffer, f => {}); 
                 }
