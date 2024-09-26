@@ -210,7 +210,7 @@ module.exports = function(RED) {
     
 
              node.dcmdTopic = this.getDCMDTopic();
-             node.brokerConn.subscribe( this.dcmdTopic,options,function(topic_,payload_,packet) {
+             node.brokerConn.subscribe(this.dcmdTopic,options,function(topic_,payload_,packet) {
                  try {
                     // This should never happen.
                     // Extra check to make sure that we are not handing command from old topic name. 
@@ -431,11 +431,18 @@ module.exports = function(RED) {
                                 this.warn(RED._("mqtt-sparkplug-plus.errors.missing-attribute-name"));
                             } else if (this.metrics.hasOwnProperty(m.name)) {
                                
+                                // Clone every metric to make we dont modify the input metric 
+                                m = JSON.parse(JSON.stringify(m));
+
                                 if (!m.hasOwnProperty("value")) {
                                     //m.is_null = true;
                                     m.value = null; // the Sparkplug-payload module will create the isNull property
                                 }
-
+                                
+                                // [tck-id-payloads-name-birth-data-requirement] The timestamp MUST be included with every metric in all NBIRTH, DBIRTH, NDATA, and DDATA messages
+                                if (!m.hasOwnProperty("timestamp")) {
+                                    m.timestamp = new Date()
+                                }
                                 // Sparkplug dates are always send a Unix Time
                                 if (m.timestamp instanceof Date && !isNaN(m.timestamp)) {
                                     m.timestamp = m.timestamp.getTime();
@@ -468,10 +475,10 @@ module.exports = function(RED) {
                                 
                                 // We dont know how long it will take or when REBIRTH will be send
                                 // so always include timewstamp in DBIRTH messages
-                                this.latestMetrics[m.name] = JSON.parse(JSON.stringify(m));
-                                if (!this.latestMetrics[m.name].hasOwnProperty("timestamp")) {
-                                    this.latestMetrics[m.name].timestamp = new Date().getTime(); // We dont know when DBIRTH will be send, so force a timetamp in metric 
-                                }
+                                this.latestMetrics[m.name] = m;
+                                //if (!this.latestMetrics[m.name].hasOwnProperty("timestamp")) {
+                                //    this.latestMetrics[m.name].timestamp = new Date().getTime(); // We dont know when DBIRTH will be send, so force a timetamp in metric 
+                                //}
                                 _metrics.push(m);
                             }else {
                                 node.warn(RED._("mqtt-sparkplug-plus.errors.device-unknown-metric", m));
@@ -724,16 +731,12 @@ module.exports = function(RED) {
                     node.metricsAliasMap[metric.name] = ++node.nextMetricAlias;
                 }
 
-                // Create a new object and copy the properties manually
-                let metricCopy = {
-                    ...metric,
-                    alias: node.metricsAliasMap[metric.name]
-                };
+                metric.alias = node.metricsAliasMap[metric.name];
                 // Remove the name property if the message type is not NBIRTH or DBIRTH
                 if (msgType != "NBIRTH" && msgType != "DBIRTH") {
-                    delete metricCopy.name;
+                    delete metric.name;
                 }
-                return metricCopy;
+                return metric;
             });
         }
 

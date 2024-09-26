@@ -663,7 +663,7 @@ describe('mqtt sparkplug device node', function () {
 				payload.metrics[0].should.have.property("type").which.is.eql("Int32");
 				//payload.metrics[0].should.have.property("timestamp").which.is.a.Number();
 				payload.metrics.length.should.eql(1);
-				Object.keys(payload.metrics[0]).length.should.eql(3);
+				Object.keys(payload.metrics[0]).length.should.eql(4);
 				
 				payload.should.have.property("timestamp");
 				long.isLong(payload.timestamp).should.be.true();
@@ -960,7 +960,7 @@ describe('mqtt sparkplug device node', function () {
 				payload.metrics[0].should.have.property("type").which.is.eql("Int32");
 				//payload.metrics[0].should.have.property("timestamp").which.is.a.Number();
 				payload.metrics.length.should.eql(1);
-				Object.keys(payload.metrics[0]).length.should.eql(3);
+				Object.keys(payload.metrics[0]).length.should.eql(4);
 
 				simpleFlow[1].compressAlgorithm = undefined;
 				done();
@@ -1041,7 +1041,7 @@ describe('mqtt sparkplug device node', function () {
 				payload.metrics[0].should.have.property("type").which.is.eql("Int32");
 				//payload.metrics[0].should.have.property("timestamp").which.is.a.Number();
 				payload.metrics.length.should.eql(1);
-				Object.keys(payload.metrics[0]).length.should.eql(3);
+				Object.keys(payload.metrics[0]).length.should.eql(4);
 
 
 				simpleFlow[1].compressAlgorithm = undefined;
@@ -1133,7 +1133,7 @@ describe('mqtt sparkplug device node', function () {
 				payload.metrics[0].should.have.property("type").which.is.eql("Int32");
 				//payload.metrics[0].should.have.property("timestamp").which.is.a.Number();
 				payload.metrics.length.should.eql(1);
-				Object.keys(payload.metrics[0]).length.should.eql(3);
+				Object.keys(payload.metrics[0]).length.should.eql(4);
 
 				simpleFlow[1].compressAlgorithm = undefined;
 				done();
@@ -1672,7 +1672,7 @@ describe('mqtt sparkplug device node', function () {
 				alias.should.eql(1);
 				//payload.metrics[0].should.have.property("timestamp").which.is.a.Number();
 				payload.metrics.length.should.eql(1);
-				Object.keys(payload.metrics[0]).length.should.eql(3);
+				Object.keys(payload.metrics[0]).length.should.eql(4);
 				
 				payload.should.have.property("seq");
                 payload.seq.toInt().should.eql(2); // 0 is NBIRTH, 1 is DBIRTH
