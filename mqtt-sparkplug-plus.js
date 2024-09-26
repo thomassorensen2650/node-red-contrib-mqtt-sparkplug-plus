@@ -686,10 +686,14 @@ module.exports = function(RED) {
                 topic : topic,
                 payload : {
                     timestamp : new Date().getTime(),
-                    seq : that.nextSeq(), 
                     metrics : metrics
                 }
             };
+
+            //[tck-id-topics-ndeath-seq] The NDEATH message MUST NOT include a sequence number.
+            if (msgType != "NDEATH") {
+                msg.payload.seq = that.nextSeq(); 
+            }
 
             if (node.aliasMetrics) {
                 msg.payload.metrics = node.addAliasMetrics(msgType, msg.payload.metrics);
