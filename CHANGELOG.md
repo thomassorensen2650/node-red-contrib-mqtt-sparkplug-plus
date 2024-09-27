@@ -1,3 +1,11 @@
+### 2.1.11: Maintenance Release
+Fixed:
+- #80 - Node sends message content of 'NDEATH'
+- #79 - metric timestamp not optional
+- #68 - All metrics are now cloned before any modifications.
+Added:
+- Added support for string timestamps
+  
 ### 2.1.10: Maintenance Release
 Fixed:
 - #68 - shaddow copy
