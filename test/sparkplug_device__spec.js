@@ -510,8 +510,7 @@ describe('mqtt sparkplug device node', function () {
 				// Check that bdSeq in inceased every time we reconnect
 				payload.metrics[0].value.toInt().should.eql(expectedBd);
 				payload.metrics.length.should.eql(1);
-				console.log(payload);
-
+				
 				if (expectedBd == 5) {
 					done();
 				}
