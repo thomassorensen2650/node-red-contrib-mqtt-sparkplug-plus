@@ -88,6 +88,7 @@ module.exports = function(RED) {
      * @returns a sparkplug B encoded Buffer
      */
     function sparkplugEncode(payload) {
+        // return JSON.stringify(payload); // for debugging
 
         if (typeof payload.timestamp  === "string") {
                         
@@ -166,7 +167,7 @@ module.exports = function(RED) {
 
     function MQTTSparkplugDeviceNode(n) {
         RED.nodes.createNode(this,n);
-        this.dataTypes = ["Int8", "Int16", "Int32", "Int64", "UInt8", "UInt16", "UInt32", "UInt64", "Float", "Double", "Boolean", "DateTime", "UUID", "DataSet", "Bytes", "String", "Unknown"]
+        this.dataTypes = ["Int8", "Int16", "Int32", "Int64", "UInt8", "UInt16", "UInt32", "UInt64", "Float", "Double", "Boolean", "DateTime", "UUID", "DataSet", "Bytes", "String", "Unknown", "Template"]
 
         this.bufferDevice = n.bufferDevice
         this.broker = n.broker;
@@ -178,6 +179,84 @@ module.exports = function(RED) {
         this.dcmdTopic = ""; // Used to store the topic for DCMD
         this.inflatedMetrics = {};
         this.shouldBuffer = true; // hardcoded / Devices always buffers
+
+        /**
+         * Build a Sparkplug B compliant Template Instance value object.
+         *
+         * @param {string}  templateName  Name of the Template Definition to instantiate
+         * @param {object}  flatValues    Flat map of relative metric paths to values,
+         *                               e.g. { "speed": 42, "nested/rpm": 5 }
+         * @param {Array}   templates     Full list of Template Definition objects from the broker
+         * @param {number}  timestamp     Unix ms timestamp to attach to each metric
+         * @param {boolean} forBirth      true → include ALL definition members (nulls for missing);
+         *                               false → include only members present in flatValues (partial DDATA)
+         * @returns {object|null} Template instance value, or null if definition not found
+         */
+        this.buildTemplateInstance = function buildTemplateInstance(templateName, flatValues, templates, timestamp, forBirth) {
+            var def = templates.find(function(t) { return t.name === templateName; });
+            if (!def || !def.value) {
+                node.error("Template definition '" + templateName + "' not found in broker templates");
+                return null;
+            }
+
+            var defMetrics = def.value.metrics || [];
+            var instanceMetrics = [];
+
+            defMetrics.forEach(function(defMetric) {
+                var mName = defMetric.name;
+                var mType = defMetric.type;
+
+                if (mType === "Template") {
+                    // Nested template — collect sub-paths and recurse
+                    var nestedTemplateRef = defMetric.templateRef || mName;
+                    // filter flatValues to entries starting with "mName/"
+                    var prefix = mName + "/";
+                    var nestedFlat = {};
+                    Object.keys(flatValues).forEach(function(k) {
+                        if (k === mName || k.indexOf(prefix) === 0) {
+                            var subKey = k === mName ? "" : k.slice(prefix.length);
+                            nestedFlat[subKey] = flatValues[k];
+                        }
+                    });
+
+                    // Only include this nested template in DDATA if at least one sub-value is present
+                    if (forBirth || Object.keys(nestedFlat).length > 0) {
+                        var nestedInstance = buildTemplateInstance(nestedTemplateRef, nestedFlat, templates, timestamp, forBirth);
+                        if (nestedInstance) {
+                            instanceMetrics.push({
+                                name: mName,
+                                type: "Template",
+                                value: nestedInstance,
+                                timestamp: timestamp
+                            });
+                        }
+                    }
+                } else {
+                    var hasValue = flatValues.hasOwnProperty(mName);
+                    if (forBirth || hasValue) {
+                        instanceMetrics.push({
+                            name: mName,
+                            type: mType,
+                            value: hasValue ? flatValues[mName] : null,
+                            timestamp: timestamp
+                        });
+                    }
+                }
+            });
+
+            // Copy parameters from definition (instances MAY include parameter values)
+            var instanceParams = (def.value.parameters || []).map(function(p) {
+                return Object.assign({}, p);
+            });
+
+            return {
+                templateRef: templateName,
+                isDefinition: false,
+                version: def.value.version || "",
+                metrics: instanceMetrics,
+                parameters: instanceParams
+            };
+        };
 
         if (typeof this.birthImmediately === 'undefined') {
             this.birthImmediately = false;
@@ -216,7 +295,7 @@ module.exports = function(RED) {
                     // This was a issue before V2.1.1.. Hopefully this has been fully resolved now, but keep this extra check...
                     let expectedTopic = node.getDCMDTopic()
                     if (topic_ != expectedTopic) {
-                        node.error(`Topic ${topic_} does not match expected topic ${expectedTopic}. Please create a GitHub issue with description on how to reproduce`)
+                        node.error(`Topic ${payload_} does not match expected topic ${expectedTopic}.. Pleae create a Gibhub issue with description on how to reproduce`)
                         return;
                     }
                      var msg = {
@@ -251,11 +330,11 @@ module.exports = function(RED) {
          * try to send Sparkplug DBirth Messages
          * @param {function} done Node-Red Done Function 
          */
-        this.trySendBirth = function(done) {    
+        this.trySendBirth = function(done) {
 
             var isOnline = (node.brokerConn.enableStoreForward && node.brokerConn.primaryScadaStatus === "ONLINE" && node.brokerConn.connected) ||
             (!node.brokerConn.enableStoreForward && node.brokerConn.connected);
-            
+
             if (!isOnline) {
                 return;
             }
@@ -265,9 +344,31 @@ module.exports = function(RED) {
             let hasMetrics = Object.keys(this.metrics).length > 0;
             if (readyToSend && hasMetrics) {
                 let birthMetrics = [];
-            
+                let templates = [];
+                try { templates = node.brokerConn.getTemplates(); } catch(e) {}
+                let ts = Date.now();
+
                 for (const [key, value] of Object.entries(this.metrics)) {
                     const lv = Object.assign({}, this.latestMetrics[key]);
+                    let dataType = value.dataType;
+                    let isNamedTemplate = (dataType !== "Template" && !node.dataTypes.includes(dataType));
+
+                    if (isNamedTemplate) {
+                        // Rebuild a FULL template instance (DBIRTH requires all members)
+                        // Gather existing sub-values from the cached partial instance (if any)
+                        let existingFlatVals = {};
+                        if (lv.value && lv.value.metrics) {
+                            lv.value.metrics.forEach(function(im) {
+                                existingFlatVals[im.name] = im.value;
+                            });
+                        }
+                        let fullInstance = node.buildTemplateInstance(dataType, existingFlatVals, templates, ts, true);
+                        if (fullInstance) {
+                            lv.value = fullInstance;
+                            lv.type = "Template";
+                            lv.timestamp = ts;
+                        }
+                    }
 
                     if (value.hasOwnProperty("properties")) {
                         lv.properties = value.properties;
@@ -276,7 +377,7 @@ module.exports = function(RED) {
                 }
                 let bMsg = node.brokerConn.createMsg(this.name, "DBIRTH", birthMetrics, f => {});
                 if(bMsg) {
-                    this.brokerConn.publish(bMsg, true, done);  // send the message 
+                    this.brokerConn.publish(bMsg, true, done);  // send the message
                     this.birthMessageSend = true;
                     this.emptyBuffer();
                 }
@@ -350,6 +451,7 @@ module.exports = function(RED) {
                             this.brokerConn.deviceGroup = msg.command.node.set_group;
                         }
                         if (msg.command.node.set_server) {
+                            // FIXME: Should we Disconnect here?
                             this.brokerConn.broker = msg.command.node.set_server;
                         }
                         if (rebirthRequired) {
@@ -378,11 +480,16 @@ module.exports = function(RED) {
                     if (definitionValid) {
                         for (const [key, value] of Object.entries(msg.definition)) {
                             // Check name
+                            if (false) { // TODO: Is there any requirements for the metric name?
+                                this.error(`${key} is not a valid definition !!!`);
+                                definitionValid = false;
+                            }
 
                             if (!value.hasOwnProperty("dataType")) {
                                 this.error(RED._("mqtt-sparkplug-plus.errors.invalid-metric-definition", { name : key, error: `datatype required` }));
                                 definitionValid = false;
-                            }else if (!node.dataTypes.includes(value.dataType)) {
+                            }else if (!node.dataTypes.includes(value.dataType) &&
+                                      !node.brokerConn.resolveTemplateDefinition(value.dataType)) {
                                 this.error(RED._("mqtt-sparkplug-plus.errors.invalid-metric-definition", { name : key, error: `Invalid datatype ${value.dataType}` }));
                                 definitionValid = false;
                             }
@@ -416,26 +523,50 @@ module.exports = function(RED) {
                 }
                     
                 if (validPayload) {
-                 
+
                     if (msg.payload.hasOwnProperty("metrics") && Array.isArray(msg.payload.metrics)) {
                         let _metrics = [];
+
+                        // ── Flat-path accumulator for template metrics ──────────────────
+                        // Maps: templateMetricName → { subPath → value, ... }
+                        // e.g. "motor" → { "speed": 42, "nested/rpm": 5 }
+                        let templateFlatValues = {};
+
                         msg.payload.metrics.forEach(m => {
-                            
+
                             if (!m.hasOwnProperty("name")){
                                 this.warn(RED._("mqtt-sparkplug-plus.errors.missing-attribute-name"));
-                            } else if (this.metrics.hasOwnProperty(m.name)) {
-                               
-                                // Clone every metric to make we dont modify the input metric 
+                                return;
+                            }
+
+                            // ── Check for exact metric name match ───────────────────────
+                            if (this.metrics.hasOwnProperty(m.name)) {
+                                let metricDef = this.metrics[m.name];
+                                let dataType = metricDef.dataType;
+                                let isTemplateDef = (dataType !== "Template" && !node.dataTypes.includes(dataType));
+
+                                if (isTemplateDef) {
+                                    // This is a named-template metric received with its root name.
+                                    // A caller may pass the full Template instance value directly.
+                                    m = JSON.parse(JSON.stringify(m));
+                                    if (!m.hasOwnProperty("timestamp")) { m.timestamp = new Date(); }
+                                    if (m.timestamp instanceof Date && !isNaN(m.timestamp)) { m.timestamp = m.timestamp.getTime(); }
+                                    m.type = "Template";
+                                    this.latestMetrics[m.name] = m;
+                                    _metrics.push(m);
+                                    return;
+                                }
+
+                                // Clone every metric to make we dont modify the input metric
                                 m = JSON.parse(JSON.stringify(m));
 
                                 if (!m.hasOwnProperty("value")) {
-                                    //m.is_null = true;
                                     m.value = null; // the Sparkplug-payload module will create the isNull property
                                 }
-                                
+
                                 // [tck-id-payloads-name-birth-data-requirement] The timestamp MUST be included with every metric in all NBIRTH, DBIRTH, NDATA, and DDATA messages
                                 if (!m.hasOwnProperty("timestamp")) {
-                                    m.timestamp = new Date()
+                                    m.timestamp = new Date();
                                 }
                                 // Sparkplug dates are always send a Unix Time
                                 if (m.timestamp instanceof Date && !isNaN(m.timestamp)) {
@@ -445,7 +576,7 @@ module.exports = function(RED) {
                                 // Type must be send on every message per the specicications (not sure why)
                                 // We already know then type, so lets append it if it not already there
                                 if (!m.hasOwnProperty("type")) {
-                                    m.type = this.metrics[m.name].dataType; 
+                                    m.type = dataType;
                                 }
 
                                 // Extra validation of DataSet Types
@@ -466,16 +597,60 @@ module.exports = function(RED) {
                                         m.value.numOfColumns = m.value.columns.length;
                                     }
                                 }
-                                
+
                                 // We dont know how long it will take or when REBIRTH will be send
-                                // so always include timewstamp in DBIRTH messages
+                                // so always include timestamp in DBIRTH messages
                                 this.latestMetrics[m.name] = m;
-                                //if (!this.latestMetrics[m.name].hasOwnProperty("timestamp")) {
-                                //    this.latestMetrics[m.name].timestamp = new Date().getTime(); // We dont know when DBIRTH will be send, so force a timetamp in metric 
-                                //}
                                 _metrics.push(m);
-                            }else {
-                                node.warn(RED._("mqtt-sparkplug-plus.errors.device-unknown-metric", m));
+
+                            } else {
+                                // ── Flat-path template sub-metric: "templateMetric/subPath" ──
+                                // e.g. name = "motor/speed" where "motor" is a template-typed metric
+                                let slashIdx = m.name.indexOf("/");
+                                let matched = false;
+                                if (slashIdx > 0) {
+                                    let prefix = m.name.slice(0, slashIdx);
+                                    let subPath = m.name.slice(slashIdx + 1);
+                                    if (this.metrics.hasOwnProperty(prefix)) {
+                                        let prefixDataType = this.metrics[prefix].dataType;
+                                        let isPrefixTemplate = (prefixDataType !== "Template" && !node.dataTypes.includes(prefixDataType));
+                                        if (isPrefixTemplate || prefixDataType === "Template") {
+                                            if (!templateFlatValues.hasOwnProperty(prefix)) {
+                                                templateFlatValues[prefix] = {};
+                                            }
+                                            templateFlatValues[prefix][subPath] = m.hasOwnProperty("value") ? m.value : null;
+                                            matched = true;
+                                        }
+                                    }
+                                }
+                                if (!matched) {
+                                    node.warn(RED._("mqtt-sparkplug-plus.errors.device-unknown-metric", m));
+                                }
+                            }
+                        });
+
+                        // ── Build Template Instance metrics from accumulated flat values ──
+                        let ts = Date.now();
+                        let templates = [];
+                        try { templates = node.brokerConn.getTemplates(); } catch(e) {}
+
+                        Object.keys(templateFlatValues).forEach(tMetricName => {
+                            let dataType = this.metrics[tMetricName].dataType;
+                            let flatVals = templateFlatValues[tMetricName];
+
+                            // Determine if this is DDATA (partial) or DBIRTH (full) context.
+                            // We always build a partial instance here; trySendBirth will rebuild
+                            // a full one when needed.
+                            let instance = node.buildTemplateInstance(dataType, flatVals, templates, ts, false);
+                            if (instance) {
+                                let tMetric = {
+                                    name: tMetricName,
+                                    type: "Template",
+                                    value: instance,
+                                    timestamp: ts
+                                };
+                                this.latestMetrics[tMetricName] = tMetric;
+                                _metrics.push(tMetric);
                             }
                         });
 
@@ -517,8 +692,21 @@ module.exports = function(RED) {
             //  Create "NULL" metrics if metrics should be sendt immediately
             if (this.birthImmediately) {
                 this.latestMetrics = {};
+                var templates = [];
+                try { templates = node.brokerConn.getTemplates(); } catch(e) {}
+                var ts = Date.now();
                 Object.keys(this.metrics).forEach(m => {
-                    this.latestMetrics[m] = { value : null, name : m, type: this.metrics[m].dataType }
+                    var dataType = this.metrics[m].dataType;
+                    if (dataType !== "Template" && !node.dataTypes.includes(dataType)) {
+                        // Template name used as dataType
+                        var instance = node.buildTemplateInstance(dataType, {}, templates, ts, true);
+                        node.latestMetrics[m] = { value: instance, name: m, type: "Template" };
+                    } else if (dataType === "Template") {
+                        // Generic "Template" without a named definition — leave value null
+                        node.latestMetrics[m] = { value: null, name: m, type: "Template" };
+                    } else {
+                        node.latestMetrics[m] = { value: null, name: m, type: dataType };
+                    }
                 });
             }
             node.brokerConn.register(node);
@@ -645,8 +833,8 @@ module.exports = function(RED) {
         /**
          * We Store bdSeq in context, as a redeployment of the node can cause 
          * 
-         * Note: context for config nodes are reset on redeploy. We store bdSeq in context
-         * for graceful shutdown scenarios. 
+         * FIXME: context for config nodes are reset on redeploy (node-red bug) We still have the logic to store bdSeq in Context, if it get fixed on day
+         * redeploy should always be gracefull shutdown, so it should not cause any issues (I think) 
          * @returns the next birth sequence number
          */
         this.nextBdseq = function() {
@@ -739,8 +927,21 @@ module.exports = function(RED) {
         }
 
         this.getTemplates = function() {
-            var _result = this.templates.map(m=>JSON.parse(m));
+            var _result = this.templates.map(m => typeof m === "string" ? JSON.parse(m) : m);
             return _result;
+        }
+
+        /**
+         * Find a Template Definition by name.
+         * @param {string} name Template definition name
+         * @returns {object|null} The template definition object or null if not found
+         */
+        this.resolveTemplateDefinition = function(name) {
+            try {
+                return this.getTemplates().find(t => t.name === name) || null;
+            } catch(e) {
+                return null;
+            }
         }
 
         /**
@@ -771,16 +972,19 @@ module.exports = function(RED) {
                     node.error(RED._("mqtt-sparkplug-plus.errors.unable-to-deserialize-templates", {error: e.toString()}));
                 }
             }            
+            let ts = Date.now();
             birthMessageMetrics = birthMessageMetrics.concat([
                 {
                     "name" : "Node Control/Rebirth",
                     "type" : "Boolean",
-                    "value": false
+                    "value": false,
+                    "timestamp": ts
                 },
                 {
                     "name" : "bdSeq",
                     "type" : "int64",
                     "value": this.bdSeq,
+                    "timestamp": ts
                 }]);
             var nbirth = node.createMsg("", "NBIRTH", birthMessageMetrics, x=>{});
             if (nbirth) {
@@ -1076,10 +1280,12 @@ module.exports = function(RED) {
                             }
                         }
                     });
+                    //TODO: what to do with this event? Anything? Necessary?
                     node.client.on("disconnect", function(packet) {
                         //Emitted after receiving disconnect packet from broker. MQTT 5.0 feature.
                         //var rc = packet && packet.properties && packet.properties.reasonString;
                         //var rc = packet && packet.properties && packet.reasonCode;
+                        //TODO: If keeping this event, do we use these? log these?
                     });
                     // Register disconnect handlers
                     node.client.on('close', function () {
@@ -1101,7 +1307,7 @@ module.exports = function(RED) {
                     node.client.on('error', function (error) {
                     });
                 }catch(err) {
-                    node.error('MQTT connection error: ' + err.toString());
+                    console.log(err);
                 }
             }
         };
@@ -1174,15 +1380,19 @@ module.exports = function(RED) {
                 handler:function(mtopic,mpayload, mpacket) {
                     if(mpacket.properties && options.properties && mpacket.properties.subscriptionIdentifier && options.properties.subscriptionIdentifier && (mpacket.properties.subscriptionIdentifier !== options.properties.subscriptionIdentifier) ) {
                         //do nothing as subscriptionIdentifier does not match
+                        // node.debug(`> no match - this nodes subID (${options.properties.subscriptionIdentifier}) !== packet subID (${mpacket.properties.subscriptionIdentifier})`); //TODO: remove
                     } else if (matchTopic(topic,mtopic)) {
+                        // node.debug(`>  MATCHED '${topic}' to '${mtopic}' - performing callback`); //TODO: remove
                         callback(mtopic,mpayload, mpacket);
                     } else {
+                        // node.debug(`> no match / no callback`); //TODO: remove
                     }
                 },
                 ref: ref
             };
             node.subscriptions[topic][ref] = sub;
             if (node.connected) {
+                // node.debug(`this.subscribe - registering handler ref ${ref} for ${topic} and subscribing `+JSON.stringify(options)); //TODO: remove
                 node.client.on('message',sub.handler);
                 node.client.subscribe(topic, options);
             }
@@ -1205,6 +1415,10 @@ module.exports = function(RED) {
                     
                     delete sub[ref];
                 }
+                //TODO: Review. The `if(removed)` was commented out to always delete and remove subscriptions.
+                // if we dont then property changes dont get applied and old subs still trigger
+                //if (removed) {
+
                 if (Object.keys(sub).length === 0) {
                     delete node.subscriptions[topic];
                     delete node.subscriptionIds[topic];
@@ -1212,8 +1426,11 @@ module.exports = function(RED) {
                         node.client.unsubscribe(topic);
                     }
                 }
+                //}
             } else {
+                // _debug += "sub not found! "; //TODO: remove
             }
+            // node.debug(_debug); //TODO: remove
             
         };
 
@@ -1225,7 +1442,7 @@ module.exports = function(RED) {
          */
         this.publish = function (msg, bypassQueue, done) {
 
-            if (node.connected && (!node.enableStoreForward || (node.primaryScadaStatus === "ONLINE") || bypassQueue)) {
+            if (true)  { // (node.connected && (!node.enableStoreForward || (node.primaryScadaStatus === "ONLINE") || bypassQueue)) {
                 if (msg.payload === null || msg.payload === undefined) {
                     msg.payload = "";
                 } else if (!Buffer.isBuffer(msg.payload)) {
@@ -1245,7 +1462,7 @@ module.exports = function(RED) {
                     return;
                 });
             } else {
-                node.error('Attempted to publish message when not connected and not buffering');
+               console.log("This should not happen");
                 done && done();
             }
         };

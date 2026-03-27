@@ -6,6 +6,11 @@ var pako = require('pako');
 
 var spPayload = require('sparkplug-payload').get("spBv1.0");
 helper.init(require.resolve('node-red'));
+const _brokerUrl = new URL((process.env.TEST_BROKER || 'mqtt://localhost').replace(/^mqtt(s?)/, 'http$1'));
+let brokerHost = _brokerUrl.hostname;
+let brokerPort = _brokerUrl.port || '1883';
+let brokerUsername = _brokerUrl.username || '';
+let brokerPassword = _brokerUrl.password || '';
 
 /**
  * MQTT Sparkplug B in testing
@@ -48,21 +53,21 @@ describe('mqtt sparkplug in node', function () {
 			"name": "Local Host",
 			"deviceGroup": "My Devices",
 			"eonName": "Node-Red",
-			"broker": "localhost",
-			"port": "1883",
+			"broker": brokerHost,
+			"port": brokerPort,
 			"clientid": "",
 			"usetls": false,
 			"protocolVersion": "4",
 			"keepalive": "60",
 			"cleansession": true,
-			"credentials": {}
+			"credentials": { "user": brokerUsername, "password": brokerPassword }
 		}
 	]
 	var validMsg = {"timestamp":new Date(),"metrics":[{"name":"test","type":"Int32","value":100}],"seq":200}
 
 	it('should ouput a subscribed topic', function (done) {
 
-		helper.load(sparkplugNode, inExample, function () {
+		helper.load(sparkplugNode, inExample, {b1: {user: brokerUsername, password: brokerPassword}}, function () {
 
 			var n2 = helper.getNode("n2");
 			var out = helper.getNode("out");
@@ -91,7 +96,7 @@ describe('mqtt sparkplug in node', function () {
 
 	it('should only decode spB namespace', function (done) {
 
-		helper.load(sparkplugNode, inExample, function () {
+		helper.load(sparkplugNode, inExample, {b1: {user: brokerUsername, password: brokerPassword}}, function () {
 
 			var n2 = helper.getNode("n2");
 			var out = helper.getNode("out");
@@ -134,7 +139,7 @@ describe('mqtt sparkplug in node', function () {
             } ]
         };
 		compressedPayload = spPayload.encodePayload(compressedPayload);
-		helper.load(sparkplugNode, inExample, function () {
+		helper.load(sparkplugNode, inExample, {b1: {user: brokerUsername, password: brokerPassword}}, function () {
 			var n2 = helper.getNode("n2");
 			var b1 = helper.getNode("b1");
 			b1.client.on('connect',function (connack) {
@@ -174,7 +179,7 @@ describe('mqtt sparkplug in node', function () {
         };
 		compressedPayload = spPayload.encodePayload(compressedPayload);
 	
-		helper.load(sparkplugNode, inExample, function () {
+		helper.load(sparkplugNode, inExample, {b1: {user: brokerUsername, password: brokerPassword}}, function () {
 			var n2 = helper.getNode("n2");
 
 			var b1 = helper.getNode("b1");
@@ -213,7 +218,7 @@ describe('mqtt sparkplug in node', function () {
 		compressedPayload = spPayload.encodePayload(compressedPayload);
 	
 
-		helper.load(sparkplugNode, inExample, function () {
+		helper.load(sparkplugNode, inExample, {b1: {user: brokerUsername, password: brokerPassword}}, function () {
 			var n2 = helper.getNode("n2");
 			var n1 = helper.getNode("in");
 			var b1 = helper.getNode("b1");

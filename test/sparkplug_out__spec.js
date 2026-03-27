@@ -6,7 +6,12 @@ var pako = require('pako');
 
 var spPayload = require('sparkplug-payload').get("spBv1.0");
 helper.init(require.resolve('node-red'));
-let testBroker = 'mqtt://localhost';
+let testBroker = process.env.TEST_BROKER || 'mqtt://localhost';
+const _brokerUrl = new URL(testBroker.replace(/^mqtt(s?)/, 'http$1'));
+let brokerHost = _brokerUrl.hostname;
+let brokerPort = _brokerUrl.port || '1883';
+let brokerUsername = _brokerUrl.username || '';
+let brokerPassword = _brokerUrl.password || '';
 var client = null;
 
 /**  
@@ -42,8 +47,8 @@ describe('mqtt sparkplug out node', function () {
 			"name": "Local Host",
 			"deviceGroup": "My Devices",
 			"eonName": "Node-Red",
-			"broker": "localhost",
-			"port": "1883",
+			"broker": brokerHost,
+			"port": brokerPort,
 			"clientid": "",
 			"usetls": false,
 			"protocolVersion": "4",
@@ -51,6 +56,8 @@ describe('mqtt sparkplug out node', function () {
 			"cleansession": true,
 			"enableStoreForward": true,
 			"primaryScada": "MY SCADA",
+			"username": brokerUsername,
+			"password": brokerPassword,
 			"credentials": {}
 		}
 	]
@@ -69,8 +76,8 @@ describe('mqtt sparkplug out node', function () {
 			"name": "Local Host",
 			"deviceGroup": "My Devices",
 			"eonName": "Node-Red",
-			"broker": "localhost",
-			"port": "1883",
+			"broker": brokerHost,
+			"port": brokerPort,
 			"clientid": "",
 			"usetls": false,
 			"protocolVersion": "4",
@@ -78,6 +85,8 @@ describe('mqtt sparkplug out node', function () {
 			"cleansession": true,
 			"enableStoreForward": false,
 			"primaryScada": "MY SCADA",
+			"username": brokerUsername,
+			"password": brokerPassword,
 			"credentials": {}
 		}
 	]
@@ -91,7 +100,7 @@ describe('mqtt sparkplug out node', function () {
 		client.on('connect', function () {
 			client.subscribe("spBv1.0/My Devices/DDATA/Node-Red/TEST2", function (err) {
 				if (!err) {
-					helper.load(sparkplugNode, outFlow, function () {
+					helper.load(sparkplugNode, outFlow, {b1: {user: brokerUsername, password: brokerPassword}}, function () {
 						n1 = helper.getNode("n1");
 						n1.brokerConn.enableStoreForward = false; // Force enable to buffer
 						
@@ -125,7 +134,7 @@ describe('mqtt sparkplug out node', function () {
 			client.on('connect', function () {
 				client.subscribe("spBv1.0/My Devices/DDATA/Node-Red/TEST2", function (err) {
 					if (!err) {
-						helper.load(sparkplugNode, outFlow, function () {
+						helper.load(sparkplugNode, outFlow, {b1: {user: brokerUsername, password: brokerPassword}}, function () {
 							n1 = helper.getNode("n1");
 							n1.brokerConn.enableStoreForward = false; // Force enable to buffer
 							
@@ -166,7 +175,7 @@ describe('mqtt sparkplug out node', function () {
 
 			client.subscribe("spBv1.0/My Devices/DDATA/Node-Red/TEST2", function (err) {
 				if (!err) {
-					helper.load(sparkplugNode, outFlow, function () {
+					helper.load(sparkplugNode, outFlow, {b1: {user: brokerUsername, password: brokerPassword}}, function () {
 						n1 = helper.getNode("n1");
 						n1.shouldBuffer = true; // Force enable to buffer
 						setTimeout(() => n1.receive({ payload: validMsg}), 500);
@@ -198,7 +207,7 @@ describe('mqtt sparkplug out node', function () {
 		client.on('connect', function () {
 			client.subscribe("spBv1.0/My Devices/DDATA/Node-Red/TEST2", function (err) {
 				if (!err) {
-					helper.load(sparkplugNode, outFlow, function () {
+					helper.load(sparkplugNode, outFlow, {b1: {user: brokerUsername, password: brokerPassword}}, function () {
 						n1 = helper.getNode("n1");
 						n1.shouldBuffer = true; // Force enable to buffer
 						setTimeout(() => n1.receive({ payload: validMsg}), 100);

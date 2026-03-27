@@ -115,6 +115,90 @@ msg = {
 
 _If the definition set set after the NBIRTH has been sent, them a REBIRTH is issued to notify clients about the new definition._
 
+### Templates (UDTs)
+
+Templates (also called User Defined Types) allow you to define reusable complex data structures. A Template Definition is published in the **NBIRTH** message so subscribers know the structure upfront. Devices then publish **Template Instances** — metrics whose value is a typed set of sub-metrics matching that definition.
+
+#### 1. Define the template on the broker config node
+
+Open the broker config node, go to the **Advanced** tab and click **Add Template**. Fill in:
+
+| Field | Example | Notes |
+|---|---|---|
+| Name | `MotorType` | Referenced by devices as the metric dataType |
+| Version | `1.0.0` | Optional, but recommended |
+| Metrics | `speed` / `Int32`, `torque` / `Float` | One row per member metric |
+| Parameters | `unit` / `String` / `rpm` | Optional default parameter values |
+
+The definition is automatically included in every NBIRTH message.
+
+#### 2. Add a template-typed metric to the device node
+
+In the **mqtt sparkplug device** node, add a metric and select your template name from the **Templates** group in the type dropdown (e.g. `MotorType`). The metric name (e.g. `motor`) becomes the root path for sending values.
+
+#### 3. Send values using flat-path notation
+
+Sub-metrics are addressed using `<metricName>/<memberName>` paths. The node builds the correct nested Template Instance automatically.
+
+```javascript
+// Send values for a metric named "motor" of type "MotorType"
+// (definition has members: speed: Int32, torque: Float)
+msg.payload = {
+    metrics: [
+        { name: "motor/speed",  value: 1450 },
+        { name: "motor/torque", value: 12.3 }
+    ]
+};
+```
+
+- The **first message** that provides all top-level metrics triggers a **DBIRTH**. The Template Instance in the DBIRTH will contain *all* members from the definition (missing ones get a null value).
+- Subsequent messages send a **DDATA** with a *partial* Template Instance containing only the members included in that message — as allowed by the Sparkplug B spec.
+
+#### 4. Nested templates
+
+A template metric can itself be of a template type. Use deeper slash paths to address it:
+
+```javascript
+// "pump" is of type "PumpType" which has:
+//   - rpm: Int32
+//   - motor: MotorType  (nested template with speed: Int32, torque: Float)
+msg.payload = {
+    metrics: [
+        { name: "pump/rpm",           value: 3000 },
+        { name: "pump/motor/speed",   value: 1450 },
+        { name: "pump/motor/torque",  value: 12.3 }
+    ]
+};
+```
+
+#### 5. Dynamic metric definitions with templates
+
+Templates can also be used when setting metrics via `msg.definition`. The dataType should be the template name:
+
+```javascript
+msg = {
+    definition: {
+        "motor": { dataType: "MotorType" },
+        "status": { dataType: "String" }
+    },
+    payload: {
+        metrics: [
+            { name: "motor/speed",  value: 1450 },
+            { name: "motor/torque", value: 12.3 },
+            { name: "status",       value: "running" }
+        ]
+    }
+};
+```
+
+#### What gets published
+
+| Message | Template content |
+|---|---|
+| **NBIRTH** | Template Definition (`isDefinition: true`, no `templateRef`) with all member metrics |
+| **DBIRTH** | Template Instance (`isDefinition: false`, `templateRef: "MotorType"`) with **all** members — nulls for any not yet received |
+| **DDATA** | Template Instance with only the **changed** members (partial instance) |
+
 ### Commands
 
 Commands can be used to force REBIRTH or to send DDEATH to a device.  Sending DDEATH is a good way to indicate that a connected device is offline. If a DDEANTH is send, a new birth message will be send on the next metric payload to the device or when a rebirth command is send.

@@ -7,7 +7,12 @@ var pako = require('pako');
 
 var spPayload = require('sparkplug-payload').get("spBv1.0");
 helper.init(require.resolve('node-red'));
-let testBroker = 'mqtt://localhost';
+let testBroker = process.env.TEST_BROKER || 'mqtt://localhost';
+const _brokerUrl = new URL(testBroker.replace(/^mqtt(s?)/, 'http$1'));
+let brokerHost = _brokerUrl.hostname;
+let brokerPort = _brokerUrl.port || '1883';
+let brokerUsername = _brokerUrl.username || '';
+let brokerPassword = _brokerUrl.password || '';
 var client = null;
 
 describe('mqtt sparkplug device node', function () {
@@ -45,21 +50,23 @@ describe('mqtt sparkplug device node', function () {
 			"name": "Local Host",
 			"deviceGroup": "My Devices",
 			"eonName": "Node-Red",
-			"broker": "localhost",
-			"port": "1883",
+			"broker": brokerHost,
+			"port": brokerPort,
 			"clientid": "",
 			"usetls": false,
 			"protocolVersion": "4",
 			"keepalive": "60",
 			"cleansession": true,
 			"enableStoreForward": false,
-			"primaryScada": "MY SCADA"
+			"primaryScada": "MY SCADA",
+			"username": brokerUsername,
+			"password": brokerPassword
 		}
 	];
 
 	it('should be loaded', function (done) {
 		var flow = [{ id: "n1", type: "mqtt sparkplug device", name: "device" }];
-		helper.load(sparkplugNode, flow, function () {
+		helper.load(sparkplugNode, flow, {b1: {user: brokerUsername, password: brokerPassword}}, function () {
 			var n1 = helper.getNode("n1");
 			n1.should.have.property('name', 'device');
 			done();
@@ -76,7 +83,7 @@ describe('mqtt sparkplug device node', function () {
 		client.on('connect', function () {
 			client.subscribe('#', function (err) {
 			  if (!err) {
-				helper.load(sparkplugNode, simpleFlow, function () {
+				helper.load(sparkplugNode, simpleFlow, {b1: {user: brokerUsername, password: brokerPassword}}, function () {
 					try {
 						n1 = helper.getNode("n1");
 						b1 = n1.brokerConn;
@@ -108,12 +115,17 @@ describe('mqtt sparkplug device node', function () {
 				
 				 payload.metrics[1].value.toInt().should.eql(0);
 
+				payload.metrics.forEach(function(m) {
+					m.should.have.property("timestamp");
+					long.isLong(m.timestamp).should.be.true();
+				});
+
 				done();
 				client.end();
 			}
 		});
 
-	}); // it end 
+	}); // it end
 
 	/**
 	* Verify NBirth is send when starting up Node-Red with a Device loaded.
@@ -127,7 +139,7 @@ describe('mqtt sparkplug device node', function () {
 		client.on('connect', function () {
 			client.subscribe('#', function (err) {
 			  if (!err) {
-				helper.load(sparkplugNode, simpleFlow, function () {
+				helper.load(sparkplugNode, simpleFlow, {b1: {user: brokerUsername, password: brokerPassword}}, function () {
 					try {
 						n1 = helper.getNode("n1");
 						b1 = n1.brokerConn;
@@ -163,7 +175,7 @@ describe('mqtt sparkplug device node', function () {
 		client.on('connect', function () {
 			client.subscribe('#', function (err) {
 			  if (!err) {
-				helper.load(sparkplugNode, simpleFlow, function () {
+				helper.load(sparkplugNode, simpleFlow, {b1: {user: brokerUsername, password: brokerPassword}}, function () {
 					try {
 						n1 = helper.getNode("n1");
 						b1 = n1.brokerConn;
@@ -235,7 +247,7 @@ describe('mqtt sparkplug device node', function () {
 		client.on('connect', function () {
 			client.subscribe('#', function (err) {
 			  if (!err) {
-				helper.load(sparkplugNode, flow, function () {
+				helper.load(sparkplugNode, flow, {b1: {user: brokerUsername, password: brokerPassword}}, function () {
 					try {
 						n1 = helper.getNode("n1");
 						b1 = n1.brokerConn;
@@ -275,7 +287,7 @@ describe('mqtt sparkplug device node', function () {
 		client.on('connect', function () {
 			client.subscribe('#', function (err) {
 			  if (!err) {
-				helper.load(sparkplugNode, simpleFlow, function () {
+				helper.load(sparkplugNode, simpleFlow, {b1: {user: brokerUsername, password: brokerPassword}}, function () {
 					try {
 						n1 = helper.getNode("n1");
 						b1 = n1.brokerConn;
@@ -313,7 +325,7 @@ describe('mqtt sparkplug device node', function () {
 		client.on('connect', function () {
 			client.subscribe('#', function (err) {
 			  if (!err) {
-				helper.load(sparkplugNode, flow, function () {
+				helper.load(sparkplugNode, flow, {b1: {user: brokerUsername, password: brokerPassword}}, function () {
 					try {
 						n1 = helper.getNode("n1");
 						b1 = n1.brokerConn;
@@ -352,7 +364,7 @@ describe('mqtt sparkplug device node', function () {
 		client.on('connect', function () {
 			client.subscribe('#', function (err) {
 			  if (!err) {
-				helper.load(sparkplugNode, simpleFlow, function () {
+				helper.load(sparkplugNode, simpleFlow, {b1: {user: brokerUsername, password: brokerPassword}}, function () {
 					try {
 						n1 = helper.getNode("n1");
 						b1 = n1.brokerConn;
@@ -462,7 +474,7 @@ describe('mqtt sparkplug device node', function () {
 		client.on('connect', function () {
 			client.subscribe('#', function (err) {
 			  if (!err) {
-				helper.load(sparkplugNode, simpleFlow, function () {
+				helper.load(sparkplugNode, simpleFlow, {b1: {user: brokerUsername, password: brokerPassword}}, function () {
 					try {
 						n1 = helper.getNode("n1");
 						b1 = n1.brokerConn;
@@ -510,7 +522,10 @@ describe('mqtt sparkplug device node', function () {
 				// Check that bdSeq in inceased every time we reconnect
 				payload.metrics[0].value.toInt().should.eql(expectedBd);
 				payload.metrics.length.should.eql(1);
-				
+
+				// [tck-id-topics-ndeath-seq] NDEATH MUST NOT include a sequence number
+				payload.should.not.have.property("seq");
+
 				if (expectedBd == 5) {
 					done();
 				}
@@ -533,7 +548,7 @@ describe('mqtt sparkplug device node', function () {
 		client.on('connect', function () {
 			client.subscribe('#', function (err) {
 			  if (!err) {
-				helper.load(sparkplugNode, simpleFlow, function () {
+				helper.load(sparkplugNode, simpleFlow, {b1: {user: brokerUsername, password: brokerPassword}}, function () {
 					try {
 						n1 = helper.getNode("n1");
 						b1 = n1.brokerConn;
@@ -610,7 +625,7 @@ describe('mqtt sparkplug device node', function () {
 		client.on('connect', function () {
 			client.subscribe('#', function (err) {
 			  if (!err) {
-				helper.load(sparkplugNode, simpleFlow, function () {
+				helper.load(sparkplugNode, simpleFlow, {b1: {user: brokerUsername, password: brokerPassword}}, function () {
 					try {
 						n1 = helper.getNode("n1");
 						b1 = n1.brokerConn;
@@ -686,7 +701,7 @@ describe('mqtt sparkplug device node', function () {
 		client.on('connect', function () {
 			client.subscribe('#', function (err) {
 			  if (!err) {
-				helper.load(sparkplugNode, simpleFlow, function () {
+				helper.load(sparkplugNode, simpleFlow, {b1: {user: brokerUsername, password: brokerPassword}}, function () {
 					try {
 						n1 = helper.getNode("n1");
 						b1 = n1.brokerConn;
@@ -758,7 +773,7 @@ describe('mqtt sparkplug device node', function () {
 	}); // it end 
 
 	it('should warn when passing unknown NData metric', function (done) {
-		helper.load(sparkplugNode, simpleFlow, function () {
+		helper.load(sparkplugNode, simpleFlow, {b1: {user: brokerUsername, password: brokerPassword}}, function () {
 		
 			const n1 = helper.getNode("n1");
 			n1.on('input', () => {
@@ -780,7 +795,7 @@ describe('mqtt sparkplug device node', function () {
 	}); // it end 
 
 	it('should warn when passing NData metric without name', function (done) {
-		helper.load(sparkplugNode, simpleFlow, function () {
+		helper.load(sparkplugNode, simpleFlow, {b1: {user: brokerUsername, password: brokerPassword}}, function () {
 		
 			let n1 = helper.getNode("n1");
 			n1.on('input', () => {
@@ -801,7 +816,7 @@ describe('mqtt sparkplug device node', function () {
 	}); // it end 
 
 	it('should error when passing NData metric that is not array', function (done) {
-		helper.load(sparkplugNode, simpleFlow, function () {
+		helper.load(sparkplugNode, simpleFlow, {b1: {user: brokerUsername, password: brokerPassword}}, function () {
 		
 			let n1 = helper.getNode("n1");
 			n1.receive({
@@ -825,7 +840,7 @@ describe('mqtt sparkplug device node', function () {
 			client.on('connect', function () {
 				client.subscribe('#', function (err) {
 				if (!err) {
-					helper.load(sparkplugNode, simpleFlow, function () {
+					helper.load(sparkplugNode, simpleFlow, {b1: {user: brokerUsername, password: brokerPassword}}, function () {
 						try {
 							n1 = helper.getNode("n1");
 							b1 = n1.brokerConn;
@@ -898,7 +913,7 @@ describe('mqtt sparkplug device node', function () {
 		client.on('connect', function () {
 			client.subscribe('#', function (err) {
 			  if (!err) {
-				helper.load(sparkplugNode, simpleFlow, function () {
+				helper.load(sparkplugNode, simpleFlow, {b1: {user: brokerUsername, password: brokerPassword}}, function () {
 					try {
 						n1 = helper.getNode("n1");
 						b1 = n1.brokerConn;
@@ -979,7 +994,7 @@ describe('mqtt sparkplug device node', function () {
 		client.on('connect', function () {
 			client.subscribe('#', function (err) {
 			  if (!err) {
-				helper.load(sparkplugNode, simpleFlow, function () {
+				helper.load(sparkplugNode, simpleFlow, {b1: {user: brokerUsername, password: brokerPassword}}, function () {
 					try {
 						n1 = helper.getNode("n1");
 						b1 = n1.brokerConn;
@@ -1061,7 +1076,7 @@ describe('mqtt sparkplug device node', function () {
 		client.on('connect', function () {
 			client.subscribe('#', function (err) {
 			  if (!err) {
-				helper.load(sparkplugNode, simpleFlow, function () {
+				helper.load(sparkplugNode, simpleFlow, {b1: {user: brokerUsername, password: brokerPassword}}, function () {
 					try {
 						n1 = helper.getNode("n1");
 						b1 = n1.brokerConn;
@@ -1152,7 +1167,7 @@ describe('mqtt sparkplug device node', function () {
 		client.on('connect', function () {
 			client.subscribe('#', function (err) {
 			  if (!err) {
-				helper.load(sparkplugNode, simpleFlow, function () {
+				helper.load(sparkplugNode, simpleFlow, {b1: {user: brokerUsername, password: brokerPassword}}, function () {
 					try {
 						
 						n1 = helper.getNode("n1");
@@ -1212,7 +1227,7 @@ describe('mqtt sparkplug device node', function () {
 		client.on('connect', function () {
 			client.subscribe('#', function (err) {
 				if (!err) {
-				helper.load(sparkplugNode, simpleFlow, function () {
+				helper.load(sparkplugNode, simpleFlow, {b1: {user: brokerUsername, password: brokerPassword}}, function () {
 					try {
 						n1 = helper.getNode("n1");
 						b1 = n1.brokerConn;
@@ -1248,7 +1263,7 @@ describe('mqtt sparkplug device node', function () {
 		client.on('connect', function () {
 			client.subscribe('#', function (err) {
 				if (!err) {
-				helper.load(sparkplugNode, simpleFlow, function () {
+				helper.load(sparkplugNode, simpleFlow, {b1: {user: brokerUsername, password: brokerPassword}}, function () {
 					try {
 						n1 = helper.getNode("n1");
 						b1 = n1.brokerConn;
@@ -1286,7 +1301,7 @@ describe('mqtt sparkplug device node', function () {
 		client.on('connect', function () {
 			client.subscribe('#', function (err) {
 			  if (!err) {
-				helper.load(sparkplugNode, simpleFlow, function () {
+				helper.load(sparkplugNode, simpleFlow, {b1: {user: brokerUsername, password: brokerPassword}}, function () {
 					try {
 						n1 = helper.getNode("n1");
 						b1 = n1.brokerConn;
@@ -1366,7 +1381,7 @@ describe('mqtt sparkplug device node', function () {
 		client.on('connect', function () {
 			client.subscribe('#', function (err) {
 			  if (!err) {
-				helper.load(sparkplugNode, simpleFlow, function () {
+				helper.load(sparkplugNode, simpleFlow, {b1: {user: brokerUsername, password: brokerPassword}}, function () {
 					try {
 						n1 = helper.getNode("n1");
 						b1 = n1.brokerConn;
@@ -1452,7 +1467,7 @@ describe('mqtt sparkplug device node', function () {
 		client.on('connect', function () {
 			client.subscribe('#', function (err) {
 			  if (!err) {
-				helper.load(sparkplugNode, simpleFlow, function () {
+				helper.load(sparkplugNode, simpleFlow, {b1: {user: brokerUsername, password: brokerPassword}}, function () {
 					try {
 						n1 = helper.getNode("n1");
 						b1 = n1.brokerConn;
@@ -1526,7 +1541,7 @@ describe('mqtt sparkplug device node', function () {
 		client.on('connect', function () {
 			client.subscribe('#', function (err) {
 			  if (!err) {
-				helper.load(sparkplugNode, simpleFlow, function () {
+				helper.load(sparkplugNode, simpleFlow, {b1: {user: brokerUsername, password: brokerPassword}}, function () {
 					try {
 						n1 = helper.getNode("n1");
 						b1 = n1.brokerConn;
@@ -1589,7 +1604,7 @@ describe('mqtt sparkplug device node', function () {
 			client.subscribe('#', function (err) {
 			  if (!err) {
 				simpleFlow[1].aliasMetrics = true;
-				helper.load(sparkplugNode, simpleFlow, function () {
+				helper.load(sparkplugNode, simpleFlow, {b1: {user: brokerUsername, password: brokerPassword}}, function () {
 					try {
 						n1 = helper.getNode("n1");
 						b1 = n1.brokerConn;
