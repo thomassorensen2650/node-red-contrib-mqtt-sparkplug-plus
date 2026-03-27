@@ -16,6 +16,109 @@
         background: var(--red-ui-tertiary-background);
         padding-right: 75px;
     }
+    /* Outer template list: each item fills the full width of the container */
+    #node-config-input-templates-container .red-ui-editableList-item-content {
+        width: 100%;
+        box-sizing: border-box;
+    }
+    /* Pin the delete (×) button to the top of each tall template row */
+    #node-config-input-templates-container > li.red-ui-editableList-item {
+        align-items: flex-start !important;
+    }
+    #node-config-input-templates-container > li.red-ui-editableList-item > .red-ui-editableList-item-remove {
+        margin-top: 4px;
+    }
+    /* Sub-list item content must fill available width so flex children stretch */
+    .sp-tpl-metrics-list .red-ui-editableList-item-content,
+    .sp-tpl-params-list  .red-ui-editableList-item-content {
+        width: 100%;
+        box-sizing: border-box;
+    }
+    /* Keep sub-list delete buttons vertically centred on their single-line row */
+    .sp-tpl-metrics-list li.red-ui-editableList-item,
+    .sp-tpl-params-list  li.red-ui-editableList-item {
+        align-items: center !important;
+    }
+    .sp-tpl-header-row {
+        display: flex;
+        align-items: center;
+        gap: 6px;
+        width: 100%;
+        box-sizing: border-box;
+        margin-bottom: 4px;
+    }
+    .sp-tpl-header-row .sp-tpl-name {
+        flex: 1;
+        min-width: 0;
+    }
+    .sp-tpl-header-row .sp-tpl-version {
+        width: 110px;
+        flex-shrink: 0;
+    }
+    .sp-tpl-col-labels {
+        display: flex;
+        gap: 6px;
+        font-size: 0.8em;
+        color: var(--red-ui-secondary-text, #777);
+        margin-bottom: 2px;
+    }
+    #mqtt-broker-tab-advanced .red-ui-editableList-item-content {
+
+        padding-right:45px; /* make room for the delete button */
+
+    }
+
+     #mqtt-broker-tab-advanced .red-ui-editableList-border {
+        overflow-y: hidden;
+     }
+
+    .sparkplug-template-section {
+        margin-top: 6px;
+        padding: 4px 6px 6px 6px;
+        background: var(--red-ui-secondary-background, #f0f0f0);
+        border-radius: 4px;
+
+    }
+    .sparkplug-template-section-header {
+        cursor: pointer;
+        font-weight: bold;
+        font-size: 0.85em;
+        color: var(--red-ui-secondary-text, #555);
+        user-select: none;
+        padding: 2px 0;
+    }
+    .sparkplug-template-sublist {
+        margin-top: 4px;
+    }
+    .sparkplug-template-sublist .red-ui-editableList-container {
+        background: var(--red-ui-primary-background, #fff);
+    }
+    /* Sub-list rows: inline layout for name + type columns */
+    .sp-sublist-row {
+        display: flex;
+        align-items: center;
+        gap: 4px;
+        width: 100%;
+        box-sizing: border-box;
+    }
+    .sp-sublist-row .sp-col-name {
+        flex: 1;
+        min-width: 0;
+    }
+    .sp-sublist-row .sp-col-type {
+        width: 110px;
+        flex-shrink: 0;
+    }
+    .sp-sublist-row .sp-col-value {
+        width: 100px;
+        flex-shrink: 0;
+    }
+    .sp-sublist-empty {
+        font-size: 0.85em;
+        color: var(--red-ui-secondary-text, #999);
+        padding: 4px 2px;
+        font-style: italic;
+    }
 </style>
 
 <script type="text/html" data-template-name="mqtt-sparkplug-broker">
@@ -64,11 +167,12 @@
         <div id="mqtt-broker-tab-advanced" style="display:none">
             <div class="form-row node-config-input-templates-container-row" style="margin-bottom: 0px;">
                 <label><i class="fa fa-cubes"></i> <span data-i18n="mqtt-sparkplug-plus.label.templates"></span></label>
+                <span style="font-size:0.85em; color: var(--red-ui-secondary-text, #777);" data-i18n="mqtt-sparkplug-plus.tip.templates"></span>
             </div>
             <div class="form-row node-config-input-templates-container-row" id="node-config-input-templates-container-row">
                 <ol id="node-config-input-templates-container"></ol>
             </div>
-        </div> 
+        </div>
          <div id="mqtt-broker-tab-sparkplug" style="display:none">
             <div class="form-row">
                 <label for="node-config-input-eonName"><i class="fa fa-tag"></i> <span data-i18n="mqtt-sparkplug-plus.label.name"></span></label>
@@ -113,45 +217,91 @@
 <script type="text/javascript">
 (function() {
 
-     /**
-    * Function that returns a list of configured Templates
-    * @return   {Object} A object with all configured templates.
-    */
+    var primitiveDataTypes = ["Int8", "Int16", "Int32", "Int64", "UInt8", "UInt16", "UInt32", "UInt64", "Float", "Double", "Boolean", "DateTime", "UUID", "DataSet", "Bytes", "String", "Unknown"];
+
+    /**
+     * Collect all template definitions currently entered in the outer editable list.
+     * Returns an array of JSON strings, one per template.
+     */
     function geTemplateList() {
         var _templates = [];
-        var templates = $("#node-config-input-templates-container").editableList("items");
-        templates.each(function(i) {
+        var items = $("#node-config-input-templates-container").editableList("items");
+        items.each(function() {
             var item = $(this);
-            var templateJson = item.find(".sparkplug-input-templates-json").typedInput('value');
-            //var dt = item.find(".sparkplug-input-metrics-dateType option:selected").text();
-           _templates.push(templateJson);
+            var name    = item.find(".sp-tpl-name").val().trim();
+            var version = item.find(".sp-tpl-version").val().trim();
+
+            if (!name) return; // skip empty rows
+
+            // Collect metrics sub-list
+            var metrics = [];
+            item.find(".sp-tpl-metrics-list").editableList("items").each(function() {
+                var mName = $(this).find(".sp-tpl-metric-name").val().trim();
+                var mType = $(this).find(".sp-tpl-metric-type").val();
+                if (mName) {
+                    metrics.push({ name: mName, type: mType });
+                }
+            });
+
+            // Collect parameters sub-list
+            var parameters = [];
+            item.find(".sp-tpl-params-list").editableList("items").each(function() {
+                var pName  = $(this).find(".sp-tpl-param-name").val().trim();
+                var pType  = $(this).find(".sp-tpl-param-type").val();
+                var pValue = $(this).find(".sp-tpl-param-value").val().trim();
+                if (pName) {
+                    var p = { name: pName, type: pType };
+                    if (pValue !== "") p.value = pValue;
+                    parameters.push(p);
+                }
+            });
+
+            var tpl = {
+                name: name,
+                type: "Template",
+                value: {
+                    version: version,
+                    isDefinition: true,
+                    metrics: metrics,
+                    parameters: parameters
+                }
+            };
+            _templates.push(JSON.stringify(tpl));
         });
         return _templates;
     }
 
-    function validateTemplate(value) {
-        try {
-            var json = JSON.parse(value);
-            var check = (notOk, ex) => {
-                if (notOk) throw ex;
-            }
-            check(typeof json != "object", "Template should be an object.");
-            check(Array.isArray(json), "Template should be a object and not an array.");
-            check(!json.hasOwnProperty("name"), "Template should have a name attribute");
-            check(typeof(json.name) != "string", "Template name should be a string");
+    /**
+     * Build a <select> element populated with primitive types plus optionally
+     * other defined template names (excluding the one being edited, to prevent cycles).
+     */
+    function buildTypeSelect(cssClass, selectedValue, extraTemplateNames) {
+        var sel = $('<select/>', { class: cssClass, style: "width:110px; margin-left:4px;" });
+        var g0 = $('<optgroup/>', { label: "Datatypes" }).appendTo(sel);
+        primitiveDataTypes.forEach(function(d) {
+            $('<option/>').val(d).text(d).prop('selected', d === selectedValue).appendTo(g0);
+        });
+        if (extraTemplateNames && extraTemplateNames.length) {
+            var g1 = $('<optgroup/>', { label: "Templates" }).appendTo(sel);
+            extraTemplateNames.forEach(function(n) {
+                $('<option/>').val(n).text(n).prop('selected', n === selectedValue).appendTo(g1);
+            });
+        }
+        return sel;
+    }
 
-            return {
-                valid : true,
-                name: json.name
-            }
-        } catch (e) {
-            return {
-                valid : false,
-                error: e
-            }
-            
-        };
-    };
+    /**
+     * Return template names currently defined in the outer list (used to populate
+     * the type dropdown for nested template references inside a template's metrics).
+     */
+    function getCurrentTemplateNames() {
+        var names = [];
+        $("#node-config-input-templates-container").editableList("items").each(function() {
+            var n = $(this).find(".sp-tpl-name").val().trim();
+            if (n) names.push(n);
+        });
+        return names;
+    }
 
     RED.nodes.registerType('mqtt-sparkplug-broker',{
         category: 'config',
@@ -172,9 +322,8 @@
             compressAlgorithm : {value: false},
             aliasMetrics : {value: false},
             useTemplates : {value: true},
-            templates : {value: ""},
+            templates : {value: []},
             manualEoNBirth : {value: false},
-            
 
             primaryScada: {value:"",  validate :x =>  !$("#node-config-input-enableStoreForward").is(":checked") || /^[^/+#]+$/.test(x) },
         },
@@ -216,83 +365,160 @@
                 iconClass: "fa fa-plug"
             });
 
-            if (false) { // TODO ENABLE TEMPLATES
-                tabs.addTab({
-                        id: "mqtt-broker-tab-advanced",
-                        label: this._("mqtt-sparkplug-plus.tabs-label.advanced"),
-                        iconClass: "fa fa-cog"
+            tabs.addTab({
+                id: "mqtt-broker-tab-advanced",
+                label: this._("mqtt-sparkplug-plus.tabs-label.advanced"),
+                iconClass: "fa fa-cubes"
+            });
+
+            // ── Template Definitions Editor ──────────────────────────────────────
+            var templateList = $("#node-config-input-templates-container").editableList({
+                header: $("<div>", { style: "display:flex; gap:6px;" }).append(
+                    $("<div>", { style: "flex:1; font-weight:bold;" }).text("Name"),
+                    $("<div>", { style: "width:110px; font-weight:bold;" }).text("Version")
+                ),
+                addButton: this._("mqtt-sparkplug-plus.label.add-template") || "Add Template",
+                removable: true,
+                height: "auto",
+                sortable: true,
+                addItem: function(container, i, opt) {
+
+                    // ── Header row: name + version (side by side) ─────────────
+                    var headerRow = $("<div/>", { class: "sp-tpl-header-row" }).appendTo(container);
+
+                    $("<input/>", {
+                        class: "sp-tpl-name",
+                        type: "text",
+                        placeholder: "TemplateName"
+                    }).val(opt.name || "").appendTo(headerRow);
+
+                    $("<input/>", {
+                        class: "sp-tpl-version",
+                        type: "text",
+                        placeholder: "1.0.0"
+                    }).val((opt.value && opt.value.version) || "").appendTo(headerRow);
+
+                    // ── Metrics sub-section (expanded by default) ─────────────
+                    var metricsSection = $("<div/>", { class: "sparkplug-template-section" }).appendTo(container);
+
+                    var metricsHeader = $("<div/>", {
+                        class: "sparkplug-template-section-header",
+                        html: '<i class="fa fa-caret-down" style="width:10px;"></i> Metrics'
+                    }).appendTo(metricsSection);
+
+                    var metricsSubDiv = $("<div/>", { class: "sparkplug-template-sublist" }).appendTo(metricsSection);
+
+                    metricsHeader.on("click", function() {
+                        metricsSubDiv.toggle();
+                        $(this).find("i").toggleClass("fa-caret-down fa-caret-right");
                     });
 
-                // Setup Templates !!!
-                var templateList = $("#node-config-input-templates-container").editableList( {
-                    header: $("<div>").append($.parseHTML("<div style='width:80%; display: inline-grid'>Template</div>")),
-                    addButton: "add",
-                    removable: true,
-                    height: 300,
-                    addItem: function(container,i,opt) {
-                        var parent = container.parent();
-                        var row = $("<div/>", {
-                            class:"sparkplug-config-input-metric",
-                            style: "display:flex;flex-direction:row;align-items: center;"
-                        }).appendTo(container);
+                    // Column labels inside the metrics sub-section
+                    $("<div/>", { class: "sp-tpl-col-labels" }).append(
+                        $("<span>", { style: "flex:1" }).text("Metric name"),
+                        $("<span>", { style: "width:110px" }).text("Type")
+                    ).appendTo(metricsSubDiv);
 
-                        var defaultTemplate = {
-                            "name": "MyTemplate",
-                            "type": "Template",
-                            "value": {
-                                "version": "1.0.0",
-                                "isDefinition": true,
-                                "metrics": [
-                                    {
-                                        "name": "FirstTag",
-                                        "type": "Int32"
-                                    },
-                                    {
-                                        "name": "SecondTag",
-                                        "type": "Int32"
-                                    }
-                                ],
-                                "parameters": []
-                            }
-                        };
+                    var metricsOl = $("<ol/>", { class: "sp-tpl-metrics-list" }).appendTo(metricsSubDiv);
 
-                        // Template Name
-                        var fmoduleSpan = $("<span>", {
-                            style: "width:200px;",
-                            text: "MyTemplate",
-                        }).appendTo(row); //.val(opt.name);;
+                    metricsOl.editableList({
+                        addButton: "Add Metric",
+                        removable: true,
+                        height: '200px',
+                        addItem: function(mc, mi, mopt) {
+                            var mRow = $("<div/>", { class: "sp-sublist-row" }).appendTo(mc);
+                            $("<input/>", {
+                                class: "sp-tpl-metric-name sp-col-name",
+                                type: "text",
+                                placeholder: "metricName"
+                            }).val(mopt.name || "").appendTo(mRow);
 
-                        // Template JSON EDITOR
-                        var selectField = $('<input/>',{
-                            class : "sparkplug-input-templates-json",
-                            type : "text"
-                        }).appendTo(row);
+                            var otherTemplates = getCurrentTemplateNames().filter(function(n) {
+                                return n !== container.find(".sp-tpl-name").val();
+                            });
+                            buildTypeSelect("sp-tpl-metric-type sp-col-type", mopt.type || "Int32", otherTemplates).appendTo(mRow);
+                        }
+                    });
 
-                        selectField.typedInput({
-                            type:"json",
-                            types:["json"],
-                            validate : function(v) {
-                                console.log("Validate Called");
-                            }
-                        });
+                    // Populate metrics from saved data
+                    var savedMetrics = (opt.value && opt.value.metrics) || [];
+                    savedMetrics.forEach(function(m) {
+                        metricsOl.editableList("addItem", m);
+                    });
 
-                        var useDefaultTemplate = Object.keys(opt).length == 0;
+                    // ── Parameters sub-section (collapsed by default) ─────────
+                    var paramsSection = $("<div/>", { class: "sparkplug-template-section" }).appendTo(container);
 
-                        selectField.typedInput('width', '100%');
-                        selectField.on('change', function(event, type, value) {
-                            var s = validateTemplate(value);
-                            var text = s.valid ? s.name : s.error;
-                            fmoduleSpan.text(text);
-                        });
-                        selectField.typedInput('value',useDefaultTemplate ? JSON.stringify(defaultTemplate) : JSON.stringify(opt));
-                    }
-                });
-                if (this.templates) {
-                    this.templates.forEach(t => {
-                        templateList.editableList('addItem', JSON.parse(t));
+                    var savedParams = (opt.value && opt.value.parameters) || [];
+                    var paramsExpanded = savedParams.length > 0;
+                    var paramsHeader = $("<div/>", {
+                        class: "sparkplug-template-section-header",
+                        html: '<i class="fa ' + (paramsExpanded ? "fa-caret-down" : "fa-caret-right") + '" style="width:10px;"></i> Parameters'
+                    }).appendTo(paramsSection);
+
+                    var paramsSubDiv = $("<div/>", {
+                        class: "sparkplug-template-sublist",
+                        style: paramsExpanded ? "" : "display:none;"
+                    }).appendTo(paramsSection);
+
+                    paramsHeader.on("click", function() {
+                        paramsSubDiv.toggle();
+                        $(this).find("i").toggleClass("fa-caret-down fa-caret-right");
+                    });
+
+                    // Column labels inside the parameters sub-section
+                    $("<div/>", { class: "sp-tpl-col-labels" }).append(
+                        $("<span>", { style: "flex:1" }).text("Parameter name"),
+                        $("<span>", { style: "width:110px" }).text("Type"),
+                        $("<span>", { style: "width:100px" }).text("Default value")
+                    ).appendTo(paramsSubDiv);
+
+                    var paramsOl = $("<ol/>", { class: "sp-tpl-params-list" }).appendTo(paramsSubDiv);
+
+                    paramsOl.editableList({
+                        addButton: "Add Parameter",
+                        removable: true,
+                        height: '200px',
+                        sortable: true,
+                        addItem: function(pc, pi, popt) {
+                            var pRow = $("<div/>", { class: "sp-sublist-row" }).appendTo(pc);
+                            $("<input/>", {
+                                class: "sp-tpl-param-name sp-col-name",
+                                style: 'min-width:150px;',
+                                type: "text",
+                                placeholder: "paramName"
+                            }).val(popt.name || "").appendTo(pRow);
+
+                            buildTypeSelect("sp-tpl-param-type sp-col-type", popt.type || "String", []).appendTo(pRow);
+
+                            $("<input/>", {
+                                class: "sp-tpl-param-value sp-col-value",
+                                type: "text",
+                                placeholder: "default value"
+                            }).val(popt.value !== undefined ? popt.value : "").appendTo(pRow);
+                        }
+                    });
+
+                    // Populate parameters from saved data
+                    var savedParams = (opt.value && opt.value.parameters) || [];
+                    savedParams.forEach(function(p) {
+                        paramsOl.editableList("addItem", p);
                     });
                 }
-            }
+            });
+
+            // Load existing templates
+            var savedTemplates = this.templates || [];
+            savedTemplates.forEach(function(t) {
+                try {
+                    var parsed = typeof t === "string" ? JSON.parse(t) : t;
+                    templateList.editableList("addItem", parsed);
+                } catch(e) {
+                    // skip malformed entries
+                }
+            });
+
+            // ── Connection tab setup ──────────────────────────────────────────
             this.cleansession = true;
             $("#node-storeforward-line").hide();
             $("#node-config-input-enableStoreForward").on('change',function() {
@@ -315,7 +541,6 @@
             $("#node-config-input-usetls").on("click",function() {
                 updateTLSOptions();
             });
-            var node = this;
             function updatePortEntry(){
                 var disabled = $("#node-config-input-port").prop("disabled");
                 if ($("#node-config-input-broker").val().indexOf("://") === -1){
@@ -366,11 +591,11 @@
         <ul style="min-width: 600px; margin-bottom: 20px;" id="node-mqtt-device-tabs"></ul>
     </div>
     <div id="node-mqtt-device-tabs-content" style="min-height:150px;">
-        <div id="mqtt-device-tab-metrics" style="display:none">                
+        <div id="mqtt-device-tab-metrics" style="display:none">
             <div class="form-row sparkplug-input-metric-row" id="sparkplug-input-metric-container-row">
                 <ol id="sparkplug-input-metric-container"></ol>
             </div>
-        
+
             <div class="form-tips"><span data-i18n="mqtt-sparkplug-plus.tip.device"></span></div>
         </div>
 
@@ -389,7 +614,7 @@
                 </label>
             </div>
             <div class="form-tips"><span data-i18n="mqtt-sparkplug-plus.tip.birthImmediately"></span></div>
-            
+
         </div>
 
     </div>
@@ -408,8 +633,8 @@
         metrics.each(function(i) {
             var item = $(this);
             var name = item.find(".sparkplug-input-metric-name").val();
-            var dt = item.find(".sparkplug-input-metric-dateType option:selected").text();
-           
+            var dt = item.find(".sparkplug-input-metric-dateType option:selected").val();
+
             if (name) {
                 _metrics[name] = { dataType : dt};
             }
@@ -417,18 +642,18 @@
         return _metrics;
     }
 
-    let dt =  ["Int8", "Int16", "Int32", "Int64", "UInt8", "UInt16", "UInt32", "UInt64", "Float", "Double", "Boolean", "DateTime", "UUID", "DataSet", "Bytes", "String", "Unknown"]
+    var primitiveTypes = ["Int8", "Int16", "Int32", "Int64", "UInt8", "UInt16", "UInt32", "UInt64", "Float", "Double", "Boolean", "DateTime", "UUID", "DataSet", "Bytes", "String", "Unknown"];
 
     RED.nodes.registerType('mqtt sparkplug device',{
         category: 'network',
         defaults: {
             name: {value:"",  validate :x => /^[^/+#]*$/.test(x) },
-            metrics: {value:{}, required:true, /*validate : x => Object.keys(x).length > 0*/ }, // do regex matching of invalid charaters (e.g. # or +)
+            metrics: {value:{}, required:true },
             broker: {type:"mqtt-sparkplug-broker", required:true},
             birthImmediately: {value: false},
             bufferDevice: {value: false}
         },
-       
+
         color:"#2181a6",
         inputs:1,
         outputs:1,
@@ -442,6 +667,12 @@
         oneditprepare: function() {
 
             var that = this;
+
+            // Resolve broker connection BEFORE the editableList is set up so that
+            // the addItem callback can read brokerConn.templates.
+            if (this.broker) {
+                this.brokerConn = RED.nodes.node(this.broker);
+            }
 
             var tabs = RED.tabs.create({
                 id: "node-mqtt-device-tabs",
@@ -461,7 +692,20 @@
                 iconClass: "fa fa-cog"
             });
 
-            // Setup model 
+            // Collect template names from the broker config for the type dropdown
+            var templateNames = [];
+            if (that.brokerConn && that.brokerConn.templates) {
+                that.brokerConn.templates.forEach(function(t) {
+                    try {
+                        var tv = typeof t === "string" ? JSON.parse(t) : t;
+                        if (tv && tv.name) {
+                            templateNames.push(tv.name);
+                        }
+                    } catch(e) { /* skip malformed */ }
+                });
+            }
+
+            // Setup metrics list
             var metricsList = $("#sparkplug-input-metric-container").editableList( {
                 header: $("<div>").append($.parseHTML("<div style='width:80%; display: inline-grid'>Name</div><div style='display: inline-grid'>Type</div>")),
                 addButton: "add",
@@ -469,67 +713,49 @@
                 removable: true,
                 height: 300,
                 addItem: function(container,i,opt) {
-         
-                    var parent = container.parent();
+
                     var row = $("<div/>").addClass("sparkplug-input-metric").appendTo(container);
                     var fmoduleSpan = $("<span>").appendTo(row);
-                    var fmodule = $("<input/>", {
+                    $("<input/>", {
                         class: "sparkplug-input-metric-name",
                         placeholder: "Metric Name",
                         type: "text"
-                    }).css({
-                    }).appendTo(fmoduleSpan).val(opt.name);
-                   
+                    }).appendTo(fmoduleSpan).val(opt.name || "");
+
                     var selectField = $('<select/>',{
                         style:"width:110px; margin-left: 5px; text-align: center;",
                         class : "sparkplug-input-metric-dateType"
                     }).appendTo(row);
 
-                    var group0 = $('<optgroup/>', { label: "Datatypes" }).appendTo(selectField);                
+                    var group0 = $('<optgroup/>', { label: "Datatypes" }).appendTo(selectField);
 
-                    dt.forEach(d => {
-                        let option = $("<option></option>").val(d).text(d);
+                    primitiveTypes.forEach(function(d) {
+                        var option = $("<option></option>").val(d).text(d);
                         group0.append(option);
                         if (d === opt.dataType || (Object.keys(opt).length === 0 && d === "Int32")) {
-                            option.attr('selected','selected')
+                            option.attr('selected','selected');
                         }
                     });
 
-                    // Load metrics if any defined
-                    if (that.brokerConn.templates) {
-                        try {
-                            //var b = RED.nodes.node(that.broker);
-                            var group1 = $('<optgroup/>', { label: "Templates" }).appendTo(selectField);
-                            if (that.brokerConn.templates) {
-                                that.brokerConn.templates.forEach(t=> {
-                                var tv = JSON.parse(t);
-                                tv.valid = true; // TODO...
-                                if (tv.valid) {
-                                    let option = $("<option></option>").val("_"+tv.name).text(tv.name);
-                                    if (tv.name === opt.dataType) {
-                                        option.attr('selected','selected')
-                                    }
-                                    group1.append(option);
-                                }else {
-                                    throw tv.error;
-                                }
-                                }) 
+                    // Templates optgroup — names come directly from the broker config,
+                    // no underscore prefix needed; the name IS the dataType reference.
+                    if (templateNames.length > 0) {
+                        var group1 = $('<optgroup/>', { label: "Templates" }).appendTo(selectField);
+                        templateNames.forEach(function(tName) {
+                            var option = $("<option></option>").val(tName).text(tName);
+                            if (tName === opt.dataType) {
+                                option.attr('selected','selected');
                             }
-                        }catch (e) {
-                            node.error(RED._("mqtt-sparkplug-plus.errors.unable-to-deserialize-templates", {error: analyseResult.error}));
-                        }
+                            group1.append(option);
+                        });
                     }
                 }
             });
 
-            if (this.broker) {
-                this.brokerConn = RED.nodes.node(this.broker);
-            }
             var metrics = this.metrics || {};
             for (const [key, value] of Object.entries(metrics)) {
                 value["name"] = key;
-                console.log(value);
-                metricsList.editableList('addItem', value)
+                metricsList.editableList('addItem', value);
             }
         },
         oneditsave: function() {

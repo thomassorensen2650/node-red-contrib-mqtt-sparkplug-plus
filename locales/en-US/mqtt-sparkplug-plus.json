@@ -41,6 +41,7 @@
             "session": "Session",
             "delay": "Delay",
             "templates" : "Templates",
+            "add-template" : "Add Template",
             "birthImmediately" : "Send Birth Immediately",
             "bufferDevice" : "Store Forward when not connected",
             "storeforward": "Store Forward when primary application is offline",
@@ -50,7 +51,8 @@
             "storeforward" : "all the buffered values will be kept in memory. Do not use this for high thoughput applications.",
             "device": "Tip: Use '/' to group related metrics e.g. Machine1/Speed",
             "sparkplugformat": "Topic format: namespace/group_id/message_type/edge_node_id/[device_id]",
-            "birthImmediately" : "The Send Birth Immediately option will send device online (DBIRTH) with NULL values as soon as node-red starts up."
+            "birthImmediately" : "The Send Birth Immediately option will send device online (DBIRTH) with NULL values as soon as node-red starts up.",
+            "templates": "Template Definitions are published in NBIRTH. Devices can reference them by name as a metric type."
         },
         "tabs-label": {
             "connection": "Connection",

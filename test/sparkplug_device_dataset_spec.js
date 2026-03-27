@@ -6,7 +6,12 @@ var pako = require('pako');
 
 var spPayload = require('sparkplug-payload').get("spBv1.0");
 helper.init(require.resolve('node-red'));
-let testBroker = 'mqtt://localhost';
+let testBroker = process.env.TEST_BROKER || 'mqtt://localhost';
+const _brokerUrl = new URL(testBroker.replace(/^mqtt(s?)/, 'http$1'));
+let brokerHost = _brokerUrl.hostname;
+let brokerPort = _brokerUrl.port || '1883';
+let brokerUsername = _brokerUrl.username || '';
+let brokerPassword = _brokerUrl.password || '';
 var client = null;
 
 describe('mqtt sparkplug device node - DataSet Support', function () {
@@ -39,15 +44,17 @@ describe('mqtt sparkplug device node - DataSet Support', function () {
 			"name": "Local Host",
 			"deviceGroup": "My Devices",
 			"eonName": "Node-Red",
-			"broker": "localhost",
-			"port": "1883",
+			"broker": brokerHost,
+			"port": brokerPort,
 			"clientid": "",
 			"usetls": false,
 			"protocolVersion": "4",
 			"keepalive": "60",
 			"cleansession": true,
 			"enableStoreForward": false,
-			"primaryScada": "MY SCADA"
+			"primaryScada": "MY SCADA",
+			"username": brokerUsername,
+			"password": brokerPassword
 		}
 	];
 
@@ -109,7 +116,7 @@ describe('mqtt sparkplug device node - DataSet Support', function () {
 		client.on('connect', function () {
 			client.subscribe('#', function (err) {
 				if (!err) {
-					helper.load(sparkplugNode, simpleFlow, function () {
+					helper.load(sparkplugNode, simpleFlow, {b1: {user: brokerUsername, password: brokerPassword}}, function () {
 						try {
 							n1 = helper.getNode("n1");
 							b1 = n1.brokerConn;
@@ -150,7 +157,7 @@ describe('mqtt sparkplug device node - DataSet Support', function () {
 
 		let n1;
 		let b1;
-		helper.load(sparkplugNode, simpleFlow, function () {
+		helper.load(sparkplugNode, simpleFlow, {b1: {user: brokerUsername, password: brokerPassword}}, function () {
 			try {
 				n1 = helper.getNode("n1");
 				n1.on('input', () => {
@@ -201,7 +208,7 @@ describe('mqtt sparkplug device node - DataSet Support', function () {
 		let b1;
 
 
-		helper.load(sparkplugNode, simpleFlow, function () {
+		helper.load(sparkplugNode, simpleFlow, {b1: {user: brokerUsername, password: brokerPassword}}, function () {
 			try {
 				n1 = helper.getNode("n1");
 				n1.on('input', () => {
@@ -252,7 +259,7 @@ describe('mqtt sparkplug device node - DataSet Support', function () {
 		let n1;
 		let b1;
 		
-		helper.load(sparkplugNode, simpleFlow, function () {
+		helper.load(sparkplugNode, simpleFlow, {b1: {user: brokerUsername, password: brokerPassword}}, function () {
 			n1 = helper.getNode("n1");
 			n1.on('input', () => {
 				n1.warn.should.be.calledWithExactly("mqtt-sparkplug-plus.errors.invalid-metric-data");
