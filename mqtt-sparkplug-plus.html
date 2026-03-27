@@ -216,7 +216,7 @@
                 iconClass: "fa fa-plug"
             });
 
-            if (false) { // TODO ENABLE TEMPLATES
+            if (this.useTemplates) {
                 tabs.addTab({
                         id: "mqtt-broker-tab-advanced",
                         label: this._("mqtt-sparkplug-plus.tabs-label.advanced"),
@@ -503,7 +503,7 @@
                             if (that.brokerConn.templates) {
                                 that.brokerConn.templates.forEach(t=> {
                                 var tv = JSON.parse(t);
-                                tv.valid = true; // TODO...
+                                tv.valid = true;
                                 if (tv.valid) {
                                     let option = $("<option></option>").val("_"+tv.name).text(tv.name);
                                     if (tv.name === opt.dataType) {

@@ -88,7 +88,6 @@ module.exports = function(RED) {
      * @returns a sparkplug B encoded Buffer
      */
     function sparkplugEncode(payload) {
-        // return JSON.stringify(payload); // for debugging
 
         if (typeof payload.timestamp  === "string") {
                         
@@ -217,7 +216,7 @@ module.exports = function(RED) {
                     // This was a issue before V2.1.1.. Hopefully this has been fully resolved now, but keep this extra check...
                     let expectedTopic = node.getDCMDTopic()
                     if (topic_ != expectedTopic) {
-                        node.error(`Topic ${payload_} does not match expected topic ${expectedTopic}.. Pleae create a Gibhub issue with description on how to reproduce`)
+                        node.error(`Topic ${topic_} does not match expected topic ${expectedTopic}. Please create a GitHub issue with description on how to reproduce`)
                         return;
                     }
                      var msg = {
@@ -351,7 +350,6 @@ module.exports = function(RED) {
                             this.brokerConn.deviceGroup = msg.command.node.set_group;
                         }
                         if (msg.command.node.set_server) {
-                            // FIXME: Should we Disconnect here?
                             this.brokerConn.broker = msg.command.node.set_server;
                         }
                         if (rebirthRequired) {
@@ -380,10 +378,6 @@ module.exports = function(RED) {
                     if (definitionValid) {
                         for (const [key, value] of Object.entries(msg.definition)) {
                             // Check name
-                            if (false) { // TODO: Is there any requirements for the metric name?
-                                this.error(`${key} is not a valid definition !!!`);
-                                definitionValid = false;
-                            }
 
                             if (!value.hasOwnProperty("dataType")) {
                                 this.error(RED._("mqtt-sparkplug-plus.errors.invalid-metric-definition", { name : key, error: `datatype required` }));
@@ -651,8 +645,8 @@ module.exports = function(RED) {
         /**
          * We Store bdSeq in context, as a redeployment of the node can cause 
          * 
-         * FIXME: context for config nodes are reset on redeploy (node-red bug) We still have the logic to store bdSeq in Context, if it get fixed on day
-         * redeploy should always be gracefull shutdown, so it should not cause any issues (I think) 
+         * Note: context for config nodes are reset on redeploy. We store bdSeq in context
+         * for graceful shutdown scenarios. 
          * @returns the next birth sequence number
          */
         this.nextBdseq = function() {
@@ -1082,12 +1076,10 @@ module.exports = function(RED) {
                             }
                         }
                     });
-                    //TODO: what to do with this event? Anything? Necessary?
                     node.client.on("disconnect", function(packet) {
                         //Emitted after receiving disconnect packet from broker. MQTT 5.0 feature.
                         //var rc = packet && packet.properties && packet.properties.reasonString;
                         //var rc = packet && packet.properties && packet.reasonCode;
-                        //TODO: If keeping this event, do we use these? log these?
                     });
                     // Register disconnect handlers
                     node.client.on('close', function () {
@@ -1109,7 +1101,7 @@ module.exports = function(RED) {
                     node.client.on('error', function (error) {
                     });
                 }catch(err) {
-                    console.log(err);
+                    node.error('MQTT connection error: ' + err.toString());
                 }
             }
         };
@@ -1182,19 +1174,15 @@ module.exports = function(RED) {
                 handler:function(mtopic,mpayload, mpacket) {
                     if(mpacket.properties && options.properties && mpacket.properties.subscriptionIdentifier && options.properties.subscriptionIdentifier && (mpacket.properties.subscriptionIdentifier !== options.properties.subscriptionIdentifier) ) {
                         //do nothing as subscriptionIdentifier does not match
-                        // node.debug(`> no match - this nodes subID (${options.properties.subscriptionIdentifier}) !== packet subID (${mpacket.properties.subscriptionIdentifier})`); //TODO: remove
                     } else if (matchTopic(topic,mtopic)) {
-                        // node.debug(`>  MATCHED '${topic}' to '${mtopic}' - performing callback`); //TODO: remove
                         callback(mtopic,mpayload, mpacket);
                     } else {
-                        // node.debug(`> no match / no callback`); //TODO: remove
                     }
                 },
                 ref: ref
             };
             node.subscriptions[topic][ref] = sub;
             if (node.connected) {
-                // node.debug(`this.subscribe - registering handler ref ${ref} for ${topic} and subscribing `+JSON.stringify(options)); //TODO: remove
                 node.client.on('message',sub.handler);
                 node.client.subscribe(topic, options);
             }
@@ -1217,10 +1205,6 @@ module.exports = function(RED) {
                     
                     delete sub[ref];
                 }
-                //TODO: Review. The `if(removed)` was commented out to always delete and remove subscriptions.
-                // if we dont then property changes dont get applied and old subs still trigger
-                //if (removed) {
-
                 if (Object.keys(sub).length === 0) {
                     delete node.subscriptions[topic];
                     delete node.subscriptionIds[topic];
@@ -1228,11 +1212,8 @@ module.exports = function(RED) {
                         node.client.unsubscribe(topic);
                     }
                 }
-                //}
             } else {
-                // _debug += "sub not found! "; //TODO: remove
             }
-            // node.debug(_debug); //TODO: remove
             
         };
 
@@ -1244,7 +1225,7 @@ module.exports = function(RED) {
          */
         this.publish = function (msg, bypassQueue, done) {
 
-            if (true)  { // (node.connected && (!node.enableStoreForward || (node.primaryScadaStatus === "ONLINE") || bypassQueue)) {
+            if (node.connected && (!node.enableStoreForward || (node.primaryScadaStatus === "ONLINE") || bypassQueue)) {
                 if (msg.payload === null || msg.payload === undefined) {
                     msg.payload = "";
                 } else if (!Buffer.isBuffer(msg.payload)) {
@@ -1264,7 +1245,7 @@ module.exports = function(RED) {
                     return;
                 });
             } else {
-               console.log("This should not happen");
+                node.error('Attempted to publish message when not connected and not buffering');
                 done && done();
             }
         };
