@@ -1,3 +1,8 @@
+### 2.2.0 : Feature Realse
+- #93 - Fixed issue where Metrics in NBirth would not get timestamp assigned
+- #71 - Added support for Templates (UDTs) with new UI view
+- #89 - Added unit test to ensure that NDEATH did not include seq
+
 ### 2.1.11: Maintenance Release
 Fixed:
 - #80 - Node sends message content of 'NDEATH'
