@@ -605,22 +605,24 @@ module.exports = function(RED) {
 
                             } else {
                                 // ── Flat-path template sub-metric: "templateMetric/subPath" ──
-                                // e.g. name = "motor/speed" where "motor" is a template-typed metric
-                                let slashIdx = m.name.indexOf("/");
+                                // e.g. name = "motor/speed" where "motor" is a template-typed metric.
+                                // The definition key may itself contain slashes (e.g. "site/area/dev"),
+                                // so find the longest matching key in this.metrics that is a prefix of
+                                // m.name followed by "/".
                                 let matched = false;
-                                if (slashIdx > 0) {
-                                    let prefix = m.name.slice(0, slashIdx);
-                                    let subPath = m.name.slice(slashIdx + 1);
-                                    if (this.metrics.hasOwnProperty(prefix)) {
-                                        let prefixDataType = this.metrics[prefix].dataType;
-                                        let isPrefixTemplate = (prefixDataType !== "Template" && !node.dataTypes.includes(prefixDataType));
-                                        if (isPrefixTemplate || prefixDataType === "Template") {
-                                            if (!templateFlatValues.hasOwnProperty(prefix)) {
-                                                templateFlatValues[prefix] = {};
-                                            }
-                                            templateFlatValues[prefix][subPath] = m.hasOwnProperty("value") ? m.value : null;
-                                            matched = true;
+                                let prefix = Object.keys(this.metrics)
+                                    .filter(k => m.name.startsWith(k + "/"))
+                                    .sort((a, b) => b.length - a.length)[0];
+                                if (prefix !== undefined) {
+                                    let subPath = m.name.slice(prefix.length + 1);
+                                    let prefixDataType = this.metrics[prefix].dataType;
+                                    let isPrefixTemplate = (prefixDataType !== "Template" && !node.dataTypes.includes(prefixDataType));
+                                    if (isPrefixTemplate || prefixDataType === "Template") {
+                                        if (!templateFlatValues.hasOwnProperty(prefix)) {
+                                            templateFlatValues[prefix] = {};
                                         }
+                                        templateFlatValues[prefix][subPath] = m.hasOwnProperty("value") ? m.value : null;
+                                        matched = true;
                                     }
                                 }
                                 if (!matched) {

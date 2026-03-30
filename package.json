@@ -1,6 +1,6 @@
 {
   "name": "node-red-contrib-mqtt-sparkplug-plus",
-  "version": "2.2.0",
+  "version": "2.2.1",
   "repository": {
     "type": "git",
     "url": "https://github.com/thomassorensen2650/node-red-contrib-mqtt-sparkplug-plus.git"
@@ -31,7 +31,7 @@
     "pako": "^2.1.0",
     "protobufjs": "^7.2.5",
     "sparkplug-payload": "1.0.3",
-    "long" : "^5.2.3"
+    "long": "^5.2.3"
   },
   "devDependencies": {
     "mocha": "^10.2.0",

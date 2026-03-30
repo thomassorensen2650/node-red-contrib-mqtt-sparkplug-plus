@@ -306,4 +306,94 @@ describe('mqtt sparkplug device template support', function () {
         });
     });
 
+    // -----------------------------------------------------------------------
+    // 4. Flat-path sub-metrics must be recognised when the definition key
+    //    itself contains slashes (e.g. "site/area/mytemplate").
+    //    Bug: the resolution logic splits on the first "/" and looks for
+    //    "site" in this.metrics, which does not exist, so sub-metrics are
+    //    silently dropped and no DBIRTH is ever sent.
+    // -----------------------------------------------------------------------
+    it('should recognise flat-path sub-metrics when definition key contains slashes', function (done) {
+        this.timeout(5000);
+
+        var flow = JSON.parse(JSON.stringify(templateFlow));
+        flow[0].metrics = {};           // no static metrics — definition arrives dynamically
+        flow[0].birthImmediately = false;
+
+        // Extend MyTemplate to also include a member whose own name contains a slash
+        flow[1].templates = [
+            JSON.stringify({
+                "name": "MyTemplate",
+                "type": "Template",
+                "value": {
+                    "version": "1.0.0",
+                    "isDefinition": true,
+                    "metrics": [
+                        { "name": "FirstTag",      "type": "Int32"   },
+                        { "name": "SecondTag",     "type": "Int32"   },
+                        { "name": "status/running","type": "Boolean" }
+                    ],
+                    "parameters": []
+                }
+            })
+        ];
+
+        client = mqtt.connect(testBroker);
+
+        client.on('connect', function () {
+            client.subscribe("spBv1.0/My Devices/#", function (err) {
+                if (err) return done(err);
+
+                helper.load(sparkplugNode, flow, { b1: { user: brokerUsername, password: brokerPassword } }, function () {
+                    var n1 = helper.getNode("n1");
+
+                    // Fail immediately if any metric is not recognised
+                    n1.on('input', () => {
+                        if (n1.warn.called) {
+                            done(new Error("device-unknown-metric fired: slashed definition key was not resolved correctly"));
+                        }
+                    });
+
+                    n1.receive({
+                        definition: {
+                            "site/area/mytemplate": { dataType: "MyTemplate" }
+                        },
+                        payload: {
+                            metrics: [
+                                { name: "site/area/mytemplate/FirstTag",       value: 1    },
+                                { name: "site/area/mytemplate/SecondTag",      value: 2    },
+                                { name: "site/area/mytemplate/status/running", value: true }
+                            ]
+                        }
+                    });
+                });
+            });
+        });
+
+        client.on('message', function (topic, message) {
+            if (topic !== "spBv1.0/My Devices/DBIRTH/Node-Red/TheDevice") return;
+
+            var payload = decode(message);
+            var tplMetric = findMetric(payload, "site/area/mytemplate");
+
+            should(tplMetric).be.ok();
+            tplMetric.type.should.eql("Template");
+            tplMetric.value.isDefinition.should.eql(false);
+            tplMetric.value.templateRef.should.eql("MyTemplate");
+
+            var firstTag      = tplMetric.value.metrics.find(m => m.name === "FirstTag");
+            var secondTag     = tplMetric.value.metrics.find(m => m.name === "SecondTag");
+            var statusRunning = tplMetric.value.metrics.find(m => m.name === "status/running");
+            should(firstTag).be.ok();
+            should(secondTag).be.ok();
+            should(statusRunning).be.ok();
+            firstTag.value.should.eql(1);
+            secondTag.value.should.eql(2);
+            statusRunning.value.should.eql(true);
+
+            done();
+        });
+    });
+
 });
+

@@ -1,3 +1,7 @@
+### 2.2.1 : Maintenance Release
+Fixed:
+- Issue where template names and metrics based on templates could only be 1 level deep.
+
 ### 2.2.0 : Feature Realse
 - #93 - Fixed issue where Metrics in NBirth would not get timestamp assigned
 - #71 - Added support for Templates (UDTs) with new UI view
