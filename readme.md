@@ -277,5 +277,26 @@ The easiest way to get started is to start with the example that is provided wit
 4. Configure upstream node-red nodes to send metrics data to the **mqtt sparkplug device** 
 5. Configure downstream node-red nodes to handle NCMDs (write commands)
 
+## Running Unit Tests
+
+The test suite requires a running MQTT broker. By default the tests connect to `mqtt://localhost`; set the `TEST_BROKER` environment variable to override the URL, including credentials if needed.
+
+```bash
+# Install dependencies first (only needed once)
+npm install
+
+# Run all tests against a broker with no authentication
+npm test
+
+# Run all tests with broker credentials
+TEST_BROKER=mqtt://admin:admin@localhost npm test
+
+# Run a single test file
+TEST_BROKER=mqtt://admin:admin@localhost npx mocha test/sparkplug_device_template_spec.js
+
+# Run a specific test by name
+TEST_BROKER=mqtt://admin:admin@localhost npx mocha test/sparkplug_device_template_spec.js --grep "slashes"
+```
+
 # Contributions
 Contributions are welcome. Please discuss new features before creating PR, and please try to add unit test for new features if possible.
