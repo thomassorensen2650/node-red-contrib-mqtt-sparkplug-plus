@@ -638,22 +638,39 @@ module.exports = function(RED) {
 
                         Object.keys(templateFlatValues).forEach(tMetricName => {
                             let dataType = this.metrics[tMetricName].dataType;
-                            let flatVals = templateFlatValues[tMetricName];
+                            let incomingFlatVals = templateFlatValues[tMetricName];
 
-                            // Determine if this is DDATA (partial) or DBIRTH (full) context.
-                            // We always build a partial instance here; trySendBirth will rebuild
-                            // a full one when needed.
-                            let instance = node.buildTemplateInstance(dataType, flatVals, templates, ts, false);
-                            if (instance) {
-                                let tMetric = {
-                                    name: tMetricName,
-                                    type: "Template",
-                                    value: instance,
-                                    timestamp: ts
-                                };
-                                this.latestMetrics[tMetricName] = tMetric;
-                                _metrics.push(tMetric);
+                            // Build the partial instance for DDATA (only the changed sub-metrics)
+                            let partialInstance = node.buildTemplateInstance(dataType, incomingFlatVals, templates, ts, false);
+                            if (!partialInstance) return;
+
+                            // Merge incoming values on top of any previously cached sub-metric values
+                            // so that trySendBirth can reconstruct a complete DBIRTH after a REBIRTH.
+                            let mergedFlatVals = Object.assign({}, incomingFlatVals);
+                            const cached = this.latestMetrics[tMetricName];
+                            if (cached && cached.value && Array.isArray(cached.value.metrics)) {
+                                cached.value.metrics.forEach(function(im) {
+                                    if (!mergedFlatVals.hasOwnProperty(im.name)) {
+                                        mergedFlatVals[im.name] = im.value;
+                                    }
+                                });
                             }
+                            let mergedInstance = node.buildTemplateInstance(dataType, mergedFlatVals, templates, ts, false);
+
+                            // Cache the merged state so REBIRTH produces a complete DBIRTH
+                            this.latestMetrics[tMetricName] = {
+                                name: tMetricName,
+                                type: "Template",
+                                value: mergedInstance || partialInstance,
+                                timestamp: ts
+                            };
+                            // Publish only the partial instance (DDATA = changed sub-metrics only)
+                            _metrics.push({
+                                name: tMetricName,
+                                type: "Template",
+                                value: partialInstance,
+                                timestamp: ts
+                            });
                         });
 
                         var shouldBuffer = (this.brokerConn.enableStoreForward && this.brokerConn.primaryScadaStatus !== "ONLINE") ||

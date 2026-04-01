@@ -1,3 +1,7 @@
+### 2.2.2 : Maintenance Release
+Fixed:
+- Issue with template sub-metrics and rebirth where cached metrics would not be in the DBirth
+
 ### 2.2.1 : Maintenance Release
 Fixed:
 - Issue where template names and metrics based on templates could only be 1 level deep.

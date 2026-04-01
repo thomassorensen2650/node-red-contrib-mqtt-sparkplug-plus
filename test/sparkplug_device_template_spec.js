@@ -395,5 +395,87 @@ describe('mqtt sparkplug device template support', function () {
         });
     });
 
+    // -----------------------------------------------------------------------
+    // 5. After partial updates and a REBIRTH, DBIRTH must contain all
+    //    previously-seen sub-metric values — not just the last partial update.
+    //    (Regression test for latestMetrics cache overwrite bug.)
+    // -----------------------------------------------------------------------
+    it('Should preserve all sub-metric values in DBIRTH after partial updates and REBIRTH', function (done) {
+        this.timeout(8000);
+
+        var flow = JSON.parse(JSON.stringify(templateFlow));
+        flow[0].birthImmediately = false;
+
+        client = mqtt.connect(testBroker);
+        var dbirth1Received = false;
+
+        client.on('connect', function () {
+            client.subscribe("spBv1.0/My Devices/#", function (err) {
+                if (err) return done(err);
+                helper.load(sparkplugNode, flow, {b1: {user: brokerUsername, password: brokerPassword}}, function () {
+                    var n1 = helper.getNode("n1");
+
+                    // First message: populate both sub-metrics → triggers DBIRTH
+                    n1.receive({
+                        payload: {
+                            metrics: [
+                                { name: "b",           value: 1  },
+                                { name: "a/FirstTag",  value: 10 },
+                                { name: "a/SecondTag", value: 20 }
+                            ]
+                        }
+                    });
+                });
+            });
+        });
+
+        client.on('message', function (topic, message) {
+            if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TheDevice" && !dbirth1Received) {
+                dbirth1Received = true;
+                var n1 = helper.getNode("n1");
+
+                // Second message: update ONLY FirstTag (partial update — SecondTag untouched)
+                n1.receive({
+                    payload: {
+                        metrics: [
+                            { name: "a/FirstTag", value: 99 }
+                        ]
+                    }
+                });
+
+                // Third message: trigger REBIRTH after the partial update is processed
+                setImmediate(function () {
+                    n1.receive({
+                        command: {
+                            device: { rebirth: true }
+                        }
+                    });
+                });
+                return;
+            }
+
+            // Second DBIRTH (after REBIRTH) — this is what we are testing
+            if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TheDevice" && dbirth1Received) {
+                var payload = decode(message);
+                var aMetric = findMetric(payload, "a");
+
+                should(aMetric).be.ok();
+                var firstTag  = aMetric.value.metrics.find(m => m.name === "FirstTag");
+                var secondTag = aMetric.value.metrics.find(m => m.name === "SecondTag");
+
+                should(firstTag).be.ok();
+                should(secondTag).be.ok();
+
+                // FirstTag was updated to 99 in the partial DDATA
+                firstTag.value.should.eql(99);
+                // SecondTag was NOT in the last partial update — must still carry value 20
+                should(secondTag.value).not.be.null();
+                secondTag.value.should.eql(20);
+
+                done();
+            }
+        });
+    });
+
 });
 
