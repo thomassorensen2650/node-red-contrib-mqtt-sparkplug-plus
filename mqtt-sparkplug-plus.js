@@ -266,13 +266,13 @@ module.exports = function(RED) {
         }
         var node = this;
 
-        this.emptyBuffer = function() {
+        this.emptyBuffer = async function() {
             let x = this.brokerConn.getItemFromQueue(this.name);
             while(x) { 
                 x.forEach(s=> s.isHistorical = true);
                 let dMsg = this.brokerConn.createMsg(this.name, "DDATA", x, f => {});
                 if (dMsg) {
-                    this.brokerConn.publish(dMsg, !this.shouldBuffer, f => {}); 
+                    await new Promise((resolve) => this.brokerConn.publish(dMsg, !this.shouldBuffer, resolve)); 
                 }
                 x = this.brokerConn.getItemFromQueue(this.name);
             }            
@@ -809,10 +809,10 @@ module.exports = function(RED) {
             return item;
         }
 
-        this.emptyDDataBuffer = function() {
+        this.emptyDDataBuffer = async function() {
             let x = this.getItemFromQueue("ddata");
             while(x) { 
-                this.publish(x, !this.shouldBuffer, f => {}); 
+                await new Promise((resolve) => this.publish(x, !this.shouldBuffer, resolve)); 
                 x = this.getItemFromQueue(this.name);
             }
         }
