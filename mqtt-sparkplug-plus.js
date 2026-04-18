@@ -350,6 +350,7 @@ module.exports = function(RED) {
 
                 for (const [key, value] of Object.entries(this.metrics)) {
                     const lv = Object.assign({}, this.latestMetrics[key]);
+                    lv.name = key;  // Ensure name is always set for DBIRTH
                     let dataType = value.dataType;
                     let isNamedTemplate = (dataType !== "Template" && !node.dataTypes.includes(dataType));
 

@@ -1709,3 +1709,143 @@ describe('mqtt sparkplug device node', function () {
 	
 });
 
+	describe('rebirth command with alias metrics', function () {
+
+		beforeEach(function (done) {
+			helper.startServer(done);
+		});
+		
+		afterEach(function (done) {
+			helper.unload();
+			helper.stopServer(done);
+			if (client) {
+				client.end();
+			}
+		});
+
+		var rebirthFlow = [
+			{
+				"id": "n1",
+				"type": "mqtt sparkplug device",
+				"name": "TEST2",
+				"metrics": {
+					"metric1": { "dataType": "Int32" },
+					"metric2": { "dataType": "Int32" },
+					"metric3": { "dataType": "Int32" },
+					"metric4": { "dataType": "Int32" }
+				},
+				"aliasMetrics": true,
+				"broker": "b1"
+			},
+			{
+				"id": "b1",
+				"type": "mqtt-sparkplug-broker",
+				"name": "Local Host",
+				"deviceGroup": "My Devices",
+				"eonName": "Node-Red",
+				"broker": brokerHost,
+				"port": brokerPort,
+				"clientid": "",
+				"usetls": false,
+				"protocolVersion": "4",
+				"keepalive": "60",
+				"cleansession": true,
+				"enableStoreForward": false,
+				"primaryScada": "MY SCADA",
+				"username": brokerUsername,
+				"password": brokerPassword,
+				"aliasMetrics": true
+			}
+		];
+
+		it('should send correct aliases on rebirth (regression test for issue #92)', function (done) {
+			this.timeout(10000);
+			client = mqtt.connect(testBroker);
+			let n1;
+			let dbirthCount = 0;
+
+			client.on('connect', function () {
+				client.subscribe('#', function (err) {
+					if (!err) {
+						helper.load(sparkplugNode, rebirthFlow, {b1: {user: brokerUsername, password: brokerPassword}}, function () {
+							try {
+								n1 = helper.getNode("n1");
+								let b1 = n1.brokerConn;
+								b1.client.on('connect', function (connack) {
+									n1.receive({
+										"payload": {
+											"metrics": [
+												{ "name": "metric1", "value": 1 },
+												{ "name": "metric2", "value": 2 },
+												{ "name": "metric3", "value": 3 },
+												{ "name": "metric4", "value": 4 }
+											]
+										}
+									});
+								});
+							} catch (e) {
+								done(e);
+							}
+						});
+					}
+				});
+			});
+
+			client.on('message', function (topic, message) {
+				var buffer = Buffer.from(message);
+				var payload = spPayload.decodePayload(buffer);
+
+				if (topic === "spBv1.0/My Devices/DBIRTH/Node-Red/TEST2") {
+					dbirthCount++;
+
+					if (dbirthCount === 1) {
+						var firstAliases = payload.metrics.map(m => ({
+							name: m.name,
+							alias: m.alias ? m.alias.toNumber() : null
+						}));
+
+						firstAliases.should.eql([
+							{ name: "metric1", alias: 1 },
+							{ name: "metric2", alias: 2 },
+							{ name: "metric3", alias: 3 },
+							{ name: "metric4", alias: 4 }
+						]);
+
+						n1.receive({
+							"payload": {
+								"metrics": [
+									{ "name": "metric1", "value": 10 },
+									{ "name": "metric2", "value": 20 },
+									{ "name": "metric3", "value": 30 },
+									{ "name": "metric4", "value": 40 }
+								]
+							}
+						});
+					} else if (dbirthCount === 2) {
+						var rebirthAliases = payload.metrics.map(m => ({
+							name: m.name,
+							alias: m.alias ? m.alias.toNumber() : null
+						}));
+
+						rebirthAliases.should.eql([
+							{ name: "metric1", alias: 1 },
+							{ name: "metric2", alias: 2 },
+							{ name: "metric3", alias: 3 },
+							{ name: "metric4", alias: 4 }
+						]);
+
+						done();
+					}
+				} else if (topic === "spBv1.0/My Devices/DDATA/Node-Red/TEST2") {
+					n1.receive({
+						"command": {
+							"device": {
+								"rebirth": true
+							}
+						}
+					});
+				}
+			});
+		});
+	});
+
