@@ -6,17 +6,27 @@ on:
   pull_request:
     branches: [main]
 
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
 jobs:
   test:
     runs-on: ubuntu-latest
     steps:
+      - name: Clean workspace
+        run: |
+          rm -rf $GITHUB_WORKSPACE
+          mkdir -p $GITHUB_WORKSPACE
+
       - name: Checkout code
         uses: actions/checkout@v4
+        with:
+          path: ${{ github.workspace }}
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '24'
           cache: 'npm'
 
       - name: Install Mosquitto MQTT broker
@@ -31,9 +41,11 @@ jobs:
 
       - name: Install dependencies
         run: npm install
+        working-directory: ${{ github.workspace }}
 
       - name: Run tests with coverage
         run: npm run coverage
+        working-directory: ${{ github.workspace }}
         env:
           TEST_BROKER: mqtt://localhost:1883
 
