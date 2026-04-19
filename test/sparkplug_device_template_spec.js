@@ -91,13 +91,30 @@ describe('mqtt sparkplug device template support', function () {
     });
 
     afterEach(function (done) {
-        helper.unload();
-        helper.stopServer(done);
-        if (client) {
-            client.end(true);
-            client = null;
-        }
-    });
+	var finished = false;
+	
+	var timeout = setTimeout(function() {
+		if (!finished) {
+			finished = true;
+			done();
+		}
+	}, 500);
+	
+	helper.unload();
+	helper.stopServer();
+	
+	if (client) {
+		client.end(true);  // Force immediate disconnect
+		client = null;
+	}
+	
+	setTimeout(function() {
+		if (!finished) {
+			finished = true;
+			done();
+		}
+	}, 100);
+});
 
     // -----------------------------------------------------------------------
     // 1. Template Definitions MUST be sent in the NBIRTH message

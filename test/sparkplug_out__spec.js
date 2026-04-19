@@ -24,11 +24,28 @@ describe('mqtt sparkplug out node', function () {
 	});
 	
 	afterEach(function (done) {
+		var finished = false;
+		
+		var timeout = setTimeout(function() {
+			if (!finished) {
+				finished = true;
+				done();
+			}
+		}, 500);
+		
 		helper.unload();
-		helper.stopServer(done);
+		helper.stopServer();
+		
 		if (client) {
-			client.end();
+			client.end(true);
 		}
+		
+		setTimeout(function() {
+			if (!finished) {
+				finished = true;
+				done();
+			}
+		}, 100);
 	});
 	var validMsg = {"timestamp":12345,"metrics":[{"name":"test","type":"Int32","value":100}],"seq":200}
 

@@ -22,8 +22,24 @@ describe('mqtt sparkplug in node', function () {
 	});
 	
 	afterEach(function (done) {
+		var finished = false;
+		
+		var timeout = setTimeout(function() {
+			if (!finished) {
+				finished = true;
+				done();
+			}
+		}, 500);
+		
 		helper.unload();
-		helper.stopServer(done);
+		helper.stopServer();
+		
+		setTimeout(function() {
+			if (!finished) {
+				finished = true;
+				done();
+			}
+		}, 100);
 	});
 
 	var inExample = [

@@ -22,11 +22,28 @@ describe('mqtt sparkplug device node', function () {
 	});
 	
 	afterEach(function (done) {
+		var finished = false;
+		
+		var timeout = setTimeout(function() {
+			if (!finished) {
+				finished = true;
+				done();
+			}
+		}, 500);
+		
 		helper.unload();
-		helper.stopServer(done);
+		helper.stopServer();
+		
 		if (client) {
-			client.end();
+			client.end(true);
 		}
+		
+		setTimeout(function() {
+			if (!finished) {
+				finished = true;
+				done();
+			}
+		}, 100);
 	});
 
 	var simpleFlow = [
@@ -1716,11 +1733,28 @@ describe('mqtt sparkplug device node', function () {
 		});
 		
 		afterEach(function (done) {
+			var finished = false;
+			
+			var timeout = setTimeout(function() {
+				if (!finished) {
+					finished = true;
+					done();
+				}
+			}, 500);
+			
 			helper.unload();
-			helper.stopServer(done);
+			helper.stopServer();
+			
 			if (client) {
-				client.end();
+				client.end(true);
 			}
+			
+			setTimeout(function() {
+				if (!finished) {
+					finished = true;
+					done();
+				}
+			}, 100);
 		});
 
 		var rebirthFlow = [

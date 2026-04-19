@@ -51,13 +51,28 @@ describe('mqtt sparkplug out node - edge cases', function () {
 	});
 	
 	afterEach(function (done) {
+		var finished = false;
+		
+		var timeout = setTimeout(function() {
+			if (!finished) {
+				finished = true;
+				done();
+			}
+		}, 500);
+		
 		helper.unload();
-		helper.stopServer(done);
-		if (client && client.connected) {
-			client.end();
-		} else if (client) {
-			try { client.end(); } catch(e) {}
+		helper.stopServer();
+		
+		if (client) {
+			client.end(true);
 		}
+		
+		setTimeout(function() {
+			if (!finished) {
+				finished = true;
+				done();
+			}
+		}, 100);
 	});
 
 	it('should handle invalid QoS values (99)', function (done) {
