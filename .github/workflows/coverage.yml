@@ -13,11 +13,6 @@ jobs:
   test:
     runs-on: ubuntu-latest
     steps:
-      - name: Clean workspace
-        run: |
-          rm -rf $GITHUB_WORKSPACE
-          mkdir -p $GITHUB_WORKSPACE
-
       - name: Checkout code
         uses: actions/checkout@v4
         with:
@@ -52,4 +47,6 @@ jobs:
       - name: Upload coverage to Codecov
         uses: codecov/codecov-action@v4
         with:
-          repo_token: ${{ secrets.CODECOV_TOKEN }}
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./coverage/lcov.info   # explicit is safer
+          fail_ci_if_error: true        # optional but recommended

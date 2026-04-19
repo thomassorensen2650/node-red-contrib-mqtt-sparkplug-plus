@@ -17,7 +17,7 @@
   },
   "scripts": {
     "test": "mocha \"test/**/*_spec.js\"",
-    "coverage": "nyc --reporter=text mocha \"test/**/*_spec.js\""
+    "coverage": "nyc --reporter=lcov --reporter=text mocha \"test/**/*_spec.js\""  
   },
   "keywords": [
     "MQTT",
