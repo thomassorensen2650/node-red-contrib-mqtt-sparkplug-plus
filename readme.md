@@ -1,5 +1,7 @@
 # MQTT Sparkplug implementation for Node-Red
 
+[![codecov](https://codecov.io/gh/thomassorensen2650/node-red-contrib-mqtt-sparkplug-plus/branch/main/graph/badge.svg)](https://codecov.io/gh/thomassorensen2650/node-red-contrib-mqtt-sparkplug-plus)
+
 MQTT-Sparkplug-Plus is a set of Node-Red nodes, that will enable Node-Red to communicate with other client over MQTT using the sparkplug b protocol. The package contains the followings nodes:
 
 ## mqtt sparkplug device

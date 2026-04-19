@@ -1,3 +1,8 @@
+### 2.2.3 : Maintenance Release
+Fixed:
+- #86 - EventEmitter memory leak
+- #92 - Rebirth command break with metric alias
+
 ### 2.2.2 : Maintenance Release
 Fixed:
 - Issue with template sub-metrics and rebirth where cached metrics would not be in the DBirth
