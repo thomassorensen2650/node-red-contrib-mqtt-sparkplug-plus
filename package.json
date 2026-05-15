@@ -17,7 +17,7 @@
   },
   "scripts": {
     "test": "mocha --exit \"test/**/*_spec.js\"",
-    "coverage": "nyc --reporter=lcov --reporter=text mocha --exit \"test/**/*_spec.js\""  
+    "coverage": "nyc --reporter=lcov --reporter=text mocha --exit \"test/**/*_spec.js\""
   },
   "keywords": [
     "MQTT",
@@ -35,7 +35,7 @@
     "sparkplug-payload": "1.0.3"
   },
   "devDependencies": {
-    "mocha": "^10.2.0",
+    "mocha": "^11.7.5",
     "node-red": "^3.1.3",
     "node-red-node-test-helper": "^0.3.3",
     "nyc": "^18.0.0"

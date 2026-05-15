@@ -473,13 +473,10 @@ describe('mqtt sparkplug EoN - Commands', function () {
 				case 2: // We Issue a rebirth command
 					topic.should.equal("spBv1.0/My Devices/NCMD/Node-Red")
 					break;
-				case 3: // EON will NDEATH Before new NBIRTH
-					topic.should.equal("spBv1.0/My Devices/NDEATH/Node-Red")
-					break;
-				case 4: // EON will NBIRTH
+				case 3: // EON will NBIRTH (no NDEATH before per Sparkplug v3)
 					topic.should.equal("spBv1.0/My Devices/NBIRTH/Node-Red")
 					break;
-				case 5: // EON will DBIRTH
+				case 4: // EON will DBIRTH
 					topic.should.equal("spBv1.0/My Devices/DBIRTH/Node-Red/TEST2")
 					done();
 					break;

@@ -426,9 +426,11 @@ module.exports = function(RED) {
                             this.trySendBirth();
                         }
                         if (msg.command.device.rebirth) {
-                            if (this.birthMessageSend) {
-                                this.sendDDeath();    
-                            }
+                            
+                            // I Assume no-one is using SparkplugB V2.2 anymore,
+                            //if (this.birthMessageSend) {
+                            //    this.sendDDeath();    
+                            //}
                             this.trySendBirth();
                         }
                         if (msg.command.device.death) {
@@ -1344,10 +1346,10 @@ module.exports = function(RED) {
                         if (typeof m === 'object' && m.hasOwnProperty("name") && m.name) {
                             if (m.name.toLowerCase() === "node control/rebirth") {
                                 
-                                let bMsg = this.getDeathPayload();
-                                if(bMsg) {
-                                    node.publish(bMsg, !this.shouldBuffer, f => {});  // send the message 
-                                }
+                                //let bMsg = this.getDeathPayload();
+                                //if(bMsg) {
+                                //    node.publish(bMsg, !this.shouldBuffer, f => {});  // send the message 
+                                //}
 
                                 node.sendBirth();
                             }else 
