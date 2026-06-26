@@ -413,7 +413,69 @@ describe('mqtt sparkplug device template support', function () {
     });
 
     // -----------------------------------------------------------------------
-    // 5. After partial updates and a REBIRTH, DBIRTH must contain all
+    // 5. Template definition containing a DataSet metric must encode in NBIRTH
+    //    without crashing.  Bug: when no value is provided for a DataSet metric
+    //    in the template definition, the sparkplug-payload encoder crashes with
+    //    "Cannot read properties of null (reading 'numOfColumns')".
+    // -----------------------------------------------------------------------
+    it('Should encode NBIRTH when template definition contains a DataSet metric', function (done) {
+        this.timeout(8000);
+
+        var flow = JSON.parse(JSON.stringify(templateFlow));
+        flow[1].templates = [
+            JSON.stringify({
+                "name": "MyTemplate",
+                "type": "Template",
+                "value": {
+                    "version": "1.0.0",
+                    "isDefinition": true,
+                    "metrics": [
+                        { "name": "FirstTag",  "type": "Int32" },
+                        { "name": "MyDataSet", "type": "DataSet" }
+                    ],
+                    "parameters": []
+                }
+            })
+        ];
+
+        var nbirthReceived = false;
+        client = mqtt.connect(testBroker);
+
+        var failTimer = setTimeout(function () {
+            if (!nbirthReceived) {
+                done(new Error("NBIRTH was never sent — DataSet metric in template definition caused encoding failure"));
+            }
+        }, 6000);
+
+        client.on('connect', function () {
+            client.subscribe("spBv1.0/My Devices/#", function (err) {
+                if (err) return done(err);
+                helper.load(sparkplugNode, flow, {b1: {user: brokerUsername, password: brokerPassword}}, function () {});
+            });
+        });
+
+        client.on('message', function (topic, message) {
+            if (topic !== "spBv1.0/My Devices/NBIRTH/Node-Red") return;
+            nbirthReceived = true;
+            clearTimeout(failTimer);
+
+            var payload = decode(message);
+            var tplMetric = findMetric(payload, "MyTemplate");
+
+            should(tplMetric).be.ok();
+            tplMetric.type.should.eql("Template");
+            tplMetric.value.isDefinition.should.eql(true);
+
+            var dataSetMetric = tplMetric.value.metrics.find(m => m.name === "MyDataSet");
+            should(dataSetMetric).be.ok();
+            dataSetMetric.type.should.eql("DataSet");
+
+            done();
+        });
+    });
+
+    // -----------------------------------------------------------------------
+    // 6. After partial updates and a REBIRTH, DBIRTH must contain all
     //    previously-seen sub-metric values — not just the last partial update.
     //    (Regression test for latestMetrics cache overwrite bug.)
     // -----------------------------------------------------------------------

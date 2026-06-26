@@ -234,10 +234,14 @@ module.exports = function(RED) {
                 } else {
                     var hasValue = flatValues.hasOwnProperty(mName);
                     if (forBirth || hasValue) {
+                        var mValue = hasValue ? flatValues[mName] : null;
+                        if (mValue == null && mType === "DataSet") {
+                            mValue = { numOfColumns: 0, columns: [], types: [], rows: [] };
+                        }
                         instanceMetrics.push({
                             name: mName,
                             type: mType,
-                            value: hasValue ? flatValues[mName] : null,
+                            value: mValue,
                             timestamp: timestamp
                         });
                     }
@@ -950,6 +954,15 @@ module.exports = function(RED) {
 
         this.getTemplates = function() {
             var _result = this.templates.map(m => typeof m === "string" ? JSON.parse(m) : m);
+            _result.forEach(function(tpl) {
+                if (tpl.value && Array.isArray(tpl.value.metrics)) {
+                    tpl.value.metrics.forEach(function(met) {
+                        if (met.type === "DataSet" && met.value == null) {
+                            met.value = { numOfColumns: 0, columns: [], types: [], rows: [] };
+                        }
+                    });
+                }
+            });
             return _result;
         }
 

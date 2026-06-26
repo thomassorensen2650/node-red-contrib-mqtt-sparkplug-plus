@@ -1,3 +1,7 @@
+### 2.2.4 : Maintenance Release
+Fixed:
+- Templates with DataSets would throw an error when trying to send NBIRTH.
+
 ### 2.2.3 : Maintenance Release
 Fixed:
 - #86 - EventEmitter memory leak
