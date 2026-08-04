@@ -406,6 +406,8 @@ module.exports = function(RED) {
         if (this.brokerConn) {
             this.on("input",function(msg,send,done) {
                 // Handle Command
+                // Patch: promote msg.payload.command for trigger compatibility
+                if (!msg.hasOwnProperty("command") && msg.payload && msg.payload.command) { msg.command = msg.payload.command; }
                 if (msg.hasOwnProperty("command")) {
 
                     // Lets always refresh subscriptions for now.
@@ -731,7 +733,7 @@ module.exports = function(RED) {
                         // Generic "Template" without a named definition — leave value null
                         node.latestMetrics[m] = { value: null, name: m, type: "Template" };
                     } else {
-                        node.latestMetrics[m] = { value: null, name: m, type: dataType };
+                        node.latestMetrics[m] = { value: null, name: m, type: dataType, timestamp: ts };
                     }
                 });
             }
@@ -1178,8 +1180,9 @@ module.exports = function(RED) {
                     // Send close message
                     let msg = this.getDeathPayload();
                     node.publish(msg, false, function(err) {
-                        //node.client.end(done);
-                        node.client.end(true, {}, done);
+                        // Signal done without ending the client.
+                        // The broker close handler will send DISCONNECT via end().
+                        done();
                     });
                     return;
                 } else {
@@ -1202,6 +1205,7 @@ module.exports = function(RED) {
                 try {
                     this.nextBdseq(); // Next connect will use next bdSeq
                     node.options.will = this.getDeathPayload();
+                    if (node.options.will) node.options.will.qos = 1;
                     node.serverProperties = {};
                     node.client = mqtt.connect(node.brokerurl ,node.options);
                     node.client.setMaxListeners(0);
@@ -1246,8 +1250,8 @@ module.exports = function(RED) {
                             node.handleNCMD(payload_);
                         });
  
-                        // Subscribe to Primary SCADA status if store forward is enabled.
-                        if (node.enableStoreForward === true) {
+                        // Subscribe to Primary SCADA status if primaryScada is configured.
+                        if (node.primaryScada) {
                             let options = { qos: 0 };
 
                             // SPb 2.0 Support
@@ -1258,6 +1262,7 @@ module.exports = function(RED) {
 
                                 if (node.primaryScadaStatus === "ONLINE") {
                                    node.sendBirth();
+                                   node.emptyDDataBuffer();
                                 }
                                 for (var id in node.users) {
                                     if (node.users.hasOwnProperty(id)) {
@@ -1277,13 +1282,36 @@ module.exports = function(RED) {
 
                                 try {
                                     var pss = JSON.parse(payload);
-                                    node.primaryScadaStatus = pss.hasOwnProperty("online") ? (pss.online ? "ONLINE" : "OFFLINE") : "OFFLINE";
+                                    var wasOnline = node.primaryScadaStatus === "ONLINE";
+                                    var incomingStatus = pss.hasOwnProperty("online") ? (pss.online ? "ONLINE" : "OFFLINE") : "OFFLINE";
+                                    var hasTs = pss.hasOwnProperty("timestamp") && typeof pss.timestamp === 'number';
+                                    // Only update status/timestamp for non-stale messages
+                                    var isStale = hasTs && typeof node.lastPhidTimestamp !== 'undefined' && pss.timestamp < node.lastPhidTimestamp;
+                                    if (!isStale) {
+                                        node.primaryScadaStatus = incomingStatus;
+                                        if (hasTs) node.lastPhidTimestamp = pss.timestamp;
+                                    }
                                 } catch{
                                     node.warn("Invalid Primary SCADA State:" + payload)
                                     node.primaryScadaStatus = "OFFLINE";
                                 }
                                 if (node.primaryScadaStatus === "ONLINE") {
                                     node.sendBirth();
+                                    node.emptyDDataBuffer();
+                                 } else if (wasOnline && node.primaryScadaStatus === "OFFLINE" && typeof pss !== 'undefined') {
+                                    // Patch: publish NDEATH when Primary Host goes offline
+                                    // Status was only updated if !isStale (handled above), so no need to re-check timestamp here.
+                                    var deathPayload = node.getDeathPayload();
+                                    if (deathPayload && node.client && node.client.connected) {
+                                        node.publish(deathPayload, false, function(err) {
+                                            node.client.end(false, {}, function() {
+                                                node.connected = false;
+                                                if (typeof node.connect === 'function') {
+                                                    node.connect();
+                                                }
+                                            });
+                                        });
+                                    }
                                  }
                                 for (var id in node.users) {
                                     if (node.users.hasOwnProperty(id)) {
@@ -1301,7 +1329,7 @@ module.exports = function(RED) {
                             }
 
                         } else {
-                        // Send Node Birth right away if connected and destination buffering is disabled
+                        // Send Node Birth right away if no primaryScada is configured
                             node.sendBirth();
                             node.emptyDDataBuffer();
                         }
