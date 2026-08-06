@@ -17,7 +17,9 @@
   },
   "scripts": {
     "test": "mocha --exit \"test/**/*_spec.js\"",
-    "coverage": "nyc --reporter=lcov --reporter=text mocha --exit \"test/**/*_spec.js\""
+    "coverage": "nyc --reporter=lcov --reporter=text mocha --exit \"test/**/*_spec.js\"",
+    "tck": "node test/tck/run-tck.js",
+    "tck:broker": "test/tck/start-broker.sh"
   },
   "keywords": [
     "MQTT",
