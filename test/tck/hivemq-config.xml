@@ -1,0 +1,23 @@
+<?xml version="1.0"?>
+<!--
+  HiveMQ configuration used when running the Sparkplug TCK.
+
+  Based on ref/sparkplug/tck/hivemq-configuration/config.xml, with two changes:
+    * only the TCP listener is kept - the websocket listener exists purely for
+      the Nuxt web console, which the headless harness replaces
+    * anonymous usage statistics are disabled so CI makes no outbound call
+-->
+<hivemq>
+
+    <listeners>
+        <tcp-listener>
+            <port>1883</port>
+            <bind-address>0.0.0.0</bind-address>
+        </tcp-listener>
+    </listeners>
+
+    <anonymous-usage-statistics>
+        <enabled>false</enabled>
+    </anonymous-usage-statistics>
+
+</hivemq>

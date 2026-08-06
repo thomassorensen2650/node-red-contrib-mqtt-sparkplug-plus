@@ -1,0 +1,92 @@
+name: Sparkplug TCK
+
+# Runs the Eclipse Sparkplug TCK (Edge Node profile) against the nodes in this
+# repo. The TCK is normally driven from a Nuxt web console, but its control
+# plane is plain MQTT, so test/tck/run-tck.js drives it headlessly.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+env:
+  # Pinned: the TCK's utility clients hardcode tcp://localhost:1883, so the
+  # broker must own that port. Nothing else in this workflow binds it.
+  SPARKPLUG_REF: v3.0.0
+  HIVEMQ_VERSION: '2024.9'
+
+jobs:
+  tck:
+    name: Edge Node profile
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Checkout Sparkplug TCK
+        uses: actions/checkout@v4
+        with:
+          repository: eclipse-sparkplug/sparkplug
+          ref: ${{ env.SPARKPLUG_REF }}
+          path: sparkplug-tck
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          java-version: '17'
+          distribution: temurin
+          cache: gradle
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Install dependencies
+        run: npm install
+
+      - name: Cache HiveMQ download
+        uses: actions/cache@v4
+        with:
+          path: .tck-broker/cache
+          key: hivemq-ce-${{ env.HIVEMQ_VERSION }}
+
+      # The tck/ directory ships a gradlew without its wrapper jar, so the root
+      # wrapper with -p tck is the only way to build it.
+      - name: Build TCK HiveMQ extension
+        run: ./gradlew -p tck hivemqExtensionZip --no-daemon
+        working-directory: sparkplug-tck
+
+      - name: Start broker with TCK extension
+        run: |
+          nohup test/tck/start-broker.sh sparkplug-tck > hivemq.log 2>&1 &
+          echo "Waiting for broker on 1883..."
+          for i in $(seq 1 90); do
+            if grep -q "Started TCP Listener" hivemq.log 2>/dev/null; then
+              echo "Broker is up."
+              exit 0
+            fi
+            if grep -q "Could not bind any listener\|Shutdown completed" hivemq.log 2>/dev/null; then
+              echo "Broker failed to start:"; cat hivemq.log; exit 1
+            fi
+            sleep 2
+          done
+          echo "Broker did not start in time:"; cat hivemq.log; exit 1
+
+      - name: Run Sparkplug TCK
+        run: node test/tck/run-tck.js
+        env:
+          TCK_BROKER: mqtt://localhost:1883
+          TCK_VERBOSE: '1'
+
+      - name: Upload TCK results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: tck-results
+          path: |
+            tck-results.json
+            hivemq.log
+            .tck-broker/hivemq-ce-*/bin/SparkplugTCKResults.log
+          if-no-files-found: warn
