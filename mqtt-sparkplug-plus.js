@@ -342,6 +342,15 @@ module.exports = function(RED) {
             if (!isOnline) {
                 return;
             }
+
+            // A DBIRTH may never precede the NBIRTH of its Edge Node. With a Primary
+            // Host configured, NBIRTH is withheld until that host reports ONLINE, and
+            // isOnline above does not account for that - it only tracks buffering. The
+            // device would otherwise announce itself under an edge node the host has
+            // never seen born.
+            if (!node.brokerConn.nbirthSent) {
+                return;
+            }
             let readyToSend = Object.keys(this.metrics).every(m => this.latestMetrics.hasOwnProperty(m));
 
             // Don't send birth if no metrics. we can assume that a dynamic defintion will be send if on metrics are defined.
@@ -464,7 +473,11 @@ module.exports = function(RED) {
                             this.brokerConn.broker = msg.command.node.set_server;
                         }
                         if (rebirthRequired) {
-                            this.brokerConn.sendBirth();
+                            // Forced: a set_name/set_group changes the node's Sparkplug
+                            // identity, and an NDEATH for the old one has just gone out
+                            // above. The NBIRTH already sent was for a different edge
+                            // node, so the nbirthSent guard must not suppress this one.
+                            this.brokerConn.sendBirth(true);
                         }
 
                         if (msg.command.node.connect) {
@@ -777,6 +790,7 @@ module.exports = function(RED) {
         this.options = {};
         this.subscriptions = {};
         this.bdSeq = -1;
+        this.nbirthSent = false; // has NBIRTH been sent for the current MQTT session?
         this.seq = 0;
 
         this.manualEoNBirth = n.manualEoNBirth||false,
@@ -996,9 +1010,24 @@ module.exports = function(RED) {
 
         /**
          * Send NBirth Message
+         *
+         * [tck-id-topics-nbirth-bdseq-increment] The bdSeq number MUST increment by
+         * one on every new MQTT CONNECT. bdSeq only advances when we connect, so
+         * sending more than one NBIRTH per session would repeat a bdSeq value. A
+         * repeat STATE ONLINE (a retained replay after re-subscribing, say) used to
+         * do exactly that. Birth once per session unless explicitly forced.
+         *
+         * @param {boolean} force send even if this session has already birthed.
+         *                        Required for a Rebirth NCMD, which by definition
+         *                        re-births an established session.
          */
-        this.sendBirth = function() {
-        
+        this.sendBirth = function(force) {
+
+            if (this.nbirthSent === true && force !== true) {
+                return;
+            }
+            this.nbirthSent = true;
+
             this.seq = 0;
             var birthMessageMetrics = []
             
@@ -1171,26 +1200,50 @@ module.exports = function(RED) {
          * @returns void
          */
         this.deregister = function(mqttNode,done) {
+            // done is optional - callers such as the test helper and the node's own
+            // close handler may omit it, so never call it unguarded.
+            let finished = function() {
+                if (typeof done === 'function') {
+                    done();
+                }
+            };
             delete node.users[mqttNode.id];
             if (node.closing) {
-                return done();
+                return finished();
             }
             if (Object.keys(node.users).length === 0) {
                 if (node.client && node.client.connected) {
                     // Send close message
                     let msg = this.getDeathPayload();
                     node.publish(msg, false, function(err) {
-                        // Signal done without ending the client.
-                        // The broker close handler will send DISCONNECT via end().
-                        done();
+                        // [tck-id-operational-behavior-edge-node-intentional-disconnect-packet]
+                        // A DISCONNECT packet MUST follow the NDEATH publish. end(true)
+                        // would drop the socket without sending one, so force must be
+                        // false here.
+                        node.client.end(false, {}, function() {
+                            // end(false) sends DISCONNECT and only then defers
+                            // stream.end() via setImmediate, so 'close' - and the
+                            // node.connected = false it performs - lands several turns
+                            // after the NDEATH has reached other clients. A register()
+                            // arriving in that window would call connect() and hit its
+                            // `!connected && !connecting` early-return, leaving the node
+                            // down for good. Clear the flags here and re-drive if
+                            // someone re-registered while we were closing.
+                            node.connected = false;
+                            node.connecting = false;
+                            if (Object.keys(node.users).length > 0) {
+                                node.connect();
+                            }
+                            finished();
+                        });
                     });
                     return;
                 } else {
                     node.client.end();
-                    return done();
+                    return finished();
                 }
             }
-            done();
+            finished();
         };
 
         /**
@@ -1204,6 +1257,7 @@ module.exports = function(RED) {
                 node.connecting = true;
                 try {
                     this.nextBdseq(); // Next connect will use next bdSeq
+                    node.nbirthSent = false; // new session -> NBIRTH is due again
                     node.options.will = this.getDeathPayload();
                     if (node.options.will) node.options.will.qos = 1;
                     node.serverProperties = {};
@@ -1251,7 +1305,12 @@ module.exports = function(RED) {
                         });
  
                         // Subscribe to Primary SCADA status if primaryScada is configured.
+                        // [tck-id-message-flow-edge-node-birth-publish-phid-wait] A
+                        // configured Primary Host means this node MUST withhold NBIRTH
+                        // until that host publishes ONLINE - independently of
+                        // store-and-forward, which only governs buffering.
                         if (node.primaryScada) {
+                            node.log(`Primary Host "${node.primaryScada}" configured: withholding NBIRTH until it publishes an ONLINE STATE message.`);
                             let options = { qos: 0 };
 
                             // SPb 2.0 Support
@@ -1352,6 +1411,8 @@ module.exports = function(RED) {
                     });
                     // Register disconnect handlers
                     node.client.on('close', function () {
+                        // The session is gone; the next one must birth again.
+                        node.nbirthSent = false;
                         if (node.connected) {
                             node.connected = false;
                             node.log(RED._("mqtt-sparkplug-plus.state.disconnected",{broker:(node.clientid?node.clientid+"@":"")+node.brokerurl}));
@@ -1392,8 +1453,10 @@ module.exports = function(RED) {
                                 //    node.publish(bMsg, !this.shouldBuffer, f => {});  // send the message 
                                 //}
 
-                                node.sendBirth();
-                            }else 
+                                // A Rebirth re-births an established session, so it
+                                // must bypass the once-per-session guard.
+                                node.sendBirth(true);
+                            }else
                             {
                                 node.warn(`NCMD command ${m.name} is not supported`);
                             }

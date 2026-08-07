@@ -69,7 +69,7 @@ describe('mqtt sparkplug device node - DataSet Support', function () {
 			"keepalive": "60",
 			"cleansession": true,
 			"enableStoreForward": false,
-			"primaryScada": "MY SCADA",
+			"primaryScada": "",
 			"username": brokerUsername,
 			"password": brokerPassword
 		}

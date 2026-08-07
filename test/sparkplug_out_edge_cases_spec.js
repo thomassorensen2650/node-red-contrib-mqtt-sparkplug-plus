@@ -39,7 +39,7 @@ describe('mqtt sparkplug out node - edge cases', function () {
 			"keepalive": "60",
 			"cleansession": true,
 			"enableStoreForward": false,
-			"primaryScada": "MY SCADA",
+			"primaryScada": "",
 			"username": brokerUsername,
 			"password": brokerPassword,
 			"credentials": {}

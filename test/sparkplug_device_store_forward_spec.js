@@ -164,6 +164,10 @@ describe('mqtt sparkplug device node - Store Forward', function () {
 		// WARN! We'll enable buffering for all tests
 		simpleFlow[1].enableStoreForward = false;
 		simpleFlow[1].manualEoNBirth = true;
+		// This test is about buffering while the *broker* connection is down, not
+		// about waiting on a Primary Host - and a configured Primary Host now
+		// withholds NBIRTH until it reports ONLINE, which this test never sends.
+		simpleFlow[1].primaryScada = "";
 		// Intialzie
 		// Send 5 messages
 		// Connect after 5 seconds
@@ -248,6 +252,9 @@ describe('mqtt sparkplug device node - Store Forward', function () {
 		// WARN! We'll enable buffering for all tests
 		simpleFlow[1].enableStoreForward = true;
 		simpleFlow[1].manualEoNBirth = false;
+		// Restored: the previous test clears it, and this one needs the node to
+		// wait for the host it brings ONLINE below.
+		simpleFlow[1].primaryScada = "MY SCADA";
 		// SET OFFLINE
 		// Send Birth
 		// SET SCADA ONLINE

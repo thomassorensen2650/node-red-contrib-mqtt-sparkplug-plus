@@ -1,3 +1,24 @@
+### Unreleased : Sparkplug TCK conformance
+
+**Behaviour change:** the Primary Host ID ("Destination") is now independent of
+Store Forward. Setting it makes the Edge Node withhold NBIRTH until that host
+publishes an ONLINE STATE message, whether or not Store Forward is enabled;
+previously it had no effect unless Store Forward was on. The field was hidden by
+the editor when Store Forward was unchecked, so a configuration may carry a
+Primary Host ID you cannot currently see. **If an Edge Node stops birthing after
+upgrading, open its broker configuration and clear the Primary Host ID** (the
+node also logs that it is waiting). Store Forward now governs buffering only.
+
+Fixed:
+- NBIRTH is sent once per MQTT session; a repeated STATE ONLINE no longer emits a
+  second NBIRTH re-using the same bdSeq (tck-id-topics-nbirth-bdseq-increment).
+- A DISCONNECT packet is now sent after the NDEATH on an intentional disconnect
+  (tck-id-operational-behavior-edge-node-intentional-disconnect-packet), without
+  breaking reconnect.
+- DBIRTH is no longer published while NBIRTH is being withheld pending a Primary
+  Host, which could announce a device under an edge node that had never birthed.
+- A rename via `set_name` / `set_group` births again under the new identity.
+
 ### 2.2.4 : Maintenance Release
 Fixed:
 - Templates with DataSets would throw an error when trying to send NBIRTH.

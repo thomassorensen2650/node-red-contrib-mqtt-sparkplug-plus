@@ -45,10 +45,13 @@
             "birthImmediately" : "Send Birth Immediately",
             "bufferDevice" : "Store Forward when not connected",
             "storeforward": "Store Forward when primary application is offline",
+            "primaryScada" : "Primary Host ID",
             "manualEoNBirth" : "Do not connect automaticly"
         },
         "tip": {
             "storeforward" : "all the buffered values will be kept in memory. Do not use this for high thoughput applications.",
+            "primaryScadaWait" : "This Edge Node will not send NBIRTH until the Primary Host Application publishes an ONLINE STATE message. Leave blank to birth as soon as the broker connection is established.",
+            "storeforwardNoHost" : "Store Forward needs a Primary Host ID. Without one the host is always treated as OFFLINE and data will be buffered indefinitely.",
             "device": "Tip: Use '/' to group related metrics e.g. Machine1/Speed",
             "sparkplugformat": "Topic format: namespace/group_id/message_type/edge_node_id/[device_id]",
             "birthImmediately" : "The Send Birth Immediately option will send device online (DBIRTH) with NULL values as soon as node-red starts up.",
@@ -67,6 +70,7 @@
             "eonname":"Node-Red",
             "name": "Sparkplug Device",
             "command": "NDATA",
+            "primaryScada" : "Leave blank to birth immediately",
             "username" : "Leave blank for anonymous login"
         },
         "state": {
