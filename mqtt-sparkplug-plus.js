@@ -848,8 +848,11 @@ module.exports = function(RED) {
                 case "RECONNECTING":
                     node.status({fill:"yellow",shape:"ring",text:"node-red:common.status.connecting"});
                     break;
-                case "BUFFERING": // Online´
-                    node.status({fill:"blue",shape:"dot",text:"destination offline"});
+                case "WAITING_PRIMARY_HOST": // Broker connected, host not ONLINE yet
+                    node.status({fill:"blue",shape:"ring",text:"waiting for primary host"});
+                    break;
+                case "BUFFERING": // As above, and queueing data meanwhile
+                    node.status({fill:"blue",shape:"dot",text:"buffering - primary host offline"});
                     break;
                 case "WAITING_CONNECT": // Online´
                     node.status({fill:"gray",shape:"dot",text:"awaiting connect command"});
@@ -857,6 +860,26 @@ module.exports = function(RED) {
                 default:
                     node.status({fill:"gray",shape:"dot",text:state}); // Unknown State
             }
+        };
+
+        /**
+         * Connection state for a registered node.
+         *
+         * The Primary Host condition drives this on its own: a configured host
+         * withholds NBIRTH whether or not store-and-forward is enabled, so the wait
+         * has to be visible either way. Buffering only decides *which* waiting state
+         * is shown.
+         *
+         * @param {object} user a node registered against this broker
+         * @returns {string} state for setConnectionState
+         */
+        this.userConnectionState = function(user) {
+            if (node.primaryScada && node.primaryScadaStatus === "OFFLINE") {
+                return (node.enableStoreForward && user.shouldBuffer === true)
+                    ? "BUFFERING"
+                    : "WAITING_PRIMARY_HOST";
+            }
+            return "CONNECTED";
         };
 
         /**
@@ -1182,7 +1205,11 @@ module.exports = function(RED) {
         this.register = function(mqttNode) {
             
             node.users[mqttNode.id] = mqttNode;
-            let state = node.manualEoNBirth ? "WAITING_CONNECT" : node.connected ? "CONNECTED" : "DISCONNECTED";
+            // Via userConnectionState, so a node registering while the Primary Host
+            // is still OFFLINE reports the wait rather than a bare "connected".
+            let state = node.manualEoNBirth ? "WAITING_CONNECT"
+                      : node.connected ? node.userConnectionState(mqttNode)
+                      : "DISCONNECTED";
             
             node.setConnectionState(mqttNode, state);
             if (Object.keys(node.users).length === 1) {
@@ -1267,8 +1294,7 @@ module.exports = function(RED) {
                         node.log(RED._("mqtt-sparkplug-plus.state.connected",{broker:(node.clientid?node.clientid+"@":"")+node.brokerurl}));
                         for (var id in node.users) {
                             if (node.users.hasOwnProperty(id)) {
-                                let state = node.enableStoreForward && node.primaryScadaStatus === "OFFLINE"  && node.users[id].shouldBuffer === true ? "BUFFERING" : "CONNECTED";
-                                node.setConnectionState(node.users[id], state);
+                                node.setConnectionState(node.users[id], node.userConnectionState(node.users[id]));
                             }
                         }
 
@@ -1322,8 +1348,7 @@ module.exports = function(RED) {
                                 }
                                 for (var id in node.users) {
                                     if (node.users.hasOwnProperty(id)) {
-                                        let state = node.enableStoreForward && node.primaryScadaStatus === "OFFLINE"  && node.users[id].shouldBuffer === true ? "BUFFERING" : "CONNECTED";
-                                        node.setConnectionState(node.users[id], state);
+                                        node.setConnectionState(node.users[id], node.userConnectionState(node.users[id]));
                                         //if (node.primaryScadaStatus == "ONLINE" && typeof node.users[id].trySendBirth === 'function') {
                                          //   node.users[id].trySendBirth();
                                         //}
@@ -1371,8 +1396,7 @@ module.exports = function(RED) {
                                  }
                                 for (var id in node.users) {
                                     if (node.users.hasOwnProperty(id)) {
-                                        let state = node.enableStoreForward && node.primaryScadaStatus === "OFFLINE"  && node.users[id].shouldBuffer === true ? "BUFFERING" : "CONNECTED";
-                                        node.setConnectionState(node.users[id], state);
+                                        node.setConnectionState(node.users[id], node.userConnectionState(node.users[id]));
                                         //if (node.primaryScadaStatus == "ONLINE" && typeof node.users[id].trySendBirth === 'function') {
                                         //    node.users[id].trySendBirth();
                                         //}
