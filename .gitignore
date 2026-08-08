@@ -118,3 +118,12 @@ dist
 .pnp.*
 package-lock.json
 .mqtt-sparkplug.js.swp
+.DS_Store
+
+# Local clone of the Eclipse Sparkplug spec/TCK used as reference.
+# CI checks this out itself at a pinned tag (see .github/workflows/tck.yml).
+ref/
+
+# TCK harness output
+tck-results.json
+.tck-broker/
