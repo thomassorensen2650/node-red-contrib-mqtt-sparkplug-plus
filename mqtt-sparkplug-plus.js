@@ -414,9 +414,6 @@ module.exports = function(RED) {
      
         if (this.brokerConn) {
             this.on("input",function(msg,send,done) {
-                // Handle Command
-                // Patch: promote msg.payload.command for trigger compatibility
-                if (!msg.hasOwnProperty("command") && msg.payload && msg.payload.command) { msg.command = msg.payload.command; }
                 if (msg.hasOwnProperty("command")) {
 
                     // Lets always refresh subscriptions for now.
