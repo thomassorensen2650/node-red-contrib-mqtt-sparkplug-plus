@@ -389,7 +389,11 @@ module.exports = function(RED) {
                     }
                     birthMetrics.push(lv);
                 }
-                let bMsg = node.brokerConn.createMsg(this.name, "DBIRTH", birthMetrics, f => {});
+                // Same ts the metrics above were stamped with: the payload timestamp
+                // then denotes when the birth was assembled rather than the instant
+                // before the socket write, which is both more consistent and keeps it
+                // strictly earlier than the moment a subscriber receives it.
+                let bMsg = node.brokerConn.createMsg(this.name, "DBIRTH", birthMetrics, f => {}, ts);
                 if(bMsg) {
                     this.brokerConn.publish(bMsg, true, done);  // send the message
                     this.birthMessageSend = true;
@@ -788,6 +792,7 @@ module.exports = function(RED) {
         this.subscriptions = {};
         this.bdSeq = -1;
         this.nbirthSent = false; // has NBIRTH been sent for the current MQTT session?
+        this.deathSent = false;  // has the DDEATH/NDEATH shutdown sequence already run?
         this.seq = 0;
 
         this.manualEoNBirth = n.manualEoNBirth||false,
@@ -922,14 +927,20 @@ module.exports = function(RED) {
          * @param {*} metrics The metrics to include in the payload
          * @returns a encoded sparkplug B message
          */
-        this.createMsg = function(deviceName, msgType, metrics, done) {
+        /**
+         * @param {number} [timestamp] payload timestamp, defaulting to now. Callers that
+         *                 already stamped their metrics should pass the same value, so
+         *                 the payload and its metrics agree rather than differing by
+         *                 however long the metric building took.
+         */
+        this.createMsg = function(deviceName, msgType, metrics, done, timestamp) {
             let that = this;
             let topic = deviceName ? `spBv1.0/${this.deviceGroup}/${msgType}/${this.eonName}/${deviceName}` :
                                      `spBv1.0/${this.deviceGroup}/${msgType}/${this.eonName}`;
             let msg = {
                 topic : topic,
                 payload : {
-                    timestamp : new Date().getTime(),
+                    timestamp : timestamp || new Date().getTime(),
                     metrics : metrics
                 }
             };
@@ -1223,6 +1234,70 @@ module.exports = function(RED) {
          * @param {function} done 
          * @returns void
          */
+        /**
+         * Publish the DDEATH/NDEATH sequence, then disconnect cleanly.
+         *
+         * [tck-id-payloads-ndeath-will-message-publisher-disconnect-mqtt311] The NDEATH
+         * MUST be published before the DISCONNECT packet. A *clean* DISCONNECT also
+         * suppresses the Last Will, so unless we publish the NDEATH explicitly here no
+         * NDEATH is ever seen at all.
+         *
+         * Both shutdown paths funnel through this - deregister() when the last user
+         * leaves, and the broker node's own 'close' handler - because which of them
+         * runs first depends on how Node-RED happens to order node shutdown. Hence the
+         * deathSent guard: whichever arrives first does the work, the other is a no-op.
+         *
+         * DDEATHs are sent centrally rather than from each device's close handler, so
+         * that DDEATH always precedes NDEATH no matter what order the device nodes are
+         * closed in.
+         *
+         * @param {function} [done] optional completion callback
+         */
+        this.sendDeathsAndDisconnect = function(done) {
+            let finished = function() {
+                if (typeof done === 'function') {
+                    done();
+                }
+            };
+
+            if (node.deathSent || !node.client) {
+                return finished();
+            }
+            node.deathSent = true;
+
+            if (!node.client.connected) {
+                node.client.end();
+                return finished();
+            }
+
+            for (var id in node.users) {
+                if (node.users.hasOwnProperty(id)) {
+                    let user = node.users[id];
+                    if (typeof user.sendDDeath === 'function' && user.birthMessageSend) {
+                        try {
+                            user.sendDDeath();
+                        } catch (e) {
+                            // Best effort - a failed DDEATH must not stop the NDEATH.
+                            node.warn(`Unable to send DDEATH on shutdown: ${e.toString()}`);
+                        }
+                    }
+                }
+            }
+
+            node.publish(node.getDeathPayload(), false, function(err) {
+                // [tck-id-operational-behavior-edge-node-intentional-disconnect-packet]
+                // force MUST be false so mqtt.js emits a DISCONNECT packet; end(true)
+                // destroys the socket without sending one.
+                node.client.end(false, {}, function() {
+                    // end(false) defers 'close' past the NDEATH round-trip, so clear
+                    // the connection flags here rather than waiting for that event.
+                    node.connected = false;
+                    node.connecting = false;
+                    finished();
+                });
+            });
+        };
+
         this.deregister = function(mqttNode,done) {
             // done is optional - callers such as the test helper and the node's own
             // close handler may omit it, so never call it unguarded.
@@ -1236,36 +1311,16 @@ module.exports = function(RED) {
                 return finished();
             }
             if (Object.keys(node.users).length === 0) {
-                if (node.client && node.client.connected) {
-                    // Send close message
-                    let msg = this.getDeathPayload();
-                    node.publish(msg, false, function(err) {
-                        // [tck-id-operational-behavior-edge-node-intentional-disconnect-packet]
-                        // A DISCONNECT packet MUST follow the NDEATH publish. end(true)
-                        // would drop the socket without sending one, so force must be
-                        // false here.
-                        node.client.end(false, {}, function() {
-                            // end(false) sends DISCONNECT and only then defers
-                            // stream.end() via setImmediate, so 'close' - and the
-                            // node.connected = false it performs - lands several turns
-                            // after the NDEATH has reached other clients. A register()
-                            // arriving in that window would call connect() and hit its
-                            // `!connected && !connecting` early-return, leaving the node
-                            // down for good. Clear the flags here and re-drive if
-                            // someone re-registered while we were closing.
-                            node.connected = false;
-                            node.connecting = false;
-                            if (Object.keys(node.users).length > 0) {
-                                node.connect();
-                            }
-                            finished();
-                        });
-                    });
-                    return;
-                } else {
-                    node.client.end();
-                    return finished();
-                }
+                node.sendDeathsAndDisconnect(function() {
+                    // A register() arriving while we were disconnecting would have hit
+                    // connect()'s `!connected && !connecting` early-return and left the
+                    // node down for good, so re-drive it here.
+                    if (Object.keys(node.users).length > 0) {
+                        node.connect();
+                    }
+                    finished();
+                });
+                return;
             }
             finished();
         };
@@ -1282,6 +1337,7 @@ module.exports = function(RED) {
                 try {
                     this.nextBdseq(); // Next connect will use next bdSeq
                     node.nbirthSent = false; // new session -> NBIRTH is due again
+                    node.deathSent = false;  // ...and its deaths are due again on close
                     node.options.will = this.getDeathPayload();
                     if (node.options.will) node.options.will.qos = 1;
                     node.serverProperties = {};
@@ -1436,6 +1492,8 @@ module.exports = function(RED) {
                         node.nbirthSent = false;
                         if (node.connected) {
                             node.connected = false;
+
+
                             node.log(RED._("mqtt-sparkplug-plus.state.disconnected",{broker:(node.clientid?node.clientid+"@":"")+node.brokerurl}));
                             for (var id in node.users) {
                                 if (node.users.hasOwnProperty(id)) {
@@ -1615,18 +1673,19 @@ module.exports = function(RED) {
         };
 
         this.on('close', function(done) {
-            this.closing = true;
-            if (this.connected) {
-                this.client.once('close', function() {
-                    done();
-                });
-                this.client.end();
-            } else if (this.connecting || node.client.reconnecting) {
-                node.client.end();
+            // Depending on how Node-RED orders shutdown this may run before any device
+            // node deregisters - in the TCK's flow it always does, because that flow's
+            // nodes are all config nodes and the broker is created (and so stopped)
+            // first. Setting closing=true up front used to make every later deregister
+            // early-return, so the NDEATH sequence never ran and the node disconnected
+            // silently. Publish the deaths first, and only then mark ourselves closing.
+            node.sendDeathsAndDisconnect(function() {
+                node.closing = true;
+                // done() comes from the end() callback rather than a 'close' listener:
+                // if the client was already ended that event has passed and a listener
+                // would never fire, hanging Node-RED's shutdown.
                 done();
-            } else {
-                done();
-            }
+            });
         });
     }
 
