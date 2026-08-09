@@ -206,9 +206,17 @@
                     <input type="checkbox" id="node-config-input-enableStoreForward" style="display:inline-block; width:22px; vertical-align:top;"><span data-i18n="mqtt-sparkplug-plus.label.storeforward"></span>
                 </label>
                 </div>
-            <div class="form-row" id="node-storeforward-line">
-                <label for="node-config-input-primaryScada"><i class="fa fa-desktop"></i> Destination</label>
-                <input id="node-config-input-primaryScada" type="text" placeholder="Primary Application Name">
+            <!-- Primary Host ID is independent of Store Forward: it governs whether
+                 NBIRTH waits for a host, not whether data is buffered. -->
+            <div class="form-row" id="node-primaryhost-line">
+                <label for="node-config-input-primaryScada"><i class="fa fa-desktop"></i> <span data-i18n="mqtt-sparkplug-plus.label.primaryScada"></span></label>
+                <input id="node-config-input-primaryScada" type="text" data-i18n="[placeholder]mqtt-sparkplug-plus.placeholder.primaryScada">
+            </div>
+            <div class="form-tips" id="node-primaryhost-warning" style="display:none;">
+                <i class="fa fa-warning"></i> <span data-i18n="mqtt-sparkplug-plus.tip.primaryScadaWait"></span>
+            </div>
+            <div class="form-tips" id="node-storeforward-warning" style="display:none;">
+                <i class="fa fa-warning"></i> <span data-i18n="mqtt-sparkplug-plus.tip.storeforwardNoHost"></span>
             </div>
         </div>
     </div>
@@ -325,7 +333,10 @@
             templates : {value: []},
             manualEoNBirth : {value: false},
 
-            primaryScada: {value:"",  validate :x =>  !$("#node-config-input-enableStoreForward").is(":checked") || /^[^/+#]+$/.test(x) },
+            // Optional on its own, but required by Store Forward - with buffering on
+            // and no host the status is pinned OFFLINE and data buffers forever.
+            // Whenever a value is given it must be a legal Sparkplug Host ID.
+            primaryScada: {value:"",  validate : x => $("#node-config-input-enableStoreForward").is(":checked") ? /^[^/+#]+$/.test(x) : (!x || /^[^/+#]+$/.test(x)) },
         },
         credentials: {
             user: {type:"text"},
@@ -520,15 +531,22 @@
 
             // ── Connection tab setup ──────────────────────────────────────────
             this.cleansession = true;
-            $("#node-storeforward-line").hide();
-            $("#node-config-input-enableStoreForward").on('change',function() {
-                if ($(this).is(":checked")) {
-                    $("#node-storeforward-line").show();
-                }
-                else {
-                    $("#node-storeforward-line").hide();
-                }
-            });
+
+            // Primary Host ID and Store Forward are independent settings. Setting a
+            // host makes the Edge Node withhold NBIRTH until that host publishes an
+            // ONLINE STATE message; Store Forward only decides whether data is
+            // buffered meanwhile. Run once on open as well as on change - Node-RED
+            // populates the inputs before oneditprepare, so a change-only handler
+            // leaves a saved config showing the wrong hints.
+            function updatePrimaryHostHints() {
+                var phid = ($("#node-config-input-primaryScada").val() || "").trim();
+                var sf = $("#node-config-input-enableStoreForward").is(":checked");
+                $("#node-primaryhost-warning").toggle(!!phid);
+                $("#node-storeforward-warning").toggle(sf && !phid);
+            }
+            updatePrimaryHostHints();
+            $("#node-config-input-primaryScada").on('input change', updatePrimaryHostHints);
+            $("#node-config-input-enableStoreForward").on('change', updatePrimaryHostHints);
 
             function updateTLSOptions() {
                 if ($("#node-config-input-usetls").is(':checked')) {

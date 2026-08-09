@@ -61,7 +61,7 @@ var complexFlow = [
 		"keepalive": "60",
 		"cleansession": true,
 		"enableStoreForward": false,
-		"primaryScada": "MY SCADA",
+		"primaryScada": "",
 			"username": brokerUsername,
 			"password": brokerPassword
 	}
@@ -125,7 +125,7 @@ describe('mqtt sparkplug device commands', function () {
 			"keepalive": "60",
 			"cleansession": true,
 			"enableStoreForward": false,
-			"primaryScada": "MY SCADA",
+			"primaryScada": "",
 			"username": brokerUsername,
 			"password": brokerPassword
 		}

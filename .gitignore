@@ -126,4 +126,8 @@ ref/
 
 # TCK harness output
 tck-results.json
+tck-results/
+tck-logs/
 .tck-broker/
+# Paho persistence the TCK's results collector drops in the working directory.
+SparkplugTCKResultsCollector-*/

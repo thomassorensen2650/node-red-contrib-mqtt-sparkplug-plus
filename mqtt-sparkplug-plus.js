@@ -342,6 +342,15 @@ module.exports = function(RED) {
             if (!isOnline) {
                 return;
             }
+
+            // A DBIRTH may never precede the NBIRTH of its Edge Node. With a Primary
+            // Host configured, NBIRTH is withheld until that host reports ONLINE, and
+            // isOnline above does not account for that - it only tracks buffering. The
+            // device would otherwise announce itself under an edge node the host has
+            // never seen born.
+            if (!node.brokerConn.nbirthSent) {
+                return;
+            }
             let readyToSend = Object.keys(this.metrics).every(m => this.latestMetrics.hasOwnProperty(m));
 
             // Don't send birth if no metrics. we can assume that a dynamic defintion will be send if on metrics are defined.
@@ -380,7 +389,11 @@ module.exports = function(RED) {
                     }
                     birthMetrics.push(lv);
                 }
-                let bMsg = node.brokerConn.createMsg(this.name, "DBIRTH", birthMetrics, f => {});
+                // Same ts the metrics above were stamped with: the payload timestamp
+                // then denotes when the birth was assembled rather than the instant
+                // before the socket write, which is both more consistent and keeps it
+                // strictly earlier than the moment a subscriber receives it.
+                let bMsg = node.brokerConn.createMsg(this.name, "DBIRTH", birthMetrics, f => {}, ts);
                 if(bMsg) {
                     this.brokerConn.publish(bMsg, true, done);  // send the message
                     this.birthMessageSend = true;
@@ -405,7 +418,6 @@ module.exports = function(RED) {
      
         if (this.brokerConn) {
             this.on("input",function(msg,send,done) {
-                // Handle Command
                 if (msg.hasOwnProperty("command")) {
 
                     // Lets always refresh subscriptions for now.
@@ -462,7 +474,11 @@ module.exports = function(RED) {
                             this.brokerConn.broker = msg.command.node.set_server;
                         }
                         if (rebirthRequired) {
-                            this.brokerConn.sendBirth();
+                            // Forced: a set_name/set_group changes the node's Sparkplug
+                            // identity, and an NDEATH for the old one has just gone out
+                            // above. The NBIRTH already sent was for a different edge
+                            // node, so the nbirthSent guard must not suppress this one.
+                            this.brokerConn.sendBirth(true);
                         }
 
                         if (msg.command.node.connect) {
@@ -731,7 +747,7 @@ module.exports = function(RED) {
                         // Generic "Template" without a named definition — leave value null
                         node.latestMetrics[m] = { value: null, name: m, type: "Template" };
                     } else {
-                        node.latestMetrics[m] = { value: null, name: m, type: dataType };
+                        node.latestMetrics[m] = { value: null, name: m, type: dataType, timestamp: ts };
                     }
                 });
             }
@@ -775,6 +791,8 @@ module.exports = function(RED) {
         this.options = {};
         this.subscriptions = {};
         this.bdSeq = -1;
+        this.nbirthSent = false; // has NBIRTH been sent for the current MQTT session?
+        this.deathSent = false;  // has the DDEATH/NDEATH shutdown sequence already run?
         this.seq = 0;
 
         this.manualEoNBirth = n.manualEoNBirth||false,
@@ -835,8 +853,11 @@ module.exports = function(RED) {
                 case "RECONNECTING":
                     node.status({fill:"yellow",shape:"ring",text:"node-red:common.status.connecting"});
                     break;
-                case "BUFFERING": // Online´
-                    node.status({fill:"blue",shape:"dot",text:"destination offline"});
+                case "WAITING_PRIMARY_HOST": // Broker connected, host not ONLINE yet
+                    node.status({fill:"blue",shape:"ring",text:"waiting for primary host"});
+                    break;
+                case "BUFFERING": // As above, and queueing data meanwhile
+                    node.status({fill:"blue",shape:"dot",text:"buffering - primary host offline"});
                     break;
                 case "WAITING_CONNECT": // Online´
                     node.status({fill:"gray",shape:"dot",text:"awaiting connect command"});
@@ -844,6 +865,26 @@ module.exports = function(RED) {
                 default:
                     node.status({fill:"gray",shape:"dot",text:state}); // Unknown State
             }
+        };
+
+        /**
+         * Connection state for a registered node.
+         *
+         * The Primary Host condition drives this on its own: a configured host
+         * withholds NBIRTH whether or not store-and-forward is enabled, so the wait
+         * has to be visible either way. Buffering only decides *which* waiting state
+         * is shown.
+         *
+         * @param {object} user a node registered against this broker
+         * @returns {string} state for setConnectionState
+         */
+        this.userConnectionState = function(user) {
+            if (node.primaryScada && node.primaryScadaStatus === "OFFLINE") {
+                return (node.enableStoreForward && user.shouldBuffer === true)
+                    ? "BUFFERING"
+                    : "WAITING_PRIMARY_HOST";
+            }
+            return "CONNECTED";
         };
 
         /**
@@ -886,14 +927,20 @@ module.exports = function(RED) {
          * @param {*} metrics The metrics to include in the payload
          * @returns a encoded sparkplug B message
          */
-        this.createMsg = function(deviceName, msgType, metrics, done) {
+        /**
+         * @param {number} [timestamp] payload timestamp, defaulting to now. Callers that
+         *                 already stamped their metrics should pass the same value, so
+         *                 the payload and its metrics agree rather than differing by
+         *                 however long the metric building took.
+         */
+        this.createMsg = function(deviceName, msgType, metrics, done, timestamp) {
             let that = this;
             let topic = deviceName ? `spBv1.0/${this.deviceGroup}/${msgType}/${this.eonName}/${deviceName}` :
                                      `spBv1.0/${this.deviceGroup}/${msgType}/${this.eonName}`;
             let msg = {
                 topic : topic,
                 payload : {
-                    timestamp : new Date().getTime(),
+                    timestamp : timestamp || new Date().getTime(),
                     metrics : metrics
                 }
             };
@@ -994,9 +1041,24 @@ module.exports = function(RED) {
 
         /**
          * Send NBirth Message
+         *
+         * [tck-id-topics-nbirth-bdseq-increment] The bdSeq number MUST increment by
+         * one on every new MQTT CONNECT. bdSeq only advances when we connect, so
+         * sending more than one NBIRTH per session would repeat a bdSeq value. A
+         * repeat STATE ONLINE (a retained replay after re-subscribing, say) used to
+         * do exactly that. Birth once per session unless explicitly forced.
+         *
+         * @param {boolean} force send even if this session has already birthed.
+         *                        Required for a Rebirth NCMD, which by definition
+         *                        re-births an established session.
          */
-        this.sendBirth = function() {
-        
+        this.sendBirth = function(force) {
+
+            if (this.nbirthSent === true && force !== true) {
+                return;
+            }
+            this.nbirthSent = true;
+
             this.seq = 0;
             var birthMessageMetrics = []
             
@@ -1154,7 +1216,11 @@ module.exports = function(RED) {
         this.register = function(mqttNode) {
             
             node.users[mqttNode.id] = mqttNode;
-            let state = node.manualEoNBirth ? "WAITING_CONNECT" : node.connected ? "CONNECTED" : "DISCONNECTED";
+            // Via userConnectionState, so a node registering while the Primary Host
+            // is still OFFLINE reports the wait rather than a bare "connected".
+            let state = node.manualEoNBirth ? "WAITING_CONNECT"
+                      : node.connected ? node.userConnectionState(mqttNode)
+                      : "DISCONNECTED";
             
             node.setConnectionState(mqttNode, state);
             if (Object.keys(node.users).length === 1) {
@@ -1168,26 +1234,95 @@ module.exports = function(RED) {
          * @param {function} done 
          * @returns void
          */
-        this.deregister = function(mqttNode,done) {
-            delete node.users[mqttNode.id];
-            if (node.closing) {
-                return done();
+        /**
+         * Publish the DDEATH/NDEATH sequence, then disconnect cleanly.
+         *
+         * [tck-id-payloads-ndeath-will-message-publisher-disconnect-mqtt311] The NDEATH
+         * MUST be published before the DISCONNECT packet. A *clean* DISCONNECT also
+         * suppresses the Last Will, so unless we publish the NDEATH explicitly here no
+         * NDEATH is ever seen at all.
+         *
+         * Both shutdown paths funnel through this - deregister() when the last user
+         * leaves, and the broker node's own 'close' handler - because which of them
+         * runs first depends on how Node-RED happens to order node shutdown. Hence the
+         * deathSent guard: whichever arrives first does the work, the other is a no-op.
+         *
+         * DDEATHs are sent centrally rather than from each device's close handler, so
+         * that DDEATH always precedes NDEATH no matter what order the device nodes are
+         * closed in.
+         *
+         * @param {function} [done] optional completion callback
+         */
+        this.sendDeathsAndDisconnect = function(done) {
+            let finished = function() {
+                if (typeof done === 'function') {
+                    done();
+                }
+            };
+
+            if (node.deathSent || !node.client) {
+                return finished();
             }
-            if (Object.keys(node.users).length === 0) {
-                if (node.client && node.client.connected) {
-                    // Send close message
-                    let msg = this.getDeathPayload();
-                    node.publish(msg, false, function(err) {
-                        //node.client.end(done);
-                        node.client.end(true, {}, done);
-                    });
-                    return;
-                } else {
-                    node.client.end();
-                    return done();
+            node.deathSent = true;
+
+            if (!node.client.connected) {
+                node.client.end();
+                return finished();
+            }
+
+            for (var id in node.users) {
+                if (node.users.hasOwnProperty(id)) {
+                    let user = node.users[id];
+                    if (typeof user.sendDDeath === 'function' && user.birthMessageSend) {
+                        try {
+                            user.sendDDeath();
+                        } catch (e) {
+                            // Best effort - a failed DDEATH must not stop the NDEATH.
+                            node.warn(`Unable to send DDEATH on shutdown: ${e.toString()}`);
+                        }
+                    }
                 }
             }
-            done();
+
+            node.publish(node.getDeathPayload(), false, function(err) {
+                // [tck-id-operational-behavior-edge-node-intentional-disconnect-packet]
+                // force MUST be false so mqtt.js emits a DISCONNECT packet; end(true)
+                // destroys the socket without sending one.
+                node.client.end(false, {}, function() {
+                    // end(false) defers 'close' past the NDEATH round-trip, so clear
+                    // the connection flags here rather than waiting for that event.
+                    node.connected = false;
+                    node.connecting = false;
+                    finished();
+                });
+            });
+        };
+
+        this.deregister = function(mqttNode,done) {
+            // done is optional - callers such as the test helper and the node's own
+            // close handler may omit it, so never call it unguarded.
+            let finished = function() {
+                if (typeof done === 'function') {
+                    done();
+                }
+            };
+            delete node.users[mqttNode.id];
+            if (node.closing) {
+                return finished();
+            }
+            if (Object.keys(node.users).length === 0) {
+                node.sendDeathsAndDisconnect(function() {
+                    // A register() arriving while we were disconnecting would have hit
+                    // connect()'s `!connected && !connecting` early-return and left the
+                    // node down for good, so re-drive it here.
+                    if (Object.keys(node.users).length > 0) {
+                        node.connect();
+                    }
+                    finished();
+                });
+                return;
+            }
+            finished();
         };
 
         /**
@@ -1201,7 +1336,10 @@ module.exports = function(RED) {
                 node.connecting = true;
                 try {
                     this.nextBdseq(); // Next connect will use next bdSeq
+                    node.nbirthSent = false; // new session -> NBIRTH is due again
+                    node.deathSent = false;  // ...and its deaths are due again on close
                     node.options.will = this.getDeathPayload();
+                    if (node.options.will) node.options.will.qos = 1;
                     node.serverProperties = {};
                     node.client = mqtt.connect(node.brokerurl ,node.options);
                     node.client.setMaxListeners(0);
@@ -1212,8 +1350,7 @@ module.exports = function(RED) {
                         node.log(RED._("mqtt-sparkplug-plus.state.connected",{broker:(node.clientid?node.clientid+"@":"")+node.brokerurl}));
                         for (var id in node.users) {
                             if (node.users.hasOwnProperty(id)) {
-                                let state = node.enableStoreForward && node.primaryScadaStatus === "OFFLINE"  && node.users[id].shouldBuffer === true ? "BUFFERING" : "CONNECTED";
-                                node.setConnectionState(node.users[id], state);
+                                node.setConnectionState(node.users[id], node.userConnectionState(node.users[id]));
                             }
                         }
 
@@ -1246,8 +1383,13 @@ module.exports = function(RED) {
                             node.handleNCMD(payload_);
                         });
  
-                        // Subscribe to Primary SCADA status if store forward is enabled.
-                        if (node.enableStoreForward === true) {
+                        // Subscribe to Primary SCADA status if primaryScada is configured.
+                        // [tck-id-message-flow-edge-node-birth-publish-phid-wait] A
+                        // configured Primary Host means this node MUST withhold NBIRTH
+                        // until that host publishes ONLINE - independently of
+                        // store-and-forward, which only governs buffering.
+                        if (node.primaryScada) {
+                            node.log(`Primary Host "${node.primaryScada}" configured: withholding NBIRTH until it publishes an ONLINE STATE message.`);
                             let options = { qos: 0 };
 
                             // SPb 2.0 Support
@@ -1258,11 +1400,11 @@ module.exports = function(RED) {
 
                                 if (node.primaryScadaStatus === "ONLINE") {
                                    node.sendBirth();
+                                   node.emptyDDataBuffer();
                                 }
                                 for (var id in node.users) {
                                     if (node.users.hasOwnProperty(id)) {
-                                        let state = node.enableStoreForward && node.primaryScadaStatus === "OFFLINE"  && node.users[id].shouldBuffer === true ? "BUFFERING" : "CONNECTED";
-                                        node.setConnectionState(node.users[id], state);
+                                        node.setConnectionState(node.users[id], node.userConnectionState(node.users[id]));
                                         //if (node.primaryScadaStatus == "ONLINE" && typeof node.users[id].trySendBirth === 'function') {
                                          //   node.users[id].trySendBirth();
                                         //}
@@ -1277,18 +1419,40 @@ module.exports = function(RED) {
 
                                 try {
                                     var pss = JSON.parse(payload);
-                                    node.primaryScadaStatus = pss.hasOwnProperty("online") ? (pss.online ? "ONLINE" : "OFFLINE") : "OFFLINE";
+                                    var wasOnline = node.primaryScadaStatus === "ONLINE";
+                                    var incomingStatus = pss.hasOwnProperty("online") ? (pss.online ? "ONLINE" : "OFFLINE") : "OFFLINE";
+                                    var hasTs = pss.hasOwnProperty("timestamp") && typeof pss.timestamp === 'number';
+                                    // Only update status/timestamp for non-stale messages
+                                    var isStale = hasTs && typeof node.lastPhidTimestamp !== 'undefined' && pss.timestamp < node.lastPhidTimestamp;
+                                    if (!isStale) {
+                                        node.primaryScadaStatus = incomingStatus;
+                                        if (hasTs) node.lastPhidTimestamp = pss.timestamp;
+                                    }
                                 } catch{
                                     node.warn("Invalid Primary SCADA State:" + payload)
                                     node.primaryScadaStatus = "OFFLINE";
                                 }
                                 if (node.primaryScadaStatus === "ONLINE") {
                                     node.sendBirth();
+                                    node.emptyDDataBuffer();
+                                 } else if (wasOnline && node.primaryScadaStatus === "OFFLINE" && typeof pss !== 'undefined') {
+                                    // Patch: publish NDEATH when Primary Host goes offline
+                                    // Status was only updated if !isStale (handled above), so no need to re-check timestamp here.
+                                    var deathPayload = node.getDeathPayload();
+                                    if (deathPayload && node.client && node.client.connected) {
+                                        node.publish(deathPayload, false, function(err) {
+                                            node.client.end(false, {}, function() {
+                                                node.connected = false;
+                                                if (typeof node.connect === 'function') {
+                                                    node.connect();
+                                                }
+                                            });
+                                        });
+                                    }
                                  }
                                 for (var id in node.users) {
                                     if (node.users.hasOwnProperty(id)) {
-                                        let state = node.enableStoreForward && node.primaryScadaStatus === "OFFLINE"  && node.users[id].shouldBuffer === true ? "BUFFERING" : "CONNECTED";
-                                        node.setConnectionState(node.users[id], state);
+                                        node.setConnectionState(node.users[id], node.userConnectionState(node.users[id]));
                                         //if (node.primaryScadaStatus == "ONLINE" && typeof node.users[id].trySendBirth === 'function') {
                                         //    node.users[id].trySendBirth();
                                         //}
@@ -1301,7 +1465,7 @@ module.exports = function(RED) {
                             }
 
                         } else {
-                        // Send Node Birth right away if connected and destination buffering is disabled
+                        // Send Node Birth right away if no primaryScada is configured
                             node.sendBirth();
                             node.emptyDDataBuffer();
                         }
@@ -1324,8 +1488,12 @@ module.exports = function(RED) {
                     });
                     // Register disconnect handlers
                     node.client.on('close', function () {
+                        // The session is gone; the next one must birth again.
+                        node.nbirthSent = false;
                         if (node.connected) {
                             node.connected = false;
+
+
                             node.log(RED._("mqtt-sparkplug-plus.state.disconnected",{broker:(node.clientid?node.clientid+"@":"")+node.brokerurl}));
                             for (var id in node.users) {
                                 if (node.users.hasOwnProperty(id)) {
@@ -1364,8 +1532,10 @@ module.exports = function(RED) {
                                 //    node.publish(bMsg, !this.shouldBuffer, f => {});  // send the message 
                                 //}
 
-                                node.sendBirth();
-                            }else 
+                                // A Rebirth re-births an established session, so it
+                                // must bypass the once-per-session guard.
+                                node.sendBirth(true);
+                            }else
                             {
                                 node.warn(`NCMD command ${m.name} is not supported`);
                             }
@@ -1503,18 +1673,19 @@ module.exports = function(RED) {
         };
 
         this.on('close', function(done) {
-            this.closing = true;
-            if (this.connected) {
-                this.client.once('close', function() {
-                    done();
-                });
-                this.client.end();
-            } else if (this.connecting || node.client.reconnecting) {
-                node.client.end();
+            // Depending on how Node-RED orders shutdown this may run before any device
+            // node deregisters - in the TCK's flow it always does, because that flow's
+            // nodes are all config nodes and the broker is created (and so stopped)
+            // first. Setting closing=true up front used to make every later deregister
+            // early-return, so the NDEATH sequence never ran and the node disconnected
+            // silently. Publish the deaths first, and only then mark ourselves closing.
+            node.sendDeathsAndDisconnect(function() {
+                node.closing = true;
+                // done() comes from the end() callback rather than a 'close' listener:
+                // if the client was already ended that event has passed and a listener
+                // would never fire, hanging Node-RED's shutdown.
                 done();
-            } else {
-                done();
-            }
+            });
         });
     }
 

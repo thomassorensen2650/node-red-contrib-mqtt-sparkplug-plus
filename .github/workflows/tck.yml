@@ -20,6 +20,11 @@ jobs:
   tck:
     name: Edge Node profile
     runs-on: ubuntu-latest
+    # Backstop for the whole job. GitHub's default is 360 minutes, so without
+    # this a stalled TCK run burns six hours of runner time before anyone finds
+    # out - which is exactly what happened before. The per-step timeouts below
+    # should always fire first; this only catches a stall they do not cover.
+    timeout-minutes: 60
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
@@ -55,30 +60,32 @@ jobs:
       # The tck/ directory ships a gradlew without its wrapper jar, so the root
       # wrapper with -p tck is the only way to build it.
       - name: Build TCK HiveMQ extension
+        timeout-minutes: 15
         run: ./gradlew -p tck hivemqExtensionZip --no-daemon
         working-directory: sparkplug-tck
 
-      - name: Start broker with TCK extension
-        run: |
-          nohup test/tck/start-broker.sh sparkplug-tck > hivemq.log 2>&1 &
-          echo "Waiting for broker on 1883..."
-          for i in $(seq 1 90); do
-            if grep -q "Started TCP Listener" hivemq.log 2>/dev/null; then
-              echo "Broker is up."
-              exit 0
-            fi
-            if grep -q "Could not bind any listener\|Shutdown completed" hivemq.log 2>/dev/null; then
-              echo "Broker failed to start:"; cat hivemq.log; exit 1
-            fi
-            sleep 2
-          done
-          echo "Broker did not start in time:"; cat hivemq.log; exit 1
-
+      # One broker per test, started and torn down by the orchestrator. The TCK's
+      # Monitor keeps per-edge-node state for the whole broker session and never
+      # clears it, so sharing one broker across all five tests lets earlier tests
+      # decide later ones: measured over ten runs of unchanged code that produced
+      # 1/5 to 4/5 passing at random, and never 5/5. Isolated, it is repeatable.
+      #
+      # Deliberately longer than the script's own TCK_RUN_TIMEOUT_MS watchdog, so
+      # on a stall the script wins the race, writes partial results and exits 124.
+      # A step timeout - unlike a job timeout - still lets the `if: always()`
+      # upload below run, so the diagnostics survive either way.
       - name: Run Sparkplug TCK
-        run: node test/tck/run-tck.js
+        timeout-minutes: 40
+        run: test/tck/run-tck-isolated.sh sparkplug-tck
         env:
           TCK_BROKER: mqtt://localhost:1883
           TCK_VERBOSE: '1'
+          TCK_RUN_TIMEOUT_MS: '900000'
+          # Roughly half of first attempts lose the TCK's self-connect deadlock
+          # (see test/tck/README.md). It is not ours to fix and a retry has always
+          # cleared it, but two attempts leaves a real chance of a test losing
+          # both. A dead attempt now costs ~10s, so the third is cheap insurance.
+          TCK_ATTEMPTS: '3'
 
       - name: Upload TCK results
         if: always()
@@ -86,7 +93,7 @@ jobs:
         with:
           name: tck-results
           path: |
-            tck-results.json
-            hivemq.log
+            tck-results/
+            tck-logs/
             .tck-broker/hivemq-ce-*/bin/SparkplugTCKResults.log
           if-no-files-found: warn

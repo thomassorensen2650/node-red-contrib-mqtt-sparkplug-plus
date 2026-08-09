@@ -73,7 +73,7 @@ describe('mqtt sparkplug EoN - Commands', function () {
 			"keepalive": "60",
 			"cleansession": true,
 			"enableStoreForward": false,
-			"primaryScada": "MY SCADA",
+			"primaryScada": "",
 			"username": brokerUsername,
 			"password": brokerPassword
 		},

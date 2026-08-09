@@ -54,7 +54,42 @@ every test will hang waiting for a birth that never comes.
 
 `start-broker.sh` accepts `HIVEMQ_PORT` for convenience, but anything other than
 1883 only works for tests that never need the simulated host - which is none of
-them.
+them. Worse, the failure is quiet: the TCK connects to whatever *is* on 1883 and
+logs `Host ... successfully created` regardless, so the only symptom is every
+test timing out waiting for a birth.
+
+**The TCK can deadlock against itself on a small machine.** Starting a test runs
+entirely inside the TCK's publish interceptor:
+`PublishInterceptor.onInboundPublish` -> `TCK.newTest` ->
+`HostApplication.hostPrepare` -> `host.connect()` - a *blocking* Paho connect back
+into the very broker running that interceptor. HiveMQ does not acknowledge the
+triggering publish until the interceptor returns, so that connect has to be
+serviced by some other thread. HiveMQ sizes those pools from
+`Runtime.availableProcessors()`, and on a 2-vCPU CI runner there is nothing spare:
+the connect stalls until Paho gives up ~120s later and the test dies with
+`Error starting test edge.<name>`. All the harness sees is
+`timed out ... publish to SPARKPLUG_TCK/TEST_CONTROL`, which looks like a slow
+network and is nothing of the sort - it is localhost.
+
+There is no known way to prevent this from outside the TCK, so the harness makes
+it cheap instead: the control publish is bounded at 10s and a timeout fails the
+attempt immediately, rather than continuing into a guaranteed NBIRTH timeout and
+another blocked publish. A dead attempt costs ~10s instead of ~120s, and
+`run-tck-isolated.sh` retries against a fresh broker. That is why `TCK_ATTEMPTS`
+is 3 in CI: roughly half of first attempts stall, and retries have so far always
+succeeded.
+
+To recognise it in a broker log: `Creating new host "..."` with no following
+`Host ... successfully created`, and `Error starting test edge.<name>` about two
+minutes later if nothing kills the broker first.
+
+**Tried and rejected:** `-XX:ActiveProcessorCount=8` on the broker JVM, on the
+theory that HiveMQ sizes those pools from `Runtime.availableProcessors()`. It is
+decisive in a 2-CPU Linux container - host creation goes from a ~120s timeout at
+`=2` to ~390ms at `=8` - but it does **not** help on GitHub runners: CI run
+31302191045 had the flag applied and still stalled on 3 of 5 first attempts. Don't
+re-derive this. A thread dump of the broker at the moment of the stall is the next
+useful step; guessing from the outside has failed twice.
 
 **Restart the broker between full runs.** The TCK's `Monitor` keeps a
 per-edge-node `bdSeq` map for the lifetime of the broker process and only clears

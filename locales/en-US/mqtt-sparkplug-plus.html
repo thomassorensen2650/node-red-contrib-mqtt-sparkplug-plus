@@ -206,9 +206,10 @@ msg = {
     <h4>Do not connect automaticly</h4>
     <p>When this option is enabled, the EoN (Broker) will not connect until a connect command has been received</p>
     <h4>Enable Store Forward </h4>
-    <p>This will enable store forward if the Primary SCADA is offline</p>
-    <h4>Destination</h4>
-    <p>This is the name of the Primary SCADA. If store forward is enabled and the STATE/[PRIMARY SCADA NAME] is OFFLINE, then data will be buffered until connection is reestablished.</p>
+    <p>This will enable store forward if the Primary Host Application is offline. It requires a Primary Host ID to be set, since without one there is no host status to track.</p>
+    <h4>Primary Host ID</h4>
+    <p>This is the name of the Primary Host Application. Setting it makes this Edge Node wait for that host to publish an ONLINE STATE message before sending NBIRTH &mdash; on <code>spBv1.0/STATE/[PRIMARY HOST ID]</code> for Sparkplug 3.0, or <code>STATE/[PRIMARY HOST ID]</code> for 2.0. Leave it blank to birth as soon as the broker connection is established.</p>
+    <p>This is independent of Store Forward: the Primary Host ID decides <i>when the node births</i>, while Store Forward decides <i>whether data is buffered</i> while that host is offline. If both are set, data is buffered until the connection is reestablished.</p>
     <p>The data will be buffered via the <a href="https://nodered.org/docs/user-guide/context">Node-Red Context Store.</a>. The default Context store is only stored in memory, but it can be modified to be stored to Disk (or other places) by changing the default Context store location on Node-Red. See more about context <a href="https://nodered.org/docs/user-guide/context">here</a></p>
     <p><b><u>The full set of buffered data will be kep in memory, so do not use this feature for high thoughput applications. (or make sure that you have a enough RAM)</u></b></p>
 </script>

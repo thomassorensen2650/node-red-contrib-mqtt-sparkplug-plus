@@ -40,6 +40,21 @@ const TEST_TIMEOUT_MS = Number(process.env.TCK_TEST_TIMEOUT_MS || 90000);
 const BIRTH_TIMEOUT_MS = Number(process.env.TCK_BIRTH_TIMEOUT_MS || 20000);
 const RESULTS_FILE = process.env.TCK_RESULTS_FILE || "tck-results.json";
 
+// Every wait that depends on the broker or the TCK extension needs a bound.
+// MQTT.js reconnects forever by default and an acknowledged publish only calls
+// back once the ack arrives, so a wedged broker parks a promise that never
+// settles.
+const CONNECT_TIMEOUT_MS = Number(process.env.TCK_CONNECT_TIMEOUT_MS || 30000);
+// Not a network bound: the TCK acks a control publish only once its interceptor
+// has finished starting the test (see publish() below). On a healthy broker that
+// is milliseconds. If it has not landed in 10s the TCK is wedged and no amount of
+// extra waiting helps - it only delays the retry against a fresh broker.
+const CONTROL_TIMEOUT_MS = Number(process.env.TCK_CONTROL_TIMEOUT_MS || 10000);
+const HELPER_TIMEOUT_MS = Number(process.env.TCK_HELPER_TIMEOUT_MS || 15000);
+// Backstop for the whole run. Well under the workflow's step timeout so the
+// script gets to write partial results before CI kills it.
+const RUN_TIMEOUT_MS = Number(process.env.TCK_RUN_TIMEOUT_MS || 900000);
+
 const brokerUrl = new URL(BROKER_URL.replace(/^mqtt(s?)/, "http$1"));
 const BROKER_HOST = brokerUrl.hostname;
 const BROKER_PORT = brokerUrl.port || "1883";
@@ -58,6 +73,56 @@ const initialMetricValues = () => [
 ];
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Reject if `promise` has not settled within `ms`.
+ *
+ * Note this does not cancel the underlying operation - nothing in the MQTT.js
+ * API allows that - it only stops the run from waiting on it forever. Callers
+ * that hold a socket open are responsible for ending it on the failure path so
+ * the process can still exit.
+ */
+function withTimeout(promise, ms, label) {
+	let timer;
+	return Promise.race([
+		promise,
+		new Promise((_, reject) => {
+			timer = setTimeout(() => reject(new Error(`timed out after ${ms}ms: ${label}`)), ms);
+		})
+	]).finally(() => clearTimeout(timer));
+}
+
+/**
+ * Connect an MQTT client and subscribe, both bounded.
+ *
+ * A plain `once("error")` is not enough to catch a broker that is listening but
+ * never completes the handshake: MQTT.js treats that as a retryable condition
+ * and reconnects on a timer forever without ever emitting a terminal error. The
+ * socket is destroyed on failure so a half-open client cannot hold the event
+ * loop open and stop the process from exiting.
+ */
+async function connectAndSubscribe(client, topics, opts, label) {
+	try {
+		await withTimeout(
+			new Promise((resolve, reject) => {
+				client.once("connect", resolve);
+				client.once("error", reject);
+			}),
+			CONNECT_TIMEOUT_MS,
+			`${label} client connecting to ${BROKER_URL}`
+		);
+		await withTimeout(
+			new Promise((resolve, reject) =>
+				client.subscribe(topics, opts, (err) => (err ? reject(err) : resolve()))
+			),
+			CONTROL_TIMEOUT_MS,
+			`${label} client subscribing`
+		);
+	} catch (err) {
+		client.end(true);
+		throw err;
+	}
+}
 
 // ── Node-RED lifecycle ──────────────────────────────────────────────────────
 
@@ -80,11 +145,21 @@ function loadFlow(edgeNodeId, flowOpts) {
 			flowOpts
 		)
 	);
-	return new Promise((resolve) => helper.load(sparkplugNode, flow, {}, resolve));
+	return withTimeout(
+		new Promise((resolve) => helper.load(sparkplugNode, flow, {}, resolve)),
+		HELPER_TIMEOUT_MS,
+		"Node-RED flow load"
+	);
 }
 
 async function unloadFlow() {
-	await helper.unload();
+	// A stuck unload is not worth aborting the run over - the next test uses a
+	// fresh edge node id anyway - but it must not block either.
+	try {
+		await withTimeout(helper.unload(), HELPER_TIMEOUT_MS, "Node-RED flow unload");
+	} catch (err) {
+		console.log(`  ! ${err.message}`);
+	}
 	// Give the broker a moment to process the resulting DISCONNECT/NDEATH before
 	// the next test starts observing.
 	await sleep(500);
@@ -120,13 +195,7 @@ class Observer {
 
 	static async connect() {
 		const client = mqtt.connect(BROKER_URL, { clientId: `tck-observer-${Date.now()}` });
-		await new Promise((resolve, reject) => {
-			client.once("connect", resolve);
-			client.once("error", reject);
-		});
-		await new Promise((resolve, reject) =>
-			client.subscribe("spBv1.0/#", { qos: 0 }, (err) => (err ? reject(err) : resolve()))
-		);
+		await connectAndSubscribe(client, "spBv1.0/#", { qos: 0 }, "observer");
 		return new Observer(client);
 	}
 
@@ -198,13 +267,7 @@ class TckControl {
 
 	static async connect() {
 		const client = mqtt.connect(BROKER_URL, { clientId: `tck-harness-${Date.now()}` });
-		await new Promise((resolve, reject) => {
-			client.once("connect", resolve);
-			client.once("error", reject);
-		});
-		await new Promise((resolve, reject) =>
-			client.subscribe([TCK_RESULT, TCK_LOG], { qos: 2 }, (err) => (err ? reject(err) : resolve()))
-		);
+		await connectAndSubscribe(client, [TCK_RESULT, TCK_LOG], { qos: 2 }, "control");
 		return new TckControl(client);
 	}
 
@@ -216,8 +279,19 @@ class TckControl {
 	}
 
 	publish(topic, message) {
-		return new Promise((resolve, reject) =>
-			this.client.publish(topic, message, { qos: 2 }, (err) => (err ? reject(err) : resolve()))
+		// QoS 1 rather than 2: one round trip instead of two. That is a
+		// simplification, not a fix - it does not decouple us from the TCK.
+		// HiveMQ runs PublishInboundInterceptors before it acks, and the TCK's
+		// interceptor builds the entire test synchronously (TCK.newTest ->
+		// HostApplication.hostPrepare, which connects a Paho client back into this
+		// same broker). So the ack means "the TCK finished starting the test", not
+		// "the broker got the bytes", and it never comes if that connect stalls.
+		return withTimeout(
+			new Promise((resolve, reject) =>
+				this.client.publish(topic, message, { qos: 1 }, (err) => (err ? reject(err) : resolve()))
+			),
+			CONTROL_TIMEOUT_MS,
+			`publish to ${topic}`
 		);
 	}
 
@@ -267,15 +341,27 @@ const TESTS = [
 				payload: { metrics: [{ name: "test/int", value: 42, type: "Int32", timestamp: Date.now() }] }
 			});
 
-			// NDATA - via the generic out node, which publishes whatever topic
-			// and payload it is handed.
+			// NDATA - via the generic out node, which publishes whatever topic and
+			// payload it is handed, with no validation and no seq of its own.
+			//
+			// The metric MUST be one the *edge node* births. NBIRTH carries only
+			// "Node Control/Rebirth" and "bdSeq" (plus template definitions) - the
+			// broker node has no configuration surface for edge-level data metrics -
+			// and test/int lives solely in the device's DBIRTH. Naming it here made
+			// the harness itself violate tck-id-topics-nbirth-metric-reqs, which
+			// requires every NDATA metric to have appeared in the NBIRTH.
+			//
+			// seq is taken from the broker's own counter rather than hardcoded, so it
+			// stays correct no matter how many messages the birth sequence used.
 			await sleep(500);
 			helper.getNode("out").receive({
 				topic: `spBv1.0/${GROUP_ID}/NDATA/${edgeNodeId}`,
 				payload: {
 					timestamp: Date.now(),
-					metrics: [{ name: "test/int", value: 43, type: "Int32", timestamp: Date.now() }],
-					seq: 1
+					metrics: [
+						{ name: "Node Control/Rebirth", value: false, type: "Boolean", timestamp: Date.now() }
+					],
+					seq: helper.getNode("broker").nextSeq()
 				}
 			});
 		}
@@ -312,6 +398,8 @@ const TESTS = [
 const EXPECTED_NOT_EXECUTED = {
 	"principles-persistence-clean-session-50":
 		"node connects with MQTT 3.1.1 (protocolVersion 4); the -311 variant is asserted instead",
+	"payloads-ndeath-will-message-publisher-disconnect-mqtt50":
+		"node connects with MQTT 3.1.1 (protocolVersion 4); the -311 variant is asserted instead",
 	"payloads-alias-uniqueness": "metric aliases are an optional feature group, not used by this node",
 	// Templates are an optional feature group. The node does support them, but
 	// the spec requires that if any assertion in an optional group is tested,
@@ -328,6 +416,20 @@ const EXPECTED_NOT_EXECUTED = {
 	"payloads-template-instance-parameters": "templates are an optional group, not used by the TCK fixture",
 	"payloads-template-instance-ref": "templates are an optional group, not used by the TCK fixture"
 };
+
+// Assertions that fail as a timing race rather than a defect.
+//
+// Both DBIRTH timestamp assertions come from one check in
+// SessionEstablishmentTest.checkDBirth: `payloadTs < receivedTime`, with a strict
+// upper bound, where receivedTime is `new Date()` taken as the broker processes
+// the packet. Over loopback the DBIRTH is frequently received in the very
+// millisecond it was stamped, so the comparison fails on equality. The payload is
+// correct - it carries a valid protobuf timestamp - and the identical NBIRTH check
+// passes only because that message is stamped fractionally earlier relative to its
+// write.
+// Exposed so the orchestrator can decide whether a failure is worth retrying
+// against a fresh broker.
+const FLAKY_ASSERTIONS = ["payloads-dbirth-timestamp", "topics-dbirth-timestamp"];
 
 function parseOverall(resultText) {
 	const match = /OVERALL:\s*(.+?);/.exec(resultText);
@@ -366,16 +468,45 @@ async function runTest(control, observer, test) {
 
 	const resultPromise = control.expectResult();
 
-	if (test.loadBeforeStart) {
-		await loadFlow(edgeNodeId, {});
-		// Let the node connect and subscribe to STATE before the TCK starts
-		// toggling the host.
-		await sleep(2000);
-		await control.startTest(test.name, params);
-	} else {
-		await control.startTest(test.name, params);
-		// Give the TCK a moment to register the test and bring its host online.
-		await sleep(1000);
+	// Setup runs before the TEST_TIMEOUT_MS race below is armed, so it is not
+	// covered by it - each step here carries its own bound instead. A setup
+	// failure ends this test only, so the remaining tests still run and the
+	// results file still gets written.
+	try {
+		if (test.loadBeforeStart) {
+			await loadFlow(edgeNodeId, {});
+			// Let the node connect and subscribe to STATE before the TCK starts
+			// toggling the host.
+			await sleep(2000);
+			await control.startTest(test.name, params);
+		} else {
+			await control.startTest(test.name, params);
+			// Give the TCK a moment to register the test and bring its host online.
+			await sleep(1000);
+		}
+	} catch (err) {
+		const controlPublishTimedOut =
+			/timed out/.test(err.message) && err.message.includes(TCK_TEST_CONTROL);
+		if (controlPublishTimedOut) {
+			// The TCK never got as far as starting the test, so nothing downstream
+			// can succeed - the node cannot birth without a host. Give up now
+			// instead of spending the NBIRTH bound and another control publish on
+			// the way out; the orchestrator retries against a fresh broker.
+			console.log(`  ! TCK did not acknowledge NEW_TEST within ${CONTROL_TIMEOUT_MS}ms`);
+			console.log("    It connects its simulated host from inside the publish");
+			console.log("    interceptor, so a stalled self-connect means no ack. Check the");
+			console.log('    broker log for "Creating new host" with no "successfully created".');
+		} else {
+			console.log(`  ! setup failed: ${err.message}`);
+		}
+		await unloadFlow();
+		return {
+			test: test.name,
+			overall: "SETUP_FAILED",
+			passed: false,
+			timedOut: /timed out/.test(err.message),
+			detail: err.message
+		};
 	}
 
 	let timedOut = false;
@@ -394,8 +525,13 @@ async function runTest(control, observer, test) {
 	} catch (err) {
 		console.log(`  ! ${err.message}`);
 		// Ask the TCK to report whatever it has, so a hang still yields detail
-		// about which assertions were reached.
-		await control.endTest();
+		// about which assertions were reached. This is the recovery path, so it
+		// must not itself become the thing that hangs.
+		try {
+			await control.endTest();
+		} catch (endErr) {
+			console.log(`  ! could not end test cleanly: ${endErr.message}`);
+		}
 	}
 
 	const resultText = await Promise.race([resultPromise, sleep(10000).then(() => null)]);
@@ -440,25 +576,62 @@ async function main() {
 	console.log(`  host   : ${HOST_APP_ID}`);
 	console.log(`  group  : ${GROUP_ID}`);
 
-	await new Promise((resolve) => helper.startServer(resolve));
+	const results = [];
+	const writeResults = () =>
+		fs.writeFileSync(path.resolve(RESULTS_FILE), JSON.stringify(results, null, 2));
+
+	// Last line of defence. Every individual wait above is bounded, but a bound
+	// that was missed - or a stuck handle keeping the event loop alive after the
+	// work is done - would otherwise burn the whole CI job. Exit 124 to match
+	// timeout(1), after saving whatever has been collected so far.
+	const watchdog = setTimeout(() => {
+		console.error(`\n!! run exceeded ${RUN_TIMEOUT_MS}ms - aborting`);
+		try {
+			writeResults();
+			console.error(`Partial results written to ${RESULTS_FILE}`);
+		} catch (err) {
+			console.error(`Could not write partial results: ${err.message}`);
+		}
+		process.exit(124);
+	}, RUN_TIMEOUT_MS);
+
+	await withTimeout(
+		new Promise((resolve) => helper.startServer(resolve)),
+		HELPER_TIMEOUT_MS,
+		"Node-RED test server start"
+	);
 
 	const control = await TckControl.connect();
 	const observer = await Observer.connect();
-	const results = [];
 
 	try {
 		// Sequentially, never in parallel: the TCK holds one active test at a
 		// time and its simulated host is shared state.
 		for (const test of tests) {
+			// Deliberately no in-process retry. The TCK Monitor keeps per-edge-node
+			// state for the whole broker session and never clears it, so re-running
+			// a test against the same broker is contaminated by the attempt that
+			// just failed. Retries must restart the broker - see the orchestrator
+			// that drives this script one test at a time.
 			results.push(await runTest(control, observer, test));
 		}
 	} finally {
 		control.end();
 		observer.end();
-		await new Promise((resolve) => helper.stopServer(resolve));
+		try {
+			await withTimeout(
+				new Promise((resolve) => helper.stopServer(resolve)),
+				HELPER_TIMEOUT_MS,
+				"Node-RED test server stop"
+			);
+		} catch (err) {
+			console.log(`  ! ${err.message}`);
+		}
+		// In the finally block so a mid-run failure still leaves the artifact the
+		// workflow uploads with `if: always()`.
+		writeResults();
+		clearTimeout(watchdog);
 	}
-
-	fs.writeFileSync(path.resolve(RESULTS_FILE), JSON.stringify(results, null, 2));
 
 	console.log("\n=== Summary ===");
 	for (const r of results) {

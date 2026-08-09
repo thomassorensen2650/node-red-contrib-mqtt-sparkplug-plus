@@ -20,6 +20,12 @@ WORK_DIR="${TCK_WORK_DIR:-.tck-broker}"
 CACHE_DIR="${TCK_CACHE_DIR:-$WORK_DIR/cache}"
 # Overridable so the TCK broker can coexist with a mosquitto already on 1883
 # (the mocha suite's broker). Keep TCK_BROKER in run-tck.js in sync.
+#
+# Careful: this only moves the listener. The TCK's own utility clients hardcode
+# tcp://localhost:1883 (HostApplication.java), so on any other port its simulated
+# host connects to whatever else happens to be on 1883 - it will even log
+# "successfully created" - and the node under test never sees STATE. Only change
+# this if nothing else is listening on 1883.
 HIVEMQ_PORT="${HIVEMQ_PORT:-1883}"
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
