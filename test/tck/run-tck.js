@@ -44,7 +44,10 @@ const RESULTS_FILE = process.env.TCK_RESULTS_FILE || "tck-results.json";
 // MQTT.js reconnects forever by default and its QoS 2 publish callback only
 // fires after PUBCOMP, so a wedged broker parks a promise that never settles.
 const CONNECT_TIMEOUT_MS = Number(process.env.TCK_CONNECT_TIMEOUT_MS || 30000);
-const CONTROL_TIMEOUT_MS = Number(process.env.TCK_CONTROL_TIMEOUT_MS || 15000);
+// Generous, because this bounds a QoS 2 round trip (PUBREC/PUBREL/PUBCOMP) against
+// an extension that does real work in its callback. 15s was enough locally but lost
+// on the CI runner often enough that three of five tests needed a retry.
+const CONTROL_TIMEOUT_MS = Number(process.env.TCK_CONTROL_TIMEOUT_MS || 45000);
 const HELPER_TIMEOUT_MS = Number(process.env.TCK_HELPER_TIMEOUT_MS || 15000);
 // Backstop for the whole run. Well under the workflow's step timeout so the
 // script gets to write partial results before CI kills it.
@@ -475,15 +478,27 @@ async function runTest(control, observer, test) {
 			await sleep(1000);
 		}
 	} catch (err) {
-		console.log(`  ! setup failed: ${err.message}`);
-		await unloadFlow();
-		return {
-			test: test.name,
-			overall: "SETUP_FAILED",
-			passed: false,
-			timedOut: /timed out/.test(err.message),
-			detail: err.message
-		};
+		// A timed-out publish to TEST_CONTROL does NOT mean the TCK missed it. On a
+		// loaded runner the QoS 2 handshake can outlast the bound while the broker
+		// log still shows "Test requested edge <name>" - that was true of every
+		// PrimaryHostTest attempt in CI, and reporting SETUP_FAILED threw away a
+		// test that had in fact started. Carry on and let the per-test timeout
+		// below be the liveness guard instead.
+		const controlPublishTimedOut =
+			/timed out/.test(err.message) && err.message.includes(TCK_TEST_CONTROL);
+		if (!controlPublishTimedOut) {
+			console.log(`  ! setup failed: ${err.message}`);
+			await unloadFlow();
+			return {
+				test: test.name,
+				overall: "SETUP_FAILED",
+				passed: false,
+				timedOut: /timed out/.test(err.message),
+				detail: err.message
+			};
+		}
+		console.log(`  ! ${err.message}`);
+		console.log(`    (the TCK may still have received it - continuing)`);
 	}
 
 	let timedOut = false;
