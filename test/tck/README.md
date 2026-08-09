@@ -118,17 +118,23 @@ assertion is `NOT EXECUTED` (`Results.java:229`). The two halves are independent
 `PASS` is the verdict, `but INCOMPLETE` is coverage. `PASS but INCOMPLETE` means
 nothing failed and something was never exercised - it is not a partial failure.
 
-Some assertions cannot apply to this node at all - the MQTT 5.0 session and NDEATH
-variants, since it connects with 3.1.1 - and the optional templates group is left
-untested because the spec requires that if any assertion in an optional group is
-tested, all of them must pass. So `PASS but INCOMPLETE` is the best achievable
-result here.
+Only two assertions cannot apply to this node at all: the MQTT 5.0 session and
+NDEATH variants, since it connects with 3.1.1 and the `-311` variants are asserted
+instead. Those are the entire `EXPECTED_NOT_EXECUTED` allowlist, so
+`SessionEstablishmentTest` and `SessionTerminationTest` report `PASS but
+INCOMPLETE` and the other four report a clean `PASS`.
 
-Metric aliases are *not* in that category: the node supports them and the fixture
-enables them (`aliasMetrics: true` in `tck-flow.js`), so `payloads-alias-uniqueness`
-executes. With aliases off it silently would not - the TCK only records it inside
-`if (current.hasAlias())` - and `payloads-alias-birth-requirement` would pass
-vacuously.
+Everything else the node supports is exercised, because an unexercised feature is
+an assertion that never runs rather than one that passes:
+
+- **Metric aliases** - `aliasMetrics: true`. The TCK only records
+  `payloads-alias-uniqueness` inside `if (current.hasAlias())`, and
+  `payloads-alias-birth-requirement` passes vacuously without them.
+- **Templates** - the fixture defines `TckTemplate` and the device births an
+  instance of it, so all ten `payloads-template-*` assertions run.
+  `SendDataTest` went from `PASS but INCOMPLETE` (10 unexecuted) to `PASS`.
+- **DataSets and property sets** - a `DataSet` metric and a property-bearing
+  metric, which is what makes `SendComplexDataTest` (47 assertions) worth running.
 
 The harness therefore does not key off `OVERALL` alone. It accepts a test when
 `OVERALL` starts with `PASS`, no assertion failed, and every `NOT EXECUTED`
@@ -139,3 +145,33 @@ fails the run, so new coverage gaps stay visible instead of hiding behind
 
 Full per-assertion output is written to `tck-results.json`, and the TCK's own
 log ends up in `.tck-broker/hivemq-ce-*/bin/SparkplugTCKResults.log`.
+
+## Where the TCK is wrong, and what the fixture does about it
+
+Three assertions read a Sparkplug *datatype code* as though it were a protobuf
+*field number*. In each case the node emits what the specification text requires
+and the TCK rejects it. The fixture works around them; the node is deliberately
+**not** bent to fit, since emitting the shape the TCK wants would misreport
+conformance.
+
+- **`payloads-template-instance-members-data`** - the text says an instance in
+  NDATA/DDATA "MAY include only a subset of the members", but
+  `SendDataTest.checkInstance` requires the full set (`found && (DBIRTH||NDATA||DDATA)`)
+  and `Utils.setResultIfNotFail` makes the FAIL sticky. The node publishes only
+  changed sub-metrics, which is what the spec permits. The fixture updates every
+  member in one DDATA so the partial instance equals the full one.
+- **`payloads-propertyset-quality-value-type`** - the text says the type "MUST be
+  a value of 3 which represents a Signed 32-bit Integer", which is what the node
+  emits; `checkQualityCodeRequirement` compares it to
+  `ValueCase.LONG_VALUE.getNumber()`, i.e. 4, so only an Int64 passes. `Quality`
+  is an optional key, so the fixture omits it - and the TCK then passes both
+  quality assertions by default.
+- **`payloads-metric-propertyvalue-type-type` / `-value`** -
+  `checkPropertiesValidType` runs the datatype through `ValueCase.forNumber()`,
+  which is non-null only for 3..10. That rejects `String` (12) and `Boolean` (11),
+  so an ordinary `engUnit: "rpm"` property fails. The fixture uses numeric
+  property types only, which means string-valued properties cannot be covered here.
+
+Also seen, and not a failure: `payloads-metric-datatype-not-req` returns `MAYBE`.
+It is a SHOULD - datatype ought to be omitted from metrics in NDATA/NCMD/DDATA/DCMD
+- and the node includes it. Legal, but a candidate if DDATA size ever matters.

@@ -21,7 +21,7 @@ const path = require("path");
 const fs = require("fs");
 const helper = require("node-red-node-test-helper");
 const sparkplugNode = require("../../mqtt-sparkplug-plus.js");
-const { buildFlow } = require("./tck-flow");
+const { buildFlow, TEMPLATE_NAME } = require("./tck-flow");
 
 helper.init(require.resolve("node-red"));
 
@@ -59,18 +59,80 @@ const brokerUrl = new URL(BROKER_URL.replace(/^mqtt(s?)/, "http$1"));
 const BROKER_HOST = brokerUrl.hostname;
 const BROKER_PORT = brokerUrl.port || "1883";
 
-// The two metrics the device is born with. Every configured metric must have a
+// The metrics the device is born with. Every configured metric must have a
 // value before this node publishes DBIRTH (see trySendBirth in
-// mqtt-sparkplug-plus.js), so the harness has to feed them.
+// mqtt-sparkplug-plus.js), so the harness has to feed all of them.
+//
+// Two scalars, one Template instance and one DataSet. The complex ones exist so
+// the payloads-template-* and payloads-dataset-* assertion groups are reachable:
+// every one of those checks is gated on a metric of the matching datatype
+// actually being published.
 const DEVICE_METRICS = {
 	"test/int": { dataType: "Int32" },
-	"test/bool": { dataType: "Boolean" }
+	"test/bool": { dataType: "Boolean" },
+	motor: { dataType: TEMPLATE_NAME },
+	chart: { dataType: "DataSet" }
 };
 
-const initialMetricValues = () => [
-	{ name: "test/int", value: 1, type: "Int32", timestamp: Date.now() },
-	{ name: "test/bool", value: true, type: "Boolean", timestamp: Date.now() }
+// Template members are fed as flat paths under the metric name; the node
+// accumulates them and builds the instance (mqtt-sparkplug-plus.js:630).
+const TEMPLATE_MEMBER_VALUES = (ts) => [
+	{ name: "motor/speed", value: 1500, type: "Int32", timestamp: ts },
+	{ name: "motor/torque", value: 42, type: "Int32", timestamp: ts },
+	{ name: "motor/status/running", value: true, type: "Boolean", timestamp: ts }
 ];
+
+// Property set carried on a metric so the payloads-propertyset-* and
+// payloads-metric-propertyvalue-* assertions execute.
+//
+// Numeric types only, and no "Quality" key, because SendComplexDataTest reads
+// PropertyValue.type - a Sparkplug datatype code - as though it were a protobuf
+// field number:
+//
+//   * checkPropertiesValidType rejects any property whose type does not map via
+//     ValueCase.forNumber(), which is non-null only for 3..10. That admits Int32
+//     through Double but rejects String (12) and Boolean (11), so an ordinary
+//     engUnit string property fails payloads-metric-propertyvalue-type-type.
+//   * checkQualityCodeRequirement demands the type equal
+//     ValueCase.LONG_VALUE.getNumber(), i.e. 4, while its own requirement text
+//     says it "MUST be a value of 3 which represents a Signed 32-bit Integer" -
+//     which is exactly what the node emits. Only an Int64 would satisfy the code.
+//
+// The node is correct in both cases; emitting the shapes the TCK wants would
+// misreport conformance. Quality is optional, and the TCK passes both quality
+// assertions by default when no such key is present.
+const METRIC_PROPERTIES = {
+	engHigh: { type: "Double", value: 3000 },
+	engLow: { type: "Double", value: 0 }
+};
+
+const datasetValue = () => ({
+	numOfColumns: 2,
+	types: ["String", "Int32"],
+	columns: ["name", "count"],
+	rows: [
+		["alpha", 1],
+		["beta", 2]
+	]
+});
+
+const initialMetricValues = () => {
+	const ts = Date.now();
+	return [
+		// Properties ride along on this one so SendComplexDataTest can reach its
+		// propertyset assertions. Deliberately *not* a "Quality" property - see
+		// EXPECTED_NOT_EXECUTED below for why that key is unusable.
+		{
+			name: "test/int",
+			value: 1,
+			type: "Int32",
+			timestamp: ts,
+			properties: METRIC_PROPERTIES
+		},
+		{ name: "test/bool", value: true, type: "Boolean", timestamp: ts },
+		{ name: "chart", value: datasetValue(), type: "DataSet", timestamp: ts }
+	].concat(TEMPLATE_MEMBER_VALUES(ts));
+};
 
 const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
 
@@ -337,8 +399,24 @@ const TESTS = [
 			await birth(observer, edgeNodeId);
 
 			// DDATA - a value change on an already-born device.
+			//
+			// Every member of the template is updated in this one message, on
+			// purpose. The node publishes only the changed sub-metrics of a
+			// template instance in DDATA, which the spec explicitly permits -
+			// tck-id-payloads-template-instance-members-data says an instance in
+			// NDATA/DDATA "MAY include only a subset of the members". The TCK
+			// implements that assertion as `found && (DBIRTH||NDATA||DDATA)`
+			// (SendDataTest.checkInstance), i.e. it requires the *full* member set
+			// and records a sticky FAIL otherwise. Sending all members keeps the
+			// partial instance identical to the full one and sidesteps the
+			// contradiction without changing conformant node behaviour. Do not
+			// "optimise" this back to a single member.
 			helper.getNode("device").receive({
-				payload: { metrics: [{ name: "test/int", value: 42, type: "Int32", timestamp: Date.now() }] }
+				payload: {
+					metrics: [
+						{ name: "test/int", value: 42, type: "Int32", timestamp: Date.now() }
+					].concat(TEMPLATE_MEMBER_VALUES(Date.now()))
+				}
 			});
 
 			// NDATA - via the generic out node, which publishes whatever topic and
@@ -362,6 +440,35 @@ const TESTS = [
 						{ name: "Node Control/Rebirth", value: false, type: "Boolean", timestamp: Date.now() }
 					],
 					seq: helper.getNode("broker").nextSeq()
+				}
+			});
+		}
+	},
+	{
+		// Purely passive: it validates whatever the node publishes on Sparkplug
+		// topics, and ends itself once it has a result for all 38 of its
+		// assertions. So the job here is simply to emit payloads that reach the
+		// template, DataSet and property groups.
+		name: "SendComplexDataTest",
+		async run({ observer, edgeNodeId }) {
+			await birth(observer, edgeNodeId);
+
+			// DDATA carrying all three complex shapes at once: the full template
+			// instance (see the note in SendDataTest for why every member), a
+			// DataSet, and a metric with properties.
+			await sleep(500);
+			helper.getNode("device").receive({
+				payload: {
+					metrics: [
+						{
+							name: "test/int",
+							value: 7,
+							type: "Int32",
+							timestamp: Date.now(),
+							properties: METRIC_PROPERTIES
+						},
+						{ name: "chart", value: datasetValue(), type: "DataSet", timestamp: Date.now() }
+					].concat(TEMPLATE_MEMBER_VALUES(Date.now()))
 				}
 			});
 		}
@@ -403,20 +510,11 @@ const EXPECTED_NOT_EXECUTED = {
 	// Deliberately absent: payloads-alias-uniqueness. The node supports aliases and
 	// the TCK fixture enables them, so that assertion executes. Leaving it out
 	// means the harness reports UNTESTED if aliases ever stop being exercised.
-	// Templates are an optional feature group. The node does support them, but
-	// the spec requires that if any assertion in an optional group is tested,
-	// all of them must pass - so the TCK fixture deliberately uses plain metrics.
-	"payloads-template-definition-members": "templates are an optional group, not used by the TCK fixture",
-	"payloads-template-definition-nbirth": "templates are an optional group, not used by the TCK fixture",
-	"payloads-template-definition-parameters": "templates are an optional group, not used by the TCK fixture",
-	"payloads-template-definition-parameters-default":
-		"templates are an optional group, not used by the TCK fixture",
-	"payloads-template-definition-ref": "templates are an optional group, not used by the TCK fixture",
-	"payloads-template-instance-members": "templates are an optional group, not used by the TCK fixture",
-	"payloads-template-instance-members-birth": "templates are an optional group, not used by the TCK fixture",
-	"payloads-template-instance-members-data": "templates are an optional group, not used by the TCK fixture",
-	"payloads-template-instance-parameters": "templates are an optional group, not used by the TCK fixture",
-	"payloads-template-instance-ref": "templates are an optional group, not used by the TCK fixture"
+	// Deliberately absent: the whole payloads-template-* group. The fixture now
+	// defines a Template and births an instance of it, so those assertions
+	// execute. Templates are an optional feature group and the spec requires
+	// that once any assertion in such a group is exercised, all of them pass -
+	// leaving them out of this allowlist is what holds us to that.
 };
 
 // Assertions that fail as a timing race rather than a defect.

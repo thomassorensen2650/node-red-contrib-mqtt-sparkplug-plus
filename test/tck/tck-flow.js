@@ -17,6 +17,7 @@
  * @param {string} opts.brokerHost       broker hostname
  * @param {string|number} opts.brokerPort broker port
  * @param {object} [opts.metrics]        device metric definitions
+ * @param {Array}  [opts.templates]      Template Definitions, as JSON strings
  * @param {string} [opts.primaryScada]   Primary Host Application ID. When set,
  *                                       store-forward is enabled so the node
  *                                       gates NBIRTH on STATE (see README).
@@ -24,6 +25,13 @@
  * @param {string} [opts.password]
  * @returns {Array} Node-RED flow
  */
+
+// A device metric of this type is a *named* template: the dataType is the
+// definition's name rather than the literal "Template" (see isNamedTemplate in
+// mqtt-sparkplug-plus.js:368). Exported so run-tck.js declares the metric with
+// the same name it is defined under here.
+const TEMPLATE_NAME = "TckTemplate";
+
 function buildFlow(opts) {
 	const usePrimaryHost = typeof opts.primaryScada === "string" && opts.primaryScada !== "";
 
@@ -68,6 +76,34 @@ function buildFlow(opts) {
 			// (SessionEstablishmentTest.checkPayloadsAliasAndNameRequirement), and
 			// payloads-alias-birth-requirement passes vacuously.
 			aliasMetrics: true,
+			// A Template Definition, published in NBIRTH. Without one the whole
+			// payloads-template-* group is unreachable: every check is gated on a
+			// metric whose datatype is Template. The node emits whatever is
+			// configured here via getTemplates() (mqtt-sparkplug-plus.js:1067).
+			templates: opts.templates || [
+				JSON.stringify({
+					name: TEMPLATE_NAME,
+					type: "Template",
+					value: {
+						version: "1.0.0",
+						isDefinition: true,
+						// MUST cover every member any instance will ever carry
+						// (tck-id-payloads-template-definition-members). Member names
+						// may themselves contain "/" - the node resolves flat paths by
+						// longest matching prefix.
+						metrics: [
+							{ name: "speed", type: "Int32" },
+							{ name: "torque", type: "Int32" },
+							{ name: "status/running", type: "Boolean" }
+						],
+						// Present so the parameter assertions execute at all: the TCK
+						// only records definition-parameters, -parameters-default and
+						// instance-parameters when parameters exist. The node copies
+						// these onto each instance (mqtt-sparkplug-plus.js:251).
+						parameters: [{ name: "ratio", type: "Int32", value: 2 }]
+					}
+				})
+			],
 			protocolVersion: "4",
 			keepalive: "60",
 			cleansession: true,
@@ -79,4 +115,4 @@ function buildFlow(opts) {
 	];
 }
 
-module.exports = { buildFlow };
+module.exports = { buildFlow, TEMPLATE_NAME };
