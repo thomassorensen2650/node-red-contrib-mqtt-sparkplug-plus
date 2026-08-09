@@ -400,7 +400,9 @@ const EXPECTED_NOT_EXECUTED = {
 		"node connects with MQTT 3.1.1 (protocolVersion 4); the -311 variant is asserted instead",
 	"payloads-ndeath-will-message-publisher-disconnect-mqtt50":
 		"node connects with MQTT 3.1.1 (protocolVersion 4); the -311 variant is asserted instead",
-	"payloads-alias-uniqueness": "metric aliases are an optional feature group, not used by this node",
+	// Deliberately absent: payloads-alias-uniqueness. The node supports aliases and
+	// the TCK fixture enables them, so that assertion executes. Leaving it out
+	// means the harness reports UNTESTED if aliases ever stop being exercised.
 	// Templates are an optional feature group. The node does support them, but
 	// the spec requires that if any assertion in an optional group is tested,
 	// all of them must pass - so the TCK fixture deliberately uses plain metrics.

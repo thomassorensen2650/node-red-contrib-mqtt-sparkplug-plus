@@ -62,6 +62,12 @@ function buildFlow(opts) {
 			port: String(opts.brokerPort),
 			clientid: "",
 			usetls: false,
+			// On, so the TCK actually exercises aliases. The node supports them,
+			// and with them off payloads-alias-uniqueness is never reached - it is
+			// only recorded inside `if (current.hasAlias())`
+			// (SessionEstablishmentTest.checkPayloadsAliasAndNameRequirement), and
+			// payloads-alias-birth-requirement passes vacuously.
+			aliasMetrics: true,
 			protocolVersion: "4",
 			keepalive: "60",
 			cleansession: true,

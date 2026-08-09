@@ -114,10 +114,21 @@ not a defect in the node. If CI proves noisy, re-run before investigating.
 ## What counts as a pass
 
 The TCK appends `but INCOMPLETE` to its `OVERALL` line whenever a non-Monitor
-assertion is `NOT EXECUTED`. Some assertions cannot apply to this node at all -
-the MQTT 5.0 session variant (the node uses 3.1.1), metric aliases, and the
-optional templates group - so `PASS but INCOMPLETE` is the best achievable
-result for this configuration.
+assertion is `NOT EXECUTED` (`Results.java:229`). The two halves are independent:
+`PASS` is the verdict, `but INCOMPLETE` is coverage. `PASS but INCOMPLETE` means
+nothing failed and something was never exercised - it is not a partial failure.
+
+Some assertions cannot apply to this node at all - the MQTT 5.0 session and NDEATH
+variants, since it connects with 3.1.1 - and the optional templates group is left
+untested because the spec requires that if any assertion in an optional group is
+tested, all of them must pass. So `PASS but INCOMPLETE` is the best achievable
+result here.
+
+Metric aliases are *not* in that category: the node supports them and the fixture
+enables them (`aliasMetrics: true` in `tck-flow.js`), so `payloads-alias-uniqueness`
+executes. With aliases off it silently would not - the TCK only records it inside
+`if (current.hasAlias())` - and `payloads-alias-birth-requirement` would pass
+vacuously.
 
 The harness therefore does not key off `OVERALL` alone. It accepts a test when
 `OVERALL` starts with `PASS`, no assertion failed, and every `NOT EXECUTED`
