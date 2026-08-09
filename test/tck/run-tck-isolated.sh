@@ -14,6 +14,10 @@
 #
 # Env:
 #   TCK_ATTEMPTS        attempts per test, each with a fresh broker (default 2)
+#   TCK_BROKER_CPUS     processors the broker JVM sizes its thread pools for
+#                       (default 8, passed through to start-broker.sh). Setting
+#                       this to 2 reproduces the TCK's self-connect deadlock;
+#                       see the JAVA_OPTS comment in start-broker.sh.
 #   TCK_BROKER_SETTLE   seconds to wait after the listener is up (default 5)
 #   TCK_RESULTS_DIR     where per-test result JSON is written (default tck-results)
 #   TCK_LOG_DIR         where per-test broker logs are written (default tck-logs)

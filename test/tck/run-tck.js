@@ -41,13 +41,15 @@ const BIRTH_TIMEOUT_MS = Number(process.env.TCK_BIRTH_TIMEOUT_MS || 20000);
 const RESULTS_FILE = process.env.TCK_RESULTS_FILE || "tck-results.json";
 
 // Every wait that depends on the broker or the TCK extension needs a bound.
-// MQTT.js reconnects forever by default and its QoS 2 publish callback only
-// fires after PUBCOMP, so a wedged broker parks a promise that never settles.
+// MQTT.js reconnects forever by default and an acknowledged publish only calls
+// back once the ack arrives, so a wedged broker parks a promise that never
+// settles.
 const CONNECT_TIMEOUT_MS = Number(process.env.TCK_CONNECT_TIMEOUT_MS || 30000);
-// Generous, because this bounds a QoS 2 round trip (PUBREC/PUBREL/PUBCOMP) against
-// an extension that does real work in its callback. 15s was enough locally but lost
-// on the CI runner often enough that three of five tests needed a retry.
-const CONTROL_TIMEOUT_MS = Number(process.env.TCK_CONTROL_TIMEOUT_MS || 45000);
+// Not a network bound: the TCK acks a control publish only once its interceptor
+// has finished starting the test (see publish() below). On a healthy broker that
+// is milliseconds. If it has not landed in 10s the TCK is wedged and no amount of
+// extra waiting helps - it only delays the retry against a fresh broker.
+const CONTROL_TIMEOUT_MS = Number(process.env.TCK_CONTROL_TIMEOUT_MS || 10000);
 const HELPER_TIMEOUT_MS = Number(process.env.TCK_HELPER_TIMEOUT_MS || 15000);
 // Backstop for the whole run. Well under the workflow's step timeout so the
 // script gets to write partial results before CI kills it.
@@ -277,11 +279,16 @@ class TckControl {
 	}
 
 	publish(topic, message) {
-		// QoS 2, so this callback waits on the full PUBREC/PUBREL/PUBCOMP
-		// handshake. If the TCK extension stops responding it never fires.
+		// QoS 1 rather than 2: one round trip instead of two. That is a
+		// simplification, not a fix - it does not decouple us from the TCK.
+		// HiveMQ runs PublishInboundInterceptors before it acks, and the TCK's
+		// interceptor builds the entire test synchronously (TCK.newTest ->
+		// HostApplication.hostPrepare, which connects a Paho client back into this
+		// same broker). So the ack means "the TCK finished starting the test", not
+		// "the broker got the bytes", and it never comes if that connect stalls.
 		return withTimeout(
 			new Promise((resolve, reject) =>
-				this.client.publish(topic, message, { qos: 2 }, (err) => (err ? reject(err) : resolve()))
+				this.client.publish(topic, message, { qos: 1 }, (err) => (err ? reject(err) : resolve()))
 			),
 			CONTROL_TIMEOUT_MS,
 			`publish to ${topic}`
@@ -478,27 +485,28 @@ async function runTest(control, observer, test) {
 			await sleep(1000);
 		}
 	} catch (err) {
-		// A timed-out publish to TEST_CONTROL does NOT mean the TCK missed it. On a
-		// loaded runner the QoS 2 handshake can outlast the bound while the broker
-		// log still shows "Test requested edge <name>" - that was true of every
-		// PrimaryHostTest attempt in CI, and reporting SETUP_FAILED threw away a
-		// test that had in fact started. Carry on and let the per-test timeout
-		// below be the liveness guard instead.
 		const controlPublishTimedOut =
 			/timed out/.test(err.message) && err.message.includes(TCK_TEST_CONTROL);
-		if (!controlPublishTimedOut) {
+		if (controlPublishTimedOut) {
+			// The TCK never got as far as starting the test, so nothing downstream
+			// can succeed - the node cannot birth without a host. Give up now
+			// instead of spending the NBIRTH bound and another control publish on
+			// the way out; the orchestrator retries against a fresh broker.
+			console.log(`  ! TCK did not acknowledge NEW_TEST within ${CONTROL_TIMEOUT_MS}ms`);
+			console.log("    It connects its simulated host from inside the publish");
+			console.log("    interceptor, so a stalled self-connect means no ack. Check the");
+			console.log('    broker log for "Creating new host" with no "successfully created".');
+		} else {
 			console.log(`  ! setup failed: ${err.message}`);
-			await unloadFlow();
-			return {
-				test: test.name,
-				overall: "SETUP_FAILED",
-				passed: false,
-				timedOut: /timed out/.test(err.message),
-				detail: err.message
-			};
 		}
-		console.log(`  ! ${err.message}`);
-		console.log(`    (the TCK may still have received it - continuing)`);
+		await unloadFlow();
+		return {
+			test: test.name,
+			overall: "SETUP_FAILED",
+			passed: false,
+			timedOut: /timed out/.test(err.message),
+			detail: err.message
+		};
 	}
 
 	let timedOut = false;

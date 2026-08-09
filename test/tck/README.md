@@ -54,7 +54,31 @@ every test will hang waiting for a birth that never comes.
 
 `start-broker.sh` accepts `HIVEMQ_PORT` for convenience, but anything other than
 1883 only works for tests that never need the simulated host - which is none of
-them.
+them. Worse, the failure is quiet: the TCK connects to whatever *is* on 1883 and
+logs `Host ... successfully created` regardless, so the only symptom is every
+test timing out waiting for a birth.
+
+**The TCK can deadlock against itself on a small machine.** Starting a test runs
+entirely inside the TCK's publish interceptor:
+`PublishInterceptor.onInboundPublish` -> `TCK.newTest` ->
+`HostApplication.hostPrepare` -> `host.connect()` - a *blocking* Paho connect back
+into the very broker running that interceptor. HiveMQ does not acknowledge the
+triggering publish until the interceptor returns, so that connect has to be
+serviced by some other thread. HiveMQ sizes those pools from
+`Runtime.availableProcessors()`, and on a 2-vCPU CI runner there is nothing spare:
+the connect stalls until Paho gives up ~120s later and the test dies with
+`Error starting test edge.<name>`. All the harness sees is
+`timed out ... publish to SPARKPLUG_TCK/TEST_CONTROL`, which looks like a slow
+network and is nothing of the sort - it is localhost.
+
+`start-broker.sh` therefore starts the JVM with
+`-XX:ActiveProcessorCount=${TCK_BROKER_CPUS:-8}`, sizing those pools independently
+of the core count. Measured in a 2-CPU Linux container: at 2, host creation hits
+the ~120s timeout every run; at 8 it completes in ~390ms and the test passes in 4s.
+Set `TCK_BROKER_CPUS=2` to reproduce the deadlock deliberately.
+
+To recognise it in a broker log: `Creating new host "..."` with no following
+`Host ... successfully created`.
 
 **Restart the broker between full runs.** The TCK's `Monitor` keeps a
 per-edge-node `bdSeq` map for the lifetime of the broker process and only clears
