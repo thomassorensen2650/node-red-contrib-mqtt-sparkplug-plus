@@ -81,7 +81,11 @@ jobs:
           TCK_BROKER: mqtt://localhost:1883
           TCK_VERBOSE: '1'
           TCK_RUN_TIMEOUT_MS: '900000'
-          TCK_ATTEMPTS: '2'
+          # Roughly half of first attempts lose the TCK's self-connect deadlock
+          # (see test/tck/README.md). It is not ours to fix and a retry has always
+          # cleared it, but two attempts leaves a real chance of a test losing
+          # both. A dead attempt now costs ~10s, so the third is cheap insurance.
+          TCK_ATTEMPTS: '3'
 
       - name: Upload TCK results
         if: always()

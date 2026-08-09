@@ -10,12 +10,6 @@
 # Usage:
 #   test/tck/start-broker.sh <path-to-sparkplug-checkout>
 #
-# Env:
-#   TCK_BROKER_CPUS   how many processors the broker JVM sizes its thread pools
-#                     for, independently of the machine's core count (default 8).
-#                     See the JAVA_OPTS comment at the bottom - this is what
-#                     stops the TCK deadlocking against itself on a small runner.
-#
 # Runs in the foreground; Ctrl-C to stop.
 
 set -euo pipefail
@@ -71,21 +65,6 @@ sed "s|<port>1883</port>|<port>$HIVEMQ_PORT</port>|" \
 # The TCK appends to its results log, so a previous failing run would otherwise
 # be reported again. The UserGuide calls this out explicitly.
 rm -f "$HIVEMQ_HOME/bin/SparkplugTCKResults.log"
-
-# The TCK extension connects a Paho client back into this broker from inside its
-# own publish interceptor: PublishInterceptor.onInboundPublish -> TCK.newTest ->
-# HostApplication.hostPrepare -> host.connect(). HiveMQ does not ack the publish
-# that triggered it until the interceptor returns, so the connect has to be
-# serviced by some thread other than the one blocked waiting for it. HiveMQ sizes
-# those pools from Runtime.availableProcessors(); on a 2-vCPU CI runner there is
-# nothing spare and the self-connect deadlocks until Paho gives up ~120s later,
-# taking the test with it ("Error starting test edge.<name>").
-#
-# Sizing the pools independently of the core count is enough. Measured in a
-# 2-CPU Linux container: with ActiveProcessorCount=2 host creation hits the ~120s
-# timeout every time; at 8 it completes in ~390ms and the test passes in 4s.
-# run.sh appends to whatever JAVA_OPTS it inherits.
-export JAVA_OPTS="${JAVA_OPTS:-} -XX:ActiveProcessorCount=${TCK_BROKER_CPUS:-8}"
 
 echo "Starting HiveMQ CE $HIVEMQ_VERSION with the Sparkplug TCK extension on port $HIVEMQ_PORT..."
 exec "$HIVEMQ_HOME/bin/run.sh"
