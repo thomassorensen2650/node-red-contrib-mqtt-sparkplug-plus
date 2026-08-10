@@ -1,13 +1,16 @@
-### Unreleased : Sparkplug TCK conformance
+### 3.0.0 : Sparkplug TCK conformance
 
 **Behaviour change:** the Primary Host ID ("Destination") is now independent of
 Store Forward. Setting it makes the Edge Node withhold NBIRTH until that host
 publishes an ONLINE STATE message, whether or not Store Forward is enabled;
-previously it had no effect unless Store Forward was on. The field was hidden by
-the editor when Store Forward was unchecked, so a configuration may carry a
-Primary Host ID you cannot currently see. **If an Edge Node stops birthing after
-upgrading, open its broker configuration and clear the Primary Host ID** (the
-node also logs that it is waiting). Store Forward now governs buffering only.
+previously it had no effect unless Store Forward was on. The editor used to hide
+the field whenever Store Forward was unchecked, so a configuration saved by an
+older version may carry a Primary Host ID that was never set deliberately and was
+never visible. **If an Edge Node stops birthing after upgrading, open its broker
+configuration and clear the Primary Host ID** - the field is always shown in
+3.0.0, the node status reads "waiting for primary host", and it logs that it is
+waiting. Store Forward now governs buffering only, and on its own - with no
+Primary Host ID - it buffers indefinitely, which the editor now warns about.
 
 Fixed:
 - NBIRTH is sent once per MQTT session; a repeated STATE ONLINE no longer emits a
@@ -18,6 +21,31 @@ Fixed:
 - DBIRTH is no longer published while NBIRTH is being withheld pending a Primary
   Host, which could announce a device under an edge node that had never birthed.
 - A rename via `set_name` / `set_group` births again under the new identity.
+
+Changed:
+- NDEATH and DDEATH are now published when Node-RED shuts down or the flow is
+  redeployed. Previously neither was: the node disconnected cleanly, and a clean
+  DISCONNECT tells the broker to discard the Last Will, so subscribers saw an edge
+  node simply go quiet and never learned it had gone offline
+  (tck-id-payloads-ndeath-will-message-publisher-disconnect-mqtt311).
+- When a configured Primary Host goes from ONLINE to OFFLINE, the Edge Node now
+  publishes an NDEATH, drops the MQTT connection and reconnects, rather than
+  staying connected and silent. Subscribers therefore see the edge node leave and
+  re-birth around a host outage instead of receiving no signal at all.
+- STATE messages carrying a timestamp older than the last one seen are ignored, so
+  a retained or out-of-order STATE can no longer drive the Primary Host status
+  backwards.
+- The Last Will is registered at QoS 1 rather than QoS 0, so the broker is required
+  to acknowledge the NDEATH it publishes on an unexpected disconnect.
+- A DBIRTH payload now carries the same timestamp as the metrics inside it, rather
+  than one taken at publish time a moment later.
+
+Added:
+- Two Primary Host node statuses, so a withheld NBIRTH is visible rather than
+  looking like a hang: **waiting for primary host** (blue ring) when the broker is
+  connected but the host is not yet ONLINE, and **buffering - primary host
+  offline** (blue dot) when data is also being queued. The latter replaces the
+  previous "destination offline" text.
 
 ### 2.2.4 : Maintenance Release
 Fixed:

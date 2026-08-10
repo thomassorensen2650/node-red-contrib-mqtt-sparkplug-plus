@@ -14,7 +14,9 @@ The client will handle the following message types automatically:
 * NBIRTH
 * DBIRTH
 * NCMD : REBIRTH
-* NDEATH
+* NDEATH — as the MQTT Last Will, and published explicitly when Node-Red shuts
+  down or the flow is redeployed
+* DDEATH — published for each born device on shutdown or redeploy
 
 The following message types can be implemented by the user:
 
@@ -23,9 +25,11 @@ The following message types can be implemented by the user:
 * DDEATH (set via a msg command)
 
 The following sparkplug featues can also be handled by the node:
-* Buffering when primary SCADA is not available
+* [Primary Host](#primary-host-destination) — withhold NBIRTH until a nominated host is ONLINE
+* Store Forward — buffer data while that host is offline
 * Compression
 * Metric Alias
+* [Templates / UDTs](#templates-udts)
 
 ### Input
 One or more metrics can be written to the **mqtt sparkplug device** by passing the metrics details to the input of the **mqtt sparkplug device**. The default behaviour is to wait for a value for each of the metrics before sending birth message. so make sure to pass all metrics on start up. This functionality can be disabled by selecting **Send Birth Immediately** on the advanted settings for the device.
@@ -116,6 +120,47 @@ msg = {
 ```
 
 _If the definition set set after the NBIRTH has been sent, them a REBIRTH is issued to notify clients about the new definition._
+
+### Primary Host (Destination)
+
+The broker config node has a **Primary Host ID** field (labelled *Destination*).
+Setting it makes the Edge Node hold back its NBIRTH until that host application
+publishes an ONLINE `STATE` message, so no data is announced to a SCADA system that
+is not listening. Leave it empty and the node births as soon as it connects.
+
+**Primary Host and Store Forward are independent.** The Primary Host ID governs
+*whether the node births*; Store Forward governs *whether data is buffered* while
+that host is offline. You can use either on its own:
+
+| Primary Host ID | Store Forward | Behaviour |
+|---|---|---|
+| empty | off | Births on connect, publishes immediately |
+| empty | on | **Not a useful combination.** With no host to go ONLINE the node treats it as permanently offline and buffers data indefinitely. The editor warns about this. |
+| set | off | Waits for ONLINE STATE before NBIRTH; data sent while the host is offline is dropped |
+| set | on | Waits for ONLINE STATE before NBIRTH; data sent while the host is offline is queued and flushed when it returns |
+
+While a configured host is offline the node also publishes an NDEATH and reconnects,
+so subscribers see it leave and re-birth around the outage rather than going quiet.
+
+> **Upgrading to 3.0.0 — if an Edge Node stops birthing, check this field.** Before
+> 3.0.0 the Primary Host ID had no effect unless Store Forward was enabled, and the
+> editor hid the field whenever Store Forward was unchecked. A configuration saved
+> back then can therefore carry a Primary Host ID that was never set deliberately and
+> was never visible — and which now withholds NBIRTH. In 3.0.0 the field is always
+> shown: open the broker configuration, clear it, and the node births on connect
+> again. A node in this state reads *waiting for primary host* and logs that it is
+> waiting.
+
+### Node status
+
+| Status | Meaning |
+|---|---|
+| 🟢 connected | Connected to the broker and publishing |
+| 🔴 disconnected | Not connected to the broker |
+| 🟡 connecting | Connection attempt in progress |
+| 🔵 waiting for primary host (ring) | Broker connected, but the configured Primary Host is not ONLINE, so NBIRTH is withheld |
+| 🔵 buffering - primary host offline (dot) | As above, and Store Forward is queueing data meanwhile |
+| ⚪ awaiting connect command | Manual birth mode; waiting for `msg.command.node.connect` |
 
 ### Templates (UDTs)
 
@@ -299,6 +344,22 @@ TEST_BROKER=mqtt://admin:admin@localhost npx mocha test/sparkplug_device_templat
 # Run a specific test by name
 TEST_BROKER=mqtt://admin:admin@localhost npx mocha test/sparkplug_device_template_spec.js --grep "slashes"
 ```
+
+## Sparkplug TCK
+
+The nodes are checked against the [Eclipse Sparkplug TCK](https://github.com/eclipse-sparkplug/sparkplug)
+Edge Node profile, which runs headlessly in CI on every pull request. It covers
+session establishment and termination, data, commands, Primary Host behaviour and
+complex types (Templates, DataSets and property sets).
+
+```bash
+test/tck/run-tck-isolated.sh ref/sparkplug
+```
+
+The harness needs port **1883** free — the TCK's own utility clients hardcode
+`tcp://localhost:1883`, so it cannot be moved. See
+[test/tck/README.md](test/tck/README.md) for setup, how results are interpreted,
+and the known TCK issues the harness works around.
 
 # Contributions
 Contributions are welcome. Please discuss new features before creating PR, and please try to add unit test for new features if possible.
