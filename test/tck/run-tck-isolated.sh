@@ -33,6 +33,7 @@ TESTS=(
     SessionEstablishmentTest
     SessionTerminationTest
     SendDataTest
+    SendComplexDataTest
     ReceiveCommandTest
     PrimaryHostTest
 )
