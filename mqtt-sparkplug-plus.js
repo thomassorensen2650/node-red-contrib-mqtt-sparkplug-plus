@@ -152,6 +152,15 @@ module.exports = function(RED) {
                 if (long.isLong(m.timestamp)) {
                     m.timestamp = new Date(m.timestamp.toNumber());
                 }
+                // Sparkplug carries Int64 in an unsigned protobuf field. sparkplug-payload
+                // converts it back to signed only when its own `instanceof Long` check
+                // matches, and it does not: protobufjs builds the value from a different
+                // copy of `long` than the one the library tests against. A negative Int64
+                // then surfaces as a huge positive number (-42 as 18446744073709551574).
+                // UInt64 is genuinely unsigned and is left alone.
+                if (m.type === "Int64" && long.isLong(m.value) && m.value.unsigned) {
+                    m.value = m.value.toSigned();
+                }
             })
         }
         return payload;
@@ -308,7 +317,16 @@ module.exports = function(RED) {
                      };
  
                      if (node.brokerConn.aliasMetrics && msg.payload.hasOwnProperty("metrics")) {
-                         let lookup = Object.entries(node.brokerConn.metricsAliasMap).reduce((acc, [key, value]) => (acc[value] = key, acc), {})
+                         // The alias map is keyed by device, so only this device's entries
+                         // may resolve here - and the device prefix comes back off before
+                         // the name is handed on.
+                         let prefix = node.brokerConn.getAliasKey(node.name, "");
+                         let lookup = Object.entries(node.brokerConn.metricsAliasMap).reduce(function(acc, [key, value]) {
+                             if (key.startsWith(prefix)) {
+                                 acc[value] = key.substring(prefix.length);
+                             }
+                             return acc;
+                         }, {});
                          msg.payload.metrics.forEach(m=> {
                              if (long.isLong(m.alias)) {
                                  m.alias = m.alias;
@@ -788,6 +806,9 @@ module.exports = function(RED) {
         this.connected = false;
         this.connecting = false;
         this.closing = false;
+        // Last reported connection error, so a permanent failure is logged once
+        // rather than on every reconnect attempt.
+        this.lastConnectionError = null;
         this.options = {};
         this.subscriptions = {};
         this.bdSeq = -1;
@@ -898,24 +919,31 @@ module.exports = function(RED) {
         };
 
         /**
-         * We Store bdSeq in context, as a redeployment of the node can cause 
-         * 
-         * FIXME: context for config nodes are reset on redeploy (node-red bug) We still have the logic to store bdSeq in Context, if it get fixed on day
-         * redeploy should always be gracefull shutdown, so it should not cause any issues (I think) 
+         * bdSeq is kept in *global* context rather than this node's own: Node-RED
+         * clears a config node's context on redeploy, so a counter kept there
+         * restarts at 0 and the host sees two sessions claiming the same bdSeq.
+         * The key is per node, so several broker nodes never share one counter.
+         *
+         * Surviving a process restart additionally needs contextStorage configured
+         * in settings.js. Without it this is memory-only, which is no worse than
+         * before.
+         *
          * @returns the next birth sequence number
          */
+        this.bdSeqContextKey = "sparkplugBdSeq_" + this.id;
         this.nextBdseq = function() {
-            let bdSeq = this.context().get("bdSeq");
-            if (bdSeq === undefined) { // we can't || here because it will also filter out 0
-                bdSeq = -1;
-            }
-            if (bdSeq > 255) {
-                bdSeq = 0;
-            } else {
-                bdSeq += 1;
-            }
-            this.context().set("bdSeq", bdSeq);
-            this.bdSeq = bdSeq;
+            // Not `||`: that would swallow a stored 0 as well as "never set".
+            let stored = node.context().global.get(node.bdSeqContextKey);
+            let bdSeq = stored === undefined ? -1 : stored;
+
+            // [tck-id-message-flow-edge-node-birth-publish-will-message-payload-bdSeq]
+            // bdSeq is 0-255 inclusive, so 255 is followed by 0. Comparing against
+            // 255 rather than 256 is what keeps it in range - the previous `> 255`
+            // let the counter reach 256 before wrapping.
+            bdSeq = bdSeq >= 255 ? 0 : bdSeq + 1;
+
+            node.context().global.set(node.bdSeqContextKey, bdSeq);
+            node.bdSeq = bdSeq;
             return bdSeq;
         };
 
@@ -951,7 +979,7 @@ module.exports = function(RED) {
             }
 
             if (node.aliasMetrics) {
-                msg.payload.metrics = node.addAliasMetrics(msgType, msg.payload.metrics);
+                msg.payload.metrics = node.addAliasMetrics(msgType, msg.payload.metrics, deviceName);
             }
             try {
                 if (node.compressAlgorithm) {
@@ -973,11 +1001,21 @@ module.exports = function(RED) {
         };
         this.nextMetricAlias = 0;
         this.metricsAliasMap = {};
+
         /**
-         * Convert metric names to metric aliases. 
+         * Key a metric in the alias map. Keyed by device, because the same metric
+         * name on two devices is two distinct metrics of this Edge Node. The Edge
+         * Node's own metrics use an empty device name.
+         */
+        this.getAliasKey = function(deviceName, metricName) {
+            return (deviceName || "") + "/" + metricName;
+        };
+
+        /**
+         * Convert metric names to metric aliases.
          * This method expect that the metrics attribute name exists
          */
-        this.addAliasMetrics = function(msgType, metrics) {
+        this.addAliasMetrics = function(msgType, metrics, deviceName) {
             return metrics.map(metric => {
 
                 // [tck-id-operational-behavior-data-commands-rebirth-name-aliases] When aliases are being used by an Edge Node an NBIRTH message MUST NOT include an alias for the Node Control/Rebirth metric.
@@ -985,12 +1023,17 @@ module.exports = function(RED) {
                     return metric;
                 }
 
+                // [tck-id-payloads-alias-uniqueness] The alias MUST be unique across this
+                // Edge Node's entire set of metrics. Keying on the metric name alone gave
+                // two devices sharing a name the same alias.
+                let aliasKey = node.getAliasKey(deviceName, metric.name);
+
                 // Update the alias map if necessary
-                if (!node.metricsAliasMap.hasOwnProperty(metric.name)) {
-                    node.metricsAliasMap[metric.name] = ++node.nextMetricAlias;
+                if (!node.metricsAliasMap.hasOwnProperty(aliasKey)) {
+                    node.metricsAliasMap[aliasKey] = ++node.nextMetricAlias;
                 }
 
-                metric.alias = node.metricsAliasMap[metric.name];
+                metric.alias = node.metricsAliasMap[aliasKey];
                 // Remove the name property if the message type is not NBIRTH or DBIRTH
                 if (msgType != "NBIRTH" && msgType != "DBIRTH") {
                     delete metric.name;
@@ -1070,6 +1113,14 @@ module.exports = function(RED) {
                 }
             }            
             let ts = Date.now();
+            // [tck-id-payloads-name-birth-data-requirement] Every metric in a birth
+            // message carries a timestamp. Template definitions come straight from the
+            // configuration and have none of their own.
+            birthMessageMetrics.forEach(m => {
+                if (!m.timestamp) {
+                    m.timestamp = ts;
+                }
+            });
             birthMessageMetrics = birthMessageMetrics.concat([
                 {
                     "name" : "Node Control/Rebirth",
@@ -1187,7 +1238,27 @@ module.exports = function(RED) {
         this.options.password = this.password;
         this.options.keepalive = this.keepalive;
         this.options.clean = this.cleansession;
+        // Previously read from the config but never passed on, so every connection
+        // was MQTT 3.1.1 whatever the node said.
+        this.options.protocolVersion = parseInt(this.protocolVersion, 10) || 4;
+
+        if (this.options.protocolVersion === 5) {
+            // [tck-id-principles-persistence-clean-session-50] An MQTT 5.0 Edge Node
+            // MUST connect with Clean Start true and Session Expiry Interval 0. A
+            // session that outlived the connection would let the broker replay data
+            // from a dead session after the next NBIRTH.
+            this.options.clean = true;
+            this.options.properties = Object.assign({}, this.options.properties, {
+                sessionExpiryInterval: 0
+            });
+        }
+
         this.options.reconnectPeriod = RED.settings.mqttReconnectTime||5000;
+        // MQTT.js queues QoS 0 publishes while offline and flushes them after the
+        // reconnect - that is, after the new NBIRTH has reset seq to 0 - so the host
+        // sees the sequence jump backwards and asks for a rebirth. Replaying buffered
+        // data is store-and-forward's job, and it replays with current sequence numbers.
+        this.options.queueQoSZero = false;
      
         if (this.usetls && n.tls) {
             var tlsNode = RED.nodes.getNode(n.tls);
@@ -1285,10 +1356,16 @@ module.exports = function(RED) {
             }
 
             node.publish(node.getDeathPayload(), false, function(err) {
+                // [tck-id-payloads-ndeath-will-message-publisher-disconnect-mqtt50] With
+                // MQTT 5.0 a plain DISCONNECT tells the broker to discard the will;
+                // reason code 0x04 ("Disconnect with Will Message") asks it to publish
+                // the will too. MQTT 3.1.1 has no reason codes.
+                let disconnectOptions = node.options.protocolVersion === 5 ? { reasonCode: 4 } : {};
+
                 // [tck-id-operational-behavior-edge-node-intentional-disconnect-packet]
                 // force MUST be false so mqtt.js emits a DISCONNECT packet; end(true)
                 // destroys the socket without sending one.
-                node.client.end(false, {}, function() {
+                node.client.end(false, disconnectOptions, function() {
                     // end(false) defers 'close' past the NDEATH round-trip, so clear
                     // the connection flags here rather than waiting for that event.
                     node.connected = false;
@@ -1326,6 +1403,36 @@ module.exports = function(RED) {
         };
 
         /**
+         * Take the next bdSeq and register the matching NDEATH as the will for the
+         * next CONNECT packet.
+         *
+         * Called for every CONNECT, not just the deliberate ones: MQTT.js reconnects
+         * on its own, and builds that CONNECT from the options it is holding. Without
+         * this, every session after the first would re-use the will - and therefore
+         * the bdSeq - of the original connection.
+         */
+        this.registerNextWill = function() {
+            node.nextBdseq();
+
+            let will = node.getDeathPayload();
+            if (will) {
+                // [tck-id-message-flow-edge-node-birth-publish-will-message-qos] QoS MUST
+                // be 1, or the broker is free to drop the NDEATH.
+                // [tck-id-message-flow-edge-node-birth-publish-will-message-will-retained]
+                // The retained flag MUST be false.
+                will.qos = 1;
+                will.retain = false;
+            }
+            node.options.will = will;
+
+            // mqtt.connect() copies the options, so a live client holds its own copy -
+            // and that copy is what its next CONNECT packet is built from.
+            if (node.client) {
+                node.client.options.will = will;
+            }
+        };
+
+        /**
          * Connect to the MQTT Broker
          */
         this.connect = function () {
@@ -1335,11 +1442,9 @@ module.exports = function(RED) {
             if (!node.connected && !node.connecting) {
                 node.connecting = true;
                 try {
-                    this.nextBdseq(); // Next connect will use next bdSeq
+                    this.registerNextWill();
                     node.nbirthSent = false; // new session -> NBIRTH is due again
                     node.deathSent = false;  // ...and its deaths are due again on close
-                    node.options.will = this.getDeathPayload();
-                    if (node.options.will) node.options.will.qos = 1;
                     node.serverProperties = {};
                     node.client = mqtt.connect(node.brokerurl ,node.options);
                     node.client.setMaxListeners(0);
@@ -1347,6 +1452,9 @@ module.exports = function(RED) {
                     node.client.on('connect', function (connack) {
                         node.connecting = false;
                         node.connected = true;
+                        // A failure after a good connection is news again, even if it
+                        // happens to be the same error as last time.
+                        node.lastConnectionError = null;
                         node.log(RED._("mqtt-sparkplug-plus.state.connected",{broker:(node.clientid?node.clientid+"@":"")+node.brokerurl}));
                         for (var id in node.users) {
                             if (node.users.hasOwnProperty(id)) {
@@ -1473,6 +1581,12 @@ module.exports = function(RED) {
                     });
 
                     node.client.on("reconnect", function() {
+                        // [tck-id-topics-nbirth-bdseq-increment] Fires immediately before
+                        // MQTT.js writes the new CONNECT, which is built from the options
+                        // as they stand at that moment - so this is where the next
+                        // session's bdSeq and will are put in place. The NBIRTH that
+                        // follows the CONNACK then carries the same bdSeq.
+                        node.registerNextWill();
                         for (var id in node.users) {
                             if (node.users.hasOwnProperty(id)) {
                                 node.setConnectionState(node.users[id], "RECONNECTING");
@@ -1505,9 +1619,20 @@ module.exports = function(RED) {
                         }
                     });
 
-                    // Register connect error handler
-                    // The client's own reconnect logic will take care of errors
+                    // The client's own reconnect logic recovers from these, but swallowing
+                    // them entirely hides *why* a connection never comes up - bad
+                    // credentials, a rejected certificate, an unknown host. Identical
+                    // consecutive errors are reported once so a permanent failure does not
+                    // restate itself on every reconnect interval.
                     node.client.on('error', function (error) {
+                        let message = error && error.message ? error.message : String(error);
+                        if (message !== node.lastConnectionError) {
+                            node.lastConnectionError = message;
+                            node.error(RED._("mqtt-sparkplug-plus.errors.connection-error", {
+                                broker: node.brokerurl,
+                                error: message
+                            }));
+                        }
                     });
                 }catch(err) {
                     console.log(err);
