@@ -1,3 +1,59 @@
+### Unreleased : session lifecycle conformance
+
+These issues were catalogued by the `node-red-contrib-mqtt-sparkplug-plus-wmonitor`
+fork (ISC, Michael Sadowski), which branched from v2.2.4 and fixed them there. They
+were re-verified and fixed independently against this code base; each one has a test
+in `test/sparkplug_lifecycle_spec.js` that fails without its fix.
+
+**Behaviour change:** the configured MQTT protocol version is now actually applied.
+It was read from the broker configuration but never passed to the MQTT client, so
+every connection was MQTT 3.1.1 regardless of the setting. **A configuration already
+set to MQTT 5.0 will now genuinely connect as 5.0** - if the broker treats the two
+differently, that changes on upgrade. With 5.0 the Edge Node also sets Clean Start
+and a Session Expiry Interval of 0, so no session outlives its connection
+(tck-id-principles-persistence-clean-session-50).
+
+**Behaviour change:** metric aliases are now allocated per device rather than per
+metric name. Two devices under one Edge Node that share a metric name previously
+received the *same* alias, which breaks the requirement that an alias be unique
+across the Edge Node's entire set of metrics (tck-id-payloads-alias-uniqueness).
+Alias numbers therefore differ from previous releases; they are republished in every
+birth message, so subscribers pick the new mapping up automatically.
+
+Fixed:
+- bdSeq now wraps from 255 to 0. It previously reached 256 before wrapping, one step
+  outside the permitted range.
+- bdSeq is taken, and the matching NDEATH re-registered as the will, for *every*
+  CONNECT - including the automatic reconnects MQTT.js performs on its own.
+  Previously only a deliberate connect advanced it, so every session after the first
+  reused the first session's bdSeq, which
+  tck-id-topics-nbirth-bdseq-increment forbids.
+- bdSeq is kept in global context instead of the config node's own context, which
+  Node-RED clears on redeploy. Surviving a full process restart additionally needs
+  `contextStorage` configured in `settings.js`; without it behaviour is unchanged.
+- The will is registered with an explicit retained flag of false
+  (tck-id-message-flow-edge-node-birth-publish-will-message-will-retained).
+- A negative Int64 metric no longer decodes as a huge positive number. Sparkplug
+  carries Int64 in an unsigned protobuf field and `sparkplug-payload` only converts
+  it back when its own `instanceof Long` check matches - which it does not, because
+  protobufjs builds the value from a different copy of `long`. -42 arrived as
+  18446744073709551574.
+- MQTT connection errors are reported instead of being silently discarded, so a
+  rejected certificate or bad credentials is visible rather than presenting as a
+  connection that never comes up. Repeats of the same error are logged once, and
+  reported again after a successful connection in between.
+- Every metric in an NBIRTH now carries a timestamp. Template definitions come
+  straight from the configuration and had none
+  (tck-id-payloads-name-birth-data-requirement).
+- With MQTT 5.0 the DISCONNECT sent on an intentional shutdown carries the
+  'Disconnect with Will Message' reason code (0x04), so the broker publishes the will
+  as well rather than discarding it
+  (tck-id-payloads-ndeath-will-message-publisher-disconnect-mqtt50).
+- MQTT.js no longer queues QoS 0 publishes while offline and flushes them after a
+  reconnect. They arrived after the new NBIRTH had reset the sequence number, so the
+  host saw the sequence jump backwards and asked for a rebirth. Replaying buffered
+  data is Store Forward's job, and it replays with current sequence numbers.
+
 ### 3.0.0 : Sparkplug TCK conformance
 
 **Behaviour change:** the Primary Host ID ("Destination") is now independent of

@@ -102,7 +102,8 @@
             "not-defined": "Topic is not defined",
             "invalid-metric-definition": "Unable to use '__name__' as a metric. the error is : __error__",
             "unable-to-deserialize-templates" : "Unable to parse templates. The error is : __error__",
-            "invalid-metric-data": "Unable to send data for metric '__name__'. the error is : __error__"
+            "invalid-metric-data": "Unable to send data for metric '__name__'. the error is : __error__",
+            "connection-error": "MQTT connection error (__broker__): __error__"
         }
     }	
 }
