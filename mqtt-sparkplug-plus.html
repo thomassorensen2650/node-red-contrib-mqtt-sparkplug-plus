@@ -600,9 +600,24 @@
             // 5.0 is selected - as does the note explaining that Clean Start and the
             // Session Expiry Interval are fixed by the Sparkplug specification and
             // therefore not offered as settings.
+            // RED._ returns the key itself when the catalog has no entry, so a wrong
+            // key renders as literal text in the editor - "common.label.none" was
+            // showing up as the option label. Fall back to plain text instead.
+            let translate = function(key, fallback) {
+                let translated = RED._(key);
+                return translated === key ? fallback : translated;
+            };
+
             $("#node-config-input-userProps").typedInput({
                 default: this.userProps ? "json" : "none",
-                types: [{ value: "none", label: RED._("node-red:common.label.none"), hasValue: false }, "json"]
+                types: [
+                    {
+                        value: "none",
+                        label: translate("mqtt-sparkplug-plus.label.none", "none"),
+                        hasValue: false
+                    },
+                    "json"
+                ]
             });
             if (this.userProps) {
                 $("#node-config-input-userProps").typedInput("value", this.userProps);

@@ -36,6 +36,7 @@
             "protocolVersion": "Protocol",
             "protocolVersion4": "MQTT V3.1.1",
             "protocolVersion5": "MQTT V5.0",
+            "none": "none",
             "topicAliasMaximum": "Alias Max",
             "maximumPacketSize": "Max Packet Size",
             "receiveMaximum": "Receive Max",
