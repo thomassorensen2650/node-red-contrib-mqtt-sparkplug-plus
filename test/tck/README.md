@@ -146,6 +146,37 @@ fails the run, so new coverage gaps stay visible instead of hiding behind
 Full per-assertion output is written to `tck-results.json`, and the TCK's own
 log ends up in `.tck-broker/hivemq-ce-*/bin/SparkplugTCKResults.log`.
 
+## Conformance overview
+
+[`CONFORMANCE.md`](CONFORMANCE.md) maps every Sparkplug B 3.0 requirement to its
+status and to the test that demonstrates it - which of them apply to an Edge Node,
+which are exercised, which are not reached and why, and what the Host Application
+profile would additionally require (this package ships no Host Application).
+
+It is generated, not hand-written, so regenerate it after a run rather than editing
+it:
+
+```bash
+test/tck/run-tck-isolated.sh ref/sparkplug   # writes tck-results/
+node test/tck/coverage.js ref/sparkplug
+```
+
+**Run it at both MQTT versions for a complete picture.** The TCK branches on the
+version in the CONNECT packet and asserts either the `-311` or the `-50` variant of
+two paired requirements, never both, so a single run always leaves two assertions
+`NOT EXECUTED`. Running at each version and leaving both sets of results in place
+covers all four:
+
+```bash
+TCK_PROTOCOL_VERSION=4 TCK_RESULTS_DIR=tck-results/v4 test/tck/run-tck-isolated.sh ref/sparkplug
+TCK_PROTOCOL_VERSION=5 TCK_RESULTS_DIR=tck-results/v5 test/tck/run-tck-isolated.sh ref/sparkplug
+node test/tck/coverage.js ref/sparkplug          # reads both, best status per requirement
+```
+
+The generator reads the TCK's own `Requirements.java`, the per-profile test classes,
+`tck-results/`, and the `tck-id-*` citations in this repository. `ref/` is not
+committed, so `CONFORMANCE.md` is - a reader needs no Sparkplug checkout.
+
 ## Where the TCK is wrong, and what the fixture does about it
 
 Three assertions read a Sparkplug *datatype code* as though it were a protobuf

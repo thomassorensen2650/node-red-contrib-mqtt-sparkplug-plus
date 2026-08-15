@@ -151,6 +151,20 @@
                 <input type="password" id="node-config-input-password">
             </div>
             <div class="form-row">
+                <label for="node-config-input-protocolVersion"><i class="fa fa-cog"></i> <span data-i18n="mqtt-sparkplug-plus.label.protocolVersion"></span></label>
+                <select id="node-config-input-protocolVersion" style="width:70%;">
+                    <option value="4" data-i18n="mqtt-sparkplug-plus.label.protocolVersion4"></option>
+                    <option value="5" data-i18n="mqtt-sparkplug-plus.label.protocolVersion5"></option>
+                </select>
+            </div>
+            <div class="form-row mqtt5" style="display:none;">
+                <label for="node-config-input-userProps"><i class="fa fa-list"></i> <span data-i18n="mqtt-sparkplug-plus.label.userProperties"></span></label>
+                <input type="text" id="node-config-input-userProps" style="width:70%;">
+            </div>
+            <div class="form-tips mqtt5" id="node-mqtt5-session-note" style="display:none;">
+                <i class="fa fa-info-circle"></i> <span data-i18n="mqtt-sparkplug-plus.tip.mqtt5Session"></span>
+            </div>
+            <div class="form-row">
                 <label for="node-config-input-clientid"><i class="fa fa-tag"></i> <span data-i18n="mqtt-sparkplug-plus.label.clientid"></span></label>
                 <input type="text" id="node-config-input-clientid" data-i18n="[placeholder]mqtt-sparkplug-plus.placeholder.clientid">
             </div>
@@ -324,6 +338,8 @@
             usetls: {value: false},
             verifyservercert: { value: false},
             protocolVersion: { value: 4},
+            // MQTT 5.0 only. CONNECT user properties, as a JSON object.
+            userProps: {value: ""},
             keepalive: {value:60,validate:RED.validators.number()},
             cleansession: {value: true},
             enableStoreForward: {value: false},
@@ -579,6 +595,24 @@
                 updatePortEntry();
             });
             setTimeout(updatePortEntry,50);
+
+            // User properties are an MQTT 5.0 feature, so the row only appears when
+            // 5.0 is selected - as does the note explaining that Clean Start and the
+            // Session Expiry Interval are fixed by the Sparkplug specification and
+            // therefore not offered as settings.
+            $("#node-config-input-userProps").typedInput({
+                default: this.userProps ? "json" : "none",
+                types: [{ value: "none", label: RED._("node-red:common.label.none"), hasValue: false }, "json"]
+            });
+            if (this.userProps) {
+                $("#node-config-input-userProps").typedInput("value", this.userProps);
+            }
+
+            $("#node-config-input-protocolVersion").on("change", function() {
+                let isV5 = $("#node-config-input-protocolVersion").val() === "5";
+                $(".mqtt5").toggle(isV5);
+            });
+            $("#node-config-input-protocolVersion").val(this.protocolVersion || 4);
             setTimeout(function() {
                 $("#node-config-input-protocolVersion").trigger("change");
             },50);
@@ -587,6 +621,11 @@
             if (!$("#node-config-input-usetls").is(':checked')) {
                 $("#node-config-input-tls").val("");
             }
+            // Only meaningful for 5.0, and "none" means none - so anything else is
+            // stored empty rather than left behind from an earlier edit.
+            let keepUserProps = $("#node-config-input-protocolVersion").val() === "5"
+                && $("#node-config-input-userProps").typedInput("type") === "json";
+            this.userProps = keepUserProps ? $("#node-config-input-userProps").typedInput("value") : "";
             this.templates = geTemplateList();
         }
     });

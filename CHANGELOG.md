@@ -1,17 +1,28 @@
 ### Unreleased : session lifecycle conformance
 
-These issues were catalogued by the `node-red-contrib-mqtt-sparkplug-plus-wmonitor`
-fork (ISC, Michael Sadowski), which branched from v2.2.4 and fixed them there. They
-were re-verified and fixed independently against this code base; each one has a test
-in `test/sparkplug_lifecycle_spec.js` that fails without its fix.
+Everything under `Fixed:` below, and the alias and protocol-version behaviour changes,
+were catalogued by the `node-red-contrib-mqtt-sparkplug-plus-wmonitor` fork
+(ISC, Michael Sadowski), which branched from v2.2.4 and fixed them there. They were
+re-verified and fixed independently against this code base. The MQTT 5.0 editor
+support is new here. Every item has a test in `test/sparkplug_lifecycle_spec.js` that
+fails without its fix.
 
-**Behaviour change:** the configured MQTT protocol version is now actually applied.
-It was read from the broker configuration but never passed to the MQTT client, so
-every connection was MQTT 3.1.1 regardless of the setting. **A configuration already
-set to MQTT 5.0 will now genuinely connect as 5.0** - if the broker treats the two
-differently, that changes on upgrade. With 5.0 the Edge Node also sets Clean Start
-and a Session Expiry Interval of 0, so no session outlives its connection
-(tck-id-principles-persistence-clean-session-50).
+**Added: MQTT 5.0 can now be selected.** The broker configuration gains a Protocol
+setting offering MQTT V3.1.1 (the default, and what every existing configuration
+keeps) and MQTT V5.0. Previously the protocol version existed in the configuration
+but had no editor control *and* was never passed to the MQTT client, so every
+connection was 3.1.1 whatever the flow said. Selecting 5.0 also allows CONNECT user
+properties to be set. Only these two versions are offered - Sparkplug B permits no
+others - and a flow carrying any other value is treated as 3.1.1.
+
+**Behaviour change: Clean Session is no longer configurable.** A Sparkplug Edge Node
+MUST connect with Clean Session true, and with MQTT 5.0 with Clean Start true and a
+Session Expiry Interval of 0, so that no session outlives its connection and the
+broker cannot replay data from a dead session after the next NBIRTH
+(tck-id-principles-persistence-clean-session-311,
+tck-id-principles-persistence-clean-session-50). The editor never offered the choice,
+but the runtime honoured it, so **a flow hand-edited or imported with `cleansession`
+false is now overridden** rather than allowed to produce a non-conformant Edge Node.
 
 **Behaviour change:** metric aliases are now allocated per device rather than per
 metric name. Two devices under one Edge Node that share a metric name previously

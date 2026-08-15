@@ -104,7 +104,10 @@ function buildFlow(opts) {
 					}
 				})
 			],
-			protocolVersion: "4",
+			// 3.1.1 by default. Sparkplug asserts a different pair of requirements per
+			// version - clean-session-311 vs clean-session-50, and the NDEATH publisher
+			// rules - so the suite is run at both to cover them all.
+			protocolVersion: String(opts.protocolVersion || 4),
 			keepalive: "60",
 			cleansession: true,
 			enableStoreForward: usePrimaryHost,

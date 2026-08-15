@@ -35,6 +35,7 @@
             "flags": "Flags",
             "protocolVersion": "Protocol",
             "protocolVersion4": "MQTT V3.1.1",
+            "protocolVersion5": "MQTT V5.0",
             "topicAliasMaximum": "Alias Max",
             "maximumPacketSize": "Max Packet Size",
             "receiveMaximum": "Receive Max",
@@ -55,7 +56,8 @@
             "device": "Tip: Use '/' to group related metrics e.g. Machine1/Speed",
             "sparkplugformat": "Topic format: namespace/group_id/message_type/edge_node_id/[device_id]",
             "birthImmediately" : "The Send Birth Immediately option will send device online (DBIRTH) with NULL values as soon as node-red starts up.",
-            "templates": "Template Definitions are published in NBIRTH. Devices can reference them by name as a metric type."
+            "templates": "Template Definitions are published in NBIRTH. Devices can reference them by name as a metric type.",
+            "mqtt5Session": "Clean Start and a Session Expiry Interval of 0 are required of a Sparkplug Edge Node and are set automatically, so they are not offered as settings."
         },
         "tabs-label": {
             "connection": "Connection",
@@ -103,7 +105,8 @@
             "invalid-metric-definition": "Unable to use '__name__' as a metric. the error is : __error__",
             "unable-to-deserialize-templates" : "Unable to parse templates. The error is : __error__",
             "invalid-metric-data": "Unable to send data for metric '__name__'. the error is : __error__",
-            "connection-error": "MQTT connection error (__broker__): __error__"
+            "connection-error": "MQTT connection error (__broker__): __error__",
+            "invalid-user-properties": "Unable to parse MQTT 5.0 user properties, they will be ignored. The error is : __error__"
         }
     }	
 }

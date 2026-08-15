@@ -794,6 +794,8 @@ module.exports = function(RED) {
         this.usetls = n.usetls;
         this.verifyservercert = n.verifyservercert;
         this.protocolVersion = n.protocolVersion;
+        // MQTT 5.0 CONNECT user properties, stored as a JSON string by the editor.
+        this.userProps = n.userProps;
         this.keepalive = n.keepalive;
         this.cleansession = n.cleansession;
         
@@ -1227,32 +1229,46 @@ module.exports = function(RED) {
             }
         }
 
-        if (!this.cleansession && !this.clientid) {
-            this.cleansession = true;
-            this.warn(RED._("mqtt-sparkplug-plus.errors.nonclean-missingclientid"));
-        }
-
         // Build options for passing to the MQTT.js API
         this.options.clientId = this.clientid || 'mqtt_' + RED.util.generateId();
         this.options.username = this.username;
         this.options.password = this.password;
         this.options.keepalive = this.keepalive;
-        this.options.clean = this.cleansession;
-        // Previously read from the config but never passed on, so every connection
-        // was MQTT 3.1.1 whatever the node said.
-        this.options.protocolVersion = parseInt(this.protocolVersion, 10) || 4;
+        // [tck-id-principles-persistence-clean-session-311] and
+        // [tck-id-principles-persistence-clean-session-50] An Edge Node MUST connect
+        // with Clean Session (3.1.1) / Clean Start (5.0) set true. This is not a
+        // preference: a session that outlives the connection lets the broker replay
+        // data from a dead session after the next NBIRTH. The editor does not offer
+        // the choice, and a flow hand-edited or imported with cleansession false is
+        // overridden here rather than allowed to produce a non-conformant Edge Node.
+        this.options.clean = true;
+
+        // Previously read from the config but never passed on, so every connection was
+        // MQTT 3.1.1 whatever the node said. Sparkplug B permits only 3.1.1 and 5.0,
+        // so anything else - including MQTT 3.1, which the core Node-RED MQTT node
+        // does offer - is treated as 3.1.1.
+        this.options.protocolVersion = parseInt(this.protocolVersion, 10) === 5 ? 5 : 4;
 
         if (this.options.protocolVersion === 5) {
-            // [tck-id-principles-persistence-clean-session-50] An MQTT 5.0 Edge Node
-            // MUST connect with Clean Start true and Session Expiry Interval 0. A
-            // session that outlived the connection would let the broker replay data
-            // from a dead session after the next NBIRTH.
-            this.options.clean = true;
+            // The 5.0 half of the clean-session requirement above.
             this.options.properties = Object.assign({}, this.options.properties, {
                 sessionExpiryInterval: 0
             });
-        }
 
+            // CONNECT user properties, MQTT 5.0 only. The editor stores them as JSON.
+            let userProps = this.userProps;
+            if (typeof userProps === "string" && userProps.trim()) {
+                try {
+                    userProps = JSON.parse(userProps);
+                } catch (e) {
+                    this.warn(RED._("mqtt-sparkplug-plus.errors.invalid-user-properties", { error: e.toString() }));
+                    userProps = null;
+                }
+            }
+            if (userProps && typeof userProps === "object" && Object.keys(userProps).length) {
+                this.options.properties.userProperties = userProps;
+            }
+        }
         this.options.reconnectPeriod = RED.settings.mqttReconnectTime||5000;
         // MQTT.js queues QoS 0 publishes while offline and flushes them after the
         // reconnect - that is, after the new NBIRTH has reset seq to 0 - so the host

@@ -39,6 +39,9 @@ const DEVICE_ID = process.env.TCK_DEVICE_ID || "NodeRedDevice";
 const TEST_TIMEOUT_MS = Number(process.env.TCK_TEST_TIMEOUT_MS || 90000);
 const BIRTH_TIMEOUT_MS = Number(process.env.TCK_BIRTH_TIMEOUT_MS || 20000);
 const RESULTS_FILE = process.env.TCK_RESULTS_FILE || "tck-results.json";
+// 4 (MQTT 3.1.1) or 5. Sparkplug asserts a different requirement from each of two
+// pairs depending on which the node connects with, so the suite is run at both.
+const PROTOCOL_VERSION = Number(process.env.TCK_PROTOCOL_VERSION || 4);
 
 // Every wait that depends on the broker or the TCK extension needs a bound.
 // MQTT.js reconnects forever by default and an acknowledged publish only calls
@@ -198,6 +201,7 @@ function loadFlow(edgeNodeId, flowOpts) {
 				brokerHost: BROKER_HOST,
 				brokerPort: BROKER_PORT,
 				metrics: DEVICE_METRICS,
+				protocolVersion: PROTOCOL_VERSION,
 				// Every edge test brings the simulated Host Application online and
 				// asserts tck-id-message-flow-edge-node-birth-publish-phid-wait:
 				// the node MUST wait for STATE before NBIRTH. So the node under
@@ -502,11 +506,26 @@ const TESTS = [
 // so INCOMPLETE on its own is not a failure - but an assertion going
 // unexecuted for any *other* reason is a coverage gap we do want to see. Hence
 // the allowlist: anything not in it makes the run fail.
+//
+// The MQTT version decides which of two paired requirements can execute: the TCK
+// branches on the CONNECT packet's version and asserts either the -311 or the -50
+// variant, never both. So whichever pair does not apply to this run is allowlisted.
+const OTHER_VERSION_ONLY = PROTOCOL_VERSION === 5
+	? {
+		"principles-persistence-clean-session-311":
+			"node connects with MQTT 5.0 (TCK_PROTOCOL_VERSION=5); the -50 variant is asserted instead",
+		"payloads-ndeath-will-message-publisher-disconnect-mqtt311":
+			"node connects with MQTT 5.0 (TCK_PROTOCOL_VERSION=5); the -mqtt50 variant is asserted instead"
+	}
+	: {
+		"principles-persistence-clean-session-50":
+			"node connects with MQTT 3.1.1 (the default); the -311 variant is asserted instead",
+		"payloads-ndeath-will-message-publisher-disconnect-mqtt50":
+			"node connects with MQTT 3.1.1 (the default); the -mqtt311 variant is asserted instead"
+	};
+
 const EXPECTED_NOT_EXECUTED = {
-	"principles-persistence-clean-session-50":
-		"node connects with MQTT 3.1.1 (protocolVersion 4); the -311 variant is asserted instead",
-	"payloads-ndeath-will-message-publisher-disconnect-mqtt50":
-		"node connects with MQTT 3.1.1 (protocolVersion 4); the -311 variant is asserted instead",
+	...OTHER_VERSION_ONLY,
 	// Deliberately absent: payloads-alias-uniqueness. The node supports aliases and
 	// the TCK fixture enables them, so that assertion executes. Leaving it out
 	// means the harness reports UNTESTED if aliases ever stop being exercised.
@@ -602,6 +621,7 @@ async function runTest(control, observer, test) {
 		await unloadFlow();
 		return {
 			test: test.name,
+			protocolVersion: PROTOCOL_VERSION,
 			overall: "SETUP_FAILED",
 			passed: false,
 			timedOut: /timed out/.test(err.message),
@@ -639,7 +659,7 @@ async function runTest(control, observer, test) {
 
 	if (!resultText) {
 		console.log("  RESULT: no result reported");
-		return { test: test.name, overall: "NO_RESULT", passed: false, timedOut, detail: null };
+		return { test: test.name, protocolVersion: PROTOCOL_VERSION, overall: "NO_RESULT", passed: false, timedOut, detail: null };
 	}
 
 	const overall = parseOverall(resultText);
@@ -653,6 +673,7 @@ async function runTest(control, observer, test) {
 
 	return {
 		test: test.name,
+		protocolVersion: PROTOCOL_VERSION,
 		overall,
 		passed,
 		timedOut,
@@ -673,6 +694,7 @@ async function main() {
 
 	console.log("Sparkplug TCK - Edge Node profile");
 	console.log(`  broker : ${BROKER_URL}`);
+	console.log(`  mqtt   : ${PROTOCOL_VERSION === 5 ? "5.0" : "3.1.1"}`);
 	console.log(`  host   : ${HOST_APP_ID}`);
 	console.log(`  group  : ${GROUP_ID}`);
 

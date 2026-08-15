@@ -232,6 +232,48 @@ describe('sparkplug lifecycle', function () {
 		});
 
 		/**
+		 * Sparkplug B permits MQTT 3.1.1 and 5.0 only. The editor offers just those
+		 * two, but an imported or hand-edited flow can carry anything - including the
+		 * MQTT 3.1 that Node-RED's own MQTT node offers - and that must not reach the
+		 * wire.
+		 */
+		it('should treat any version other than 5 as 3.1.1', function (done) {
+			let flow = [
+				brokerNode({ "id": "b1", "protocolVersion": "3" }),
+				brokerNode({ "id": "b2", "protocolVersion": "not-a-version" })
+			];
+			helper.load(sparkplugNode, flow, {}, function () {
+				check(done, function () {
+					helper.getNode("b1").options.protocolVersion.should.eql(4,
+						"MQTT 3.1 was passed through instead of being coerced to 3.1.1");
+					helper.getNode("b2").options.protocolVersion.should.eql(4,
+						"an unparseable protocol version did not fall back to 3.1.1");
+				});
+			});
+		});
+
+		/**
+		 * [tck-id-principles-persistence-clean-session-311] Clean Session MUST be true.
+		 * The editor does not offer the choice, but a flow carrying `cleansession:
+		 * false` must not be able to produce a non-conformant Edge Node either.
+		 */
+		it('should force a clean session even when the config says otherwise', function (done) {
+			let flow = [
+				brokerNode({ "id": "b1", "cleansession": false, "clientid": "fixed-311" }),
+				brokerNode({ "id": "b2", "cleansession": false, "clientid": "fixed-50", "protocolVersion": "5" })
+			];
+			helper.load(sparkplugNode, flow, {}, function () {
+				check(done, function () {
+					helper.getNode("b1").options.clean.should.eql(true,
+						"a config with cleansession false produced a persistent MQTT 3.1.1 session");
+					helper.getNode("b2").options.clean.should.eql(true,
+						"a config with cleansession false produced a persistent MQTT 5.0 session");
+					helper.getNode("b2").options.properties.sessionExpiryInterval.should.eql(0);
+				});
+			});
+		});
+
+		/**
 		 * MQTT.js queues QoS 0 publishes while offline and flushes them after the
 		 * reconnect - i.e. after the new NBIRTH has reset seq to 0 - so the host
 		 * sees the sequence jump backwards. Store-and-forward is what replays
@@ -244,6 +286,43 @@ describe('sparkplug lifecycle', function () {
 					should.exist(options.queueQoSZero,
 						"queueQoSZero was never set, so MQTT.js keeps its queue-and-replay default");
 					options.queueQoSZero.should.eql(false);
+				});
+			});
+		});
+
+		describe('user properties', function () {
+
+			it('should pass configured user properties on an MQTT 5.0 connection', function (done) {
+				let userProps = { plant: "Aarhus", line: "7" };
+				helper.load(sparkplugNode, [brokerNode({ "protocolVersion": "5", "userProps": JSON.stringify(userProps) })], {}, function () {
+					check(done, function () {
+						let properties = helper.getNode("b1").options.properties;
+						should.exist(properties, "no MQTT 5.0 properties set at all");
+						should.exist(properties.userProperties, "user properties never reached the connect options");
+						properties.userProperties.should.eql(userProps);
+					});
+				});
+			});
+
+			it('should ignore user properties on MQTT 3.1.1, which has no such field', function (done) {
+				helper.load(sparkplugNode, [brokerNode({ "userProps": JSON.stringify({ plant: "Aarhus" }) })], {}, function () {
+					check(done, function () {
+						let options = helper.getNode("b1").options;
+						should.not.exist(options.properties && options.properties.userProperties,
+							"user properties were sent on a 3.1.1 connection");
+					});
+				});
+			});
+
+			it('should ignore user properties that are not valid JSON', function (done) {
+				helper.load(sparkplugNode, [brokerNode({ "protocolVersion": "5", "userProps": "{ not json" })], {}, function () {
+					check(done, function () {
+						let options = helper.getNode("b1").options;
+						should.not.exist(options.properties.userProperties,
+							"unparseable user properties were passed to the broker anyway");
+						options.protocolVersion.should.eql(5,
+							"a bad user-properties value should not disturb the rest of the connection");
+					});
 				});
 			});
 		});
