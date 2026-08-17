@@ -27,6 +27,7 @@ The following message types can be implemented by the user:
 The following sparkplug featues can also be handled by the node:
 * [Primary Host](#primary-host-destination) — withhold NBIRTH until a nominated host is ONLINE
 * Store Forward — buffer data while that host is offline
+* [MQTT 3.1.1 or MQTT 5.0](#protocol-mqtt-311-or-50)
 * Compression
 * Metric Alias
 * [Templates / UDTs](#templates-udts)
@@ -150,6 +151,34 @@ so subscribers see it leave and re-birth around the outage rather than going qui
 > shown: open the broker configuration, clear it, and the node births on connect
 > again. A node in this state reads *waiting for primary host* and logs that it is
 > waiting.
+
+### Protocol (MQTT 3.1.1 or 5.0)
+
+The broker config node has a **Protocol** setting offering **MQTT V3.1.1** (the
+default, and what every existing configuration keeps) and **MQTT V5.0**. Sparkplug B
+permits only these two, so no other version is offered, and a flow carrying anything
+else is treated as 3.1.1.
+
+Selecting MQTT V5.0 additionally allows **User Properties** to be set — a JSON object
+sent with the CONNECT packet, for example:
+
+```json
+{ "plant": "Aarhus", "line": "7" }
+```
+
+They are an MQTT 5.0 feature only, and are ignored on a 3.1.1 connection.
+
+**Clean Session is not configurable, by design.** A Sparkplug Edge Node must connect
+with Clean Session set (on MQTT 5.0: Clean Start set and a Session Expiry Interval of
+0) so that no session outlives its connection and the broker cannot replay data from a
+dead session after the next NBIRTH. The node sets this itself and does not offer it as
+a setting.
+
+> **Changed in 3.1.0.** Before 3.1.0 the protocol version was stored in the
+> configuration but never passed to the MQTT client, so every connection was 3.1.1
+> whichever value a flow held. Clean Session was also honoured from the configuration;
+> it is now enforced, so **a flow hand-edited or imported with `cleansession` set false
+> is overridden** rather than allowed to produce a non-conformant Edge Node.
 
 ### Node status
 
@@ -360,6 +389,10 @@ The harness needs port **1883** free — the TCK's own utility clients hardcode
 `tcp://localhost:1883`, so it cannot be moved. See
 [test/tck/README.md](test/tck/README.md) for setup, how results are interpreted,
 and the known TCK issues the harness works around.
+
+[**CONFORMANCE.md**](test/tck/CONFORMANCE.md) maps every Sparkplug B 3.0 requirement
+to its status and to the test that demonstrates it — which apply to an Edge Node,
+which are exercised, and which are not reached and why.
 
 # Contributions
 Contributions are welcome. Please discuss new features before creating PR, and please try to add unit test for new features if possible.

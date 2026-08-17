@@ -1,4 +1,4 @@
-### Unreleased : session lifecycle conformance
+### 3.1.0 : session lifecycle conformance
 
 Everything under `Fixed:` below, and the alias and protocol-version behaviour changes,
 were catalogued by the `node-red-contrib-mqtt-sparkplug-plus-wmonitor` fork
