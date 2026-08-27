@@ -271,6 +271,33 @@ module.exports = function(RED) {
             };
         };
 
+        /**
+         * Flatten a Template instance's metrics array into a flat path -> value map,
+         * recursing into nested Template instances so that
+         *   { name: "alarms/0_alarm", value: { metrics: [ { name: "id", value: 7 } ] } }
+         * becomes
+         *   { "alarms/0_alarm/id": 7 }
+         *
+         * Without the recursion a nested instance would be cached under its own name
+         * mapped to the whole instance object, which buildTemplateInstance cannot
+         * slice back apart - every nested member would rebuild as null.
+         *
+         * @param {Array}  metrics Instance metrics to flatten
+         * @param {string} prefix  Path prefix for this level ("" at the top)
+         * @param {object} out     Accumulator, also the return value
+         */
+        this.flattenInstanceMetrics = function flattenInstanceMetrics(metrics, prefix, out) {
+            (metrics || []).forEach(function(im) {
+                var path = prefix ? prefix + "/" + im.name : im.name;
+                if (im.type === "Template" && im.value && Array.isArray(im.value.metrics)) {
+                    flattenInstanceMetrics(im.value.metrics, path, out);
+                } else {
+                    out[path] = im.value;
+                }
+            });
+            return out;
+        };
+
         if (typeof this.birthImmediately === 'undefined') {
             this.birthImmediately = false;
         }
@@ -390,9 +417,7 @@ module.exports = function(RED) {
                         // Gather existing sub-values from the cached partial instance (if any)
                         let existingFlatVals = {};
                         if (lv.value && lv.value.metrics) {
-                            lv.value.metrics.forEach(function(im) {
-                                existingFlatVals[im.name] = im.value;
-                            });
+                            node.flattenInstanceMetrics(lv.value.metrics, "", existingFlatVals);
                         }
                         let fullInstance = node.buildTemplateInstance(dataType, existingFlatVals, templates, ts, true);
                         if (fullInstance) {
@@ -687,15 +712,13 @@ module.exports = function(RED) {
 
                             // Merge incoming values on top of any previously cached sub-metric values
                             // so that trySendBirth can reconstruct a complete DBIRTH after a REBIRTH.
-                            let mergedFlatVals = Object.assign({}, incomingFlatVals);
+                            let cachedFlatVals = {};
                             const cached = this.latestMetrics[tMetricName];
                             if (cached && cached.value && Array.isArray(cached.value.metrics)) {
-                                cached.value.metrics.forEach(function(im) {
-                                    if (!mergedFlatVals.hasOwnProperty(im.name)) {
-                                        mergedFlatVals[im.name] = im.value;
-                                    }
-                                });
+                                node.flattenInstanceMetrics(cached.value.metrics, "", cachedFlatVals);
                             }
+                            // Incoming values win over the cached ones.
+                            let mergedFlatVals = Object.assign({}, cachedFlatVals, incomingFlatVals);
                             let mergedInstance = node.buildTemplateInstance(dataType, mergedFlatVals, templates, ts, false);
 
                             // Cache the merged state so REBIRTH produces a complete DBIRTH
@@ -1046,13 +1069,58 @@ module.exports = function(RED) {
 
         this.getTemplates = function() {
             var _result = this.templates.map(m => typeof m === "string" ? JSON.parse(m) : m);
+
+            var byName = {};
+            _result.forEach(function(tpl) {
+                if (tpl && tpl.name) {
+                    byName[tpl.name] = tpl;
+                }
+            });
+
+            // The Sparkplug encoder dereferences a metric's value, so members that a
+            // definition leaves empty must be given an encodable placeholder:
+            // a DataSet needs an empty table, and a Template-typed member needs an
+            // instance stub carrying the referenced definition's member list (so the
+            // NBIRTH still describes the nested structure).
+            var backfill = function backfill(metrics, stack) {
+                (metrics || []).forEach(function(met) {
+                    // The config UI stores a nested template member as
+                    // { type: "<TemplateName>" }, while Sparkplug expresses it as
+                    // { type: "Template", templateRef: "<TemplateName>" }. Normalise the
+                    // UI form, otherwise the encoder drops the member's datatype and
+                    // buildTemplateInstance treats it as a scalar.
+                    if (met.type && met.type !== "Template" && byName[met.type]) {
+                        met.templateRef = met.templateRef || met.type;
+                        met.type = "Template";
+                    }
+
+                    if (met.type === "DataSet" && met.value == null) {
+                        met.value = { numOfColumns: 0, columns: [], types: [], rows: [] };
+                    }
+                    else if (met.type === "Template" && met.value == null) {
+                        var refName = met.templateRef || met.name;
+                        var refDef = byName[refName];
+                        var nestedMetrics = [];
+                        // stack guards against a definition that references itself.
+                        if (refDef && refDef.value && Array.isArray(refDef.value.metrics) &&
+                            stack.indexOf(refName) === -1) {
+                            nestedMetrics = JSON.parse(JSON.stringify(refDef.value.metrics));
+                            backfill(nestedMetrics, stack.concat([refName]));
+                        }
+                        met.value = {
+                            templateRef : refName,
+                            isDefinition : false,
+                            version : (refDef && refDef.value && refDef.value.version) || "",
+                            metrics : nestedMetrics,
+                            parameters : (refDef && refDef.value && refDef.value.parameters) || []
+                        };
+                    }
+                });
+            };
+
             _result.forEach(function(tpl) {
                 if (tpl.value && Array.isArray(tpl.value.metrics)) {
-                    tpl.value.metrics.forEach(function(met) {
-                        if (met.type === "DataSet" && met.value == null) {
-                            met.value = { numOfColumns: 0, columns: [], types: [], rows: [] };
-                        }
-                    });
+                    backfill(tpl.value.metrics, [tpl.name]);
                 }
             });
             return _result;

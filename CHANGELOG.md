@@ -1,3 +1,55 @@
+### 3.1.1 : nested templates (UDT arrays)
+
+A Template definition that referenced another Template could not be used at all. Four
+separate faults conspired, and each hid the next: the NBIRTH failed to encode, so
+nothing birthed; once it encoded, nested values were dropped on every rebirth; and the
+editor and the runtime disagreed about how such a member is stored in the first place.
+Nested definitions - and therefore Ignition-style UDT arrays, an indexed set of
+instances of one item type - now work end to end.
+
+Fixed:
+- **A definition containing a Template-typed member could not be published.** The
+  member carries no value of its own, and the encoder dereferences `value.metrics`
+  unconditionally, so encoding the NBIRTH threw `TypeError: Cannot read properties of
+  undefined (reading 'metrics')`. The Edge Node reported "Unable to encode NBIRTH
+  message" and no NBIRTH was sent, so no device ever birthed either. `getTemplates()`
+  now backfills such a member with an instance stub carrying the referenced
+  definition's member list, so the NBIRTH still describes the nested structure. This
+  extends the existing backfill that already did the same for an empty DataSet member,
+  and recurses to any depth with a guard against a definition that references itself.
+- **Nested member values were lost on REBIRTH.** `trySendBirth` and the DDATA merge
+  both flattened a cached instance with `flat[metric.name] = metric.value`, one level
+  deep. For a nested member that maps the whole instance object under its own name,
+  which `buildTemplateInstance` cannot slice apart again, so every nested member was
+  rebuilt as null. Two consequences: a partial update wiped the cached siblings, and
+  the DBIRTH following a REBIRTH announced the right structure with empty values. A
+  new recursive `flattenInstanceMetrics` replaces both call sites.
+- **The editor and the runtime disagreed on how a nested member is stored.** The
+  configuration UI writes the referenced definition's name as the member's type
+  (`{name: "0_item", type: "MyItemTemplate"}`), while Sparkplug expresses it as
+  `{type: "Template", templateRef: "MyItemTemplate"}`. The runtime only recursed on the
+  latter, so a member created in the editor was treated as a scalar of an unknown type
+  - and rather than failing, the encoder silently emitted it with no datatype at all.
+  Anything built through the UI was therefore quietly inert. `getTemplates()` now
+  normalises the editor's form to the Sparkplug one; both are accepted, and existing
+  flows using either need no change.
+- **The editor displayed a nested member as `Int8` and destroyed it on save.** The type
+  dropdown offers primitive datatypes plus the names of other defined templates, and
+  has no `Template` entry, so a member stored in the Sparkplug form matched no option
+  and the `<select>` fell through to its first entry. Saving read that fallback back
+  out, rewriting the member to `Int8` and discarding its `templateRef` - so merely
+  opening a broker configuration and pressing Done flattened a working nested
+  definition. The dropdown now selects on `templateRef`, and keeps the current
+  selection available even when the referenced definition has not been rendered into
+  the list yet, which otherwise reintroduced the same fallback whenever a template was
+  defined after the one referencing it.
+
+The three runtime fixes have tests in `test/sparkplug_device_template_spec.js` that
+fail without them, covering a nested definition through DDATA, a partial update
+followed by a REBIRTH, and a member written in the editor's form. The editor changes
+themselves are not covered - the suite has no browser harness - and were verified by
+hand against a nested definition.
+
 ### 3.1.0 : session lifecycle conformance
 
 Everything under `Fixed:` below, and the alias and protocol-version behaviour changes,
