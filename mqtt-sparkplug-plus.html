@@ -261,7 +261,12 @@
                 var mName = $(this).find(".sp-tpl-metric-name").val().trim();
                 var mType = $(this).find(".sp-tpl-metric-type").val();
                 if (mName) {
-                    metrics.push({ name: mName, type: mType });
+                    if (mType && primitiveDataTypes.indexOf(mType) === -1) {
+                        // Selected another template: persist the Sparkplug-native shape.
+                        metrics.push({ name: mName, type: "Template", templateRef: mType });
+                    } else {
+                        metrics.push({ name: mName, type: mType });
+                    }
                 }
             });
 
@@ -303,9 +308,17 @@
         primitiveDataTypes.forEach(function(d) {
             $('<option/>').val(d).text(d).prop('selected', d === selectedValue).appendTo(g0);
         });
-        if (extraTemplateNames && extraTemplateNames.length) {
+        var names = (extraTemplateNames || []).slice();
+        // Templates are rendered in order, so a referenced definition may not be in
+        // the outer list yet. Keep the current selection available regardless,
+        // otherwise the <select> silently falls back to the first datatype (Int8).
+        if (selectedValue && primitiveDataTypes.indexOf(selectedValue) === -1 &&
+            names.indexOf(selectedValue) === -1) {
+            names.push(selectedValue);
+        }
+        if (names.length) {
             var g1 = $('<optgroup/>', { label: "Templates" }).appendTo(sel);
-            extraTemplateNames.forEach(function(n) {
+            names.forEach(function(n) {
                 $('<option/>').val(n).text(n).prop('selected', n === selectedValue).appendTo(g1);
             });
         }
@@ -463,7 +476,13 @@
                             var otherTemplates = getCurrentTemplateNames().filter(function(n) {
                                 return n !== container.find(".sp-tpl-name").val();
                             });
-                            buildTypeSelect("sp-tpl-metric-type sp-col-type", mopt.type || "Int32", otherTemplates).appendTo(mRow);
+                            // A nested template member is stored as
+                            // { type: "Template", templateRef: "<def>" }; the dropdown
+                            // lists definition names, so select on the ref.
+                            var selectedType = (mopt.type === "Template" && mopt.templateRef)
+                                ? mopt.templateRef
+                                : (mopt.type || "Int32");
+                            buildTypeSelect("sp-tpl-metric-type sp-col-type", selectedType, otherTemplates).appendTo(mRow);
                         }
                     });
 

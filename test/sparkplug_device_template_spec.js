@@ -556,5 +556,238 @@ describe('mqtt sparkplug device template support', function () {
         });
     });
 
+
+    // -----------------------------------------------------------------------
+    // 8. Nested Template instances (a Template-typed member inside a Template)
+    //    must keep their sub-metric values across a partial update and a
+    //    REBIRTH. The cached-instance flatten used by trySendBirth and by the
+    //    DDATA merge must recurse into nested instances, otherwise every
+    //    nested member is rebuilt as null.
+    // -----------------------------------------------------------------------
+    it('Should preserve nested template sub-metric values in DBIRTH after partial updates and REBIRTH', function (done) {
+        this.timeout(8000);
+
+        var flow = JSON.parse(JSON.stringify(templateFlow));
+        flow[0].birthImmediately = false;
+
+        // Item template instantiated once per array slot.
+        var itemTemplate = {
+            "name": "MyItemTemplate",
+            "type": "Template",
+            "value": {
+                "version": "1.0.0",
+                "isDefinition": true,
+                "metrics": [
+                    { "name": "id",      "type": "Int32"  },
+                    { "name": "message", "type": "String" }
+                ],
+                "parameters": []
+            }
+        };
+        flow[1].templates.push(JSON.stringify(itemTemplate));
+
+        // Give MyTemplate an "items" array: a scalar size plus one nested slot.
+        var myTemplate = JSON.parse(flow[1].templates[0]);
+        myTemplate.value.metrics.push({ "name": "items/item_size", "type": "Int32" });
+        myTemplate.value.metrics.push({
+            "name": "items/0_item",
+            "type": "Template",
+            "templateRef": "MyItemTemplate"
+        });
+        flow[1].templates[0] = JSON.stringify(myTemplate);
+
+        client = mqtt.connect(testBroker);
+        var dbirth1Received = false;
+
+        client.on('connect', function () {
+            client.subscribe("spBv1.0/My Devices/#", function (err) {
+                if (err) return done(err);
+                helper.load(sparkplugNode, flow, {b1: {user: brokerUsername, password: brokerPassword}}, function () {
+                    var n1 = helper.getNode("n1");
+
+                    // Populate every member, including both nested ones -> DBIRTH
+                    n1.receive({
+                        payload: {
+                            metrics: [
+                                { name: "b",                     value: 1    },
+                                { name: "a/FirstTag",            value: 10   },
+                                { name: "a/SecondTag",           value: 20   },
+                                { name: "a/items/item_size",     value: 1    },
+                                { name: "a/items/0_item/id",     value: 7    },
+                                { name: "a/items/0_item/message", value: "hi" }
+                            ]
+                        }
+                    });
+                });
+            });
+        });
+
+        // Assertions run inside the MQTT handler, where a throw would otherwise be
+        // swallowed and surface only as a mocha timeout. Route it to done() instead.
+        client.on('message', function (topic, message) {
+          try {
+            if (topic !== "spBv1.0/My Devices/DBIRTH/Node-Red/TheDevice") {
+                return;
+            }
+
+            if (!dbirth1Received) {
+                dbirth1Received = true;
+
+                // Sanity: the first DBIRTH must already carry the nested values
+                var payload = decode(message);
+                var aMetric = findMetric(payload, "a");
+                should(aMetric).be.ok();
+                var item = aMetric.value.metrics.find(m => m.name === "items/0_item");
+                should(item).be.ok();
+                item.value.metrics.find(m => m.name === "id").value.should.eql(7);
+                item.value.metrics.find(m => m.name === "message").value.should.eql("hi");
+
+                var n1 = helper.getNode("n1");
+
+                // Partial update: only the nested "id" changes. "message" is untouched
+                // and must survive in the cached instance.
+                n1.receive({
+                    payload: {
+                        metrics: [
+                            { name: "a/items/0_item/id", value: 8 }
+                        ]
+                    }
+                });
+
+                setImmediate(function () {
+                    n1.receive({
+                        command: {
+                            device: { rebirth: true }
+                        }
+                    });
+                });
+                return;
+            }
+
+            // Second DBIRTH (after REBIRTH) — this is what we are testing
+            var payload2 = decode(message);
+            var a2 = findMetric(payload2, "a");
+            should(a2).be.ok();
+
+            // Direct (non-nested) members still work today
+            a2.value.metrics.find(m => m.name === "FirstTag").value.should.eql(10);
+            a2.value.metrics.find(m => m.name === "items/item_size").value.should.eql(1);
+
+            var item2 = a2.value.metrics.find(m => m.name === "items/0_item");
+            should(item2).be.ok();
+            should(item2.value).be.ok();
+            should(item2.value.metrics).be.an.Array();
+
+            var idM  = item2.value.metrics.find(m => m.name === "id");
+            var msgM = item2.value.metrics.find(m => m.name === "message");
+            should(idM).be.ok();
+            should(msgM).be.ok();
+
+            // "id" was updated to 8 in the partial DDATA
+            should(idM.value).not.be.null();
+            idM.value.should.eql(8);
+            // "message" was NOT in the partial update — must still carry "hi"
+            should(msgM.value).not.be.null();
+            msgM.value.should.eql("hi");
+
+            done();
+          } catch (e) {
+            done(e);
+          }
+        });
+    });
+
+
+
+    // -----------------------------------------------------------------------
+    // 9. The config UI stores a nested template member as { type: "<TemplateName>" }
+    //    rather than { type: "Template", templateRef: "..." }. getTemplates() must
+    //    normalise that shape, otherwise the encoder drops the member's datatype
+    //    and buildTemplateInstance treats the member as a scalar.
+    // -----------------------------------------------------------------------
+    it('Should accept a nested template member typed with the definition name (config UI shape)', function (done) {
+        this.timeout(8000);
+
+        var flow = JSON.parse(JSON.stringify(templateFlow));
+        flow[0].birthImmediately = false;
+
+        flow[1].templates.push(JSON.stringify({
+            "name": "MyItemTemplate",
+            "type": "Template",
+            "value": {
+                "version": "1.0.0",
+                "isDefinition": true,
+                "metrics": [
+                    { "name": "id",      "type": "Int32"  },
+                    { "name": "message", "type": "String" }
+                ],
+                "parameters": []
+            }
+        }));
+
+        var myTemplate = JSON.parse(flow[1].templates[0]);
+        // The UI shape: the definition name IS the type, with no templateRef.
+        myTemplate.value.metrics.push({ "name": "items/0_item", "type": "MyItemTemplate" });
+        flow[1].templates[0] = JSON.stringify(myTemplate);
+
+        client = mqtt.connect(testBroker);
+        var nbirthChecked = false;
+
+        client.on('connect', function () {
+            client.subscribe("spBv1.0/My Devices/#", function (err) {
+                if (err) return done(err);
+                helper.load(sparkplugNode, flow, {b1: {user: brokerUsername, password: brokerPassword}}, function () {
+                    var n1 = helper.getNode("n1");
+                    n1.receive({
+                        payload: {
+                            metrics: [
+                                { name: "b",                      value: 1    },
+                                { name: "a/FirstTag",             value: 10   },
+                                { name: "a/SecondTag",            value: 20   },
+                                { name: "a/items/0_item/id",      value: 7    },
+                                { name: "a/items/0_item/message", value: "hi" }
+                            ]
+                        }
+                    });
+                });
+            });
+        });
+
+        client.on('message', function (topic, message) {
+          try {
+            // The NBIRTH must describe the member as a Template, not drop its datatype
+            if (topic === "spBv1.0/My Devices/NBIRTH/Node-Red" && !nbirthChecked) {
+                nbirthChecked = true;
+                var def = findMetric(decode(message), "MyTemplate");
+                should(def).be.ok();
+                var member = def.value.metrics.find(m => m.name === "items/0_item");
+                should(member).be.ok();
+                member.type.should.eql("Template");
+                member.value.templateRef.should.eql("MyItemTemplate");
+                return;
+            }
+
+            if (topic !== "spBv1.0/My Devices/DBIRTH/Node-Red/TheDevice") {
+                return;
+            }
+
+            // ...and the DBIRTH must carry a real nested instance with the values
+            var aMetric = findMetric(decode(message), "a");
+            should(aMetric).be.ok();
+            var item = aMetric.value.metrics.find(m => m.name === "items/0_item");
+            should(item).be.ok();
+            item.type.should.eql("Template");
+            item.value.templateRef.should.eql("MyItemTemplate");
+            item.value.metrics.find(m => m.name === "id").value.should.eql(7);
+            item.value.metrics.find(m => m.name === "message").value.should.eql("hi");
+
+            done();
+          } catch (e) {
+            done(e);
+          }
+        });
+    });
+
+
 });
 
